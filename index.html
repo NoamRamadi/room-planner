@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Room planner</title>
+    <meta name="description" content="Plan a room in 3D: set its size, choose floor and wall colors, and arrange furniture." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="panel" id="panel" aria-label="Room and furniture"></aside>
+      <main class="stage" id="stage" aria-label="3D view of the room"></main>
+      <div class="viewbar" id="viewbar"></div>
+      <aside class="inspector" id="inspector" aria-label="Selected furniture"></aside>
+      <p class="hint">Drag furniture to move it. Drag the room to look around. Scroll or pinch to zoom.</p>
+    </div>
+    <p class="toast" id="toast" role="status" aria-live="polite"></p>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
