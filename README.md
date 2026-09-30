@@ -31,13 +31,21 @@ Open the address it prints (usually http://localhost:5173).
 
 To try it on your phone or tablet on the same Wi-Fi, start it with `npm run dev -- --host` and open the network address it prints.
 
-## Put it online
+## Live site
+
+**https://noamramadi.github.io/room-planner/**
+
+The site is published with GitHub Pages. Every push to the `main` branch rebuilds it and publishes the new version within a couple of minutes (see the **Actions** tab on GitHub; the workflow is in `.github/workflows/deploy.yml`).
+
+To publish a change:
 
 ```bash
-npm run build
+git add -A
+git commit -m "Describe the change"
+git push
 ```
 
-This creates a `dist/` folder of plain static files. Upload that folder to any static host (GitHub Pages, GitLab Pages, Netlify, Vercel, or any web server) and open it from anywhere.
+`npm run build` also creates a `dist/` folder of plain static files that works on any other static host.
 
 ## Building walls
 
