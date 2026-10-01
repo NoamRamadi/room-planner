@@ -1,7 +1,8 @@
 // Side panel, inspector (selected furniture, wall, group or several walls), camera bar and keyboard shortcuts.
 import { CATALOG, FLOOR_FINISHES, FLOOR_PATTERNS, WALL_PAINTS, dimsOf, isFlat, isOnWall, limitsOf, presetsOf, styleOf, tvScreen } from './catalog.js';
+import { OPENINGS, openingLimitsOf, openingStyleOf } from './openings.js';
 import * as store from './state.js';
-import { LIMITS, angleOf, lengthOf, maxCurve } from './walls.js';
+import { LIMITS, angleOf, lengthOf, maxCurve, openingSpan, takesOpenings } from './walls.js';
 
 const ICONS = {
   sofa: '<path d="M9 15V9a2 2 0 0 1 2-2h26a2 2 0 0 1 2 2v6"/><path d="M5 16a2.5 2.5 0 0 1 5 0v4h28v-4a2.5 2.5 0 0 1 5 0v8H5z"/><path d="M8 24v3M40 24v3"/>',
@@ -12,6 +13,10 @@ const ICONS = {
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  door: '<path d="M15 30V3h18v27"/><path d="M10 30h28"/><path d="M29 16v2"/>',
+  window: '<rect x="8" y="4" width="32" height="22"/><path d="M24 4v22"/><path d="M5 28h38"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>',
 };
 
 // Line drawings of each furniture design, keyed "type:design".
@@ -42,6 +47,17 @@ const DESIGN_ICONS = {
   'rug:shaggy':
     '<rect x="8" y="4" width="32" height="24" rx="5"/><path d="M13 10l1 2M19 9l-1 2M25 10l1 2M31 9l-1 2M16 16l1 2M22 15l-1 2M28 16l1 2M34 15l-1 2M13 21l1 2M19 22l-1 2M25 21l1 2M31 22l-1 2"/>',
 };
+
+Object.assign(DESIGN_ICONS, {
+  'door:single': ICONS.door,
+  'door:double': '<path d="M9 30V3h30v27M24 3v27"/><path d="M5 30h38"/><path d="M21 16v2M27 16v2"/>',
+  'door:sliding': '<path d="M7 30V3h34v27"/><path d="M10 6h15v24M23 6h15v24"/><path d="M3 30h42"/>',
+  'door:doorway': '<path d="M14 30V3h20v27"/><path d="M17 30V6h14v24"/><path d="M10 30h28"/>',
+  'window:standard': ICONS.window,
+  'window:picture': '<rect x="6" y="5" width="36" height="21"/><path d="M4 28h40"/>',
+  'window:grid': '<rect x="9" y="4" width="30" height="22"/><path d="M19 4v22M29 4v22M9 11.3h30M9 18.6h30"/><path d="M7 28h34"/>',
+  'window:tall': '<rect x="14" y="2" width="20" height="28"/><path d="M24 2v28M14 23h20"/>',
+});
 
 const icon = (name, viewBox = '0 0 24 24') =>
   `<svg viewBox="${viewBox}" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
@@ -164,7 +180,7 @@ function panelHead(title, subtitle, onClose) {
     'div',
     { class: 'inspector__head' },
     h('div', { class: 'inspector__heading' }, title, subtitle && h('p', { class: 'inspector__sub' }, subtitle)),
-    h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', title: 'Close (Esc)', html: icon('close'), onclick: onClose }),
+    h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', title: 'Close (Esc)', 'data-always': '', html: icon('close'), onclick: onClose }),
   );
 }
 
@@ -191,6 +207,77 @@ function say(message) {
   toast.classList.add('is-on');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('is-on'), 3200);
+}
+
+// A button for each kind of thing (from a catalog), each opening a menu of that kind's designs.
+// Picking a design calls onPick(kind, design).
+function adder({ id, kinds, onPick }) {
+  const buttons = new Map();
+  const menu = h('div', { class: 'design-menu', id, role: 'group', hidden: true });
+  let open = null;
+  function show(kind) {
+    open = kind;
+    for (const [k, b] of buttons) b.setAttribute('aria-expanded', String(k === kind));
+    menu.hidden = !kind;
+    if (!kind) return;
+    const def = kinds[kind];
+    menu.setAttribute('aria-label', `${def.label} designs`);
+    menu.replaceChildren(
+      h(
+        'div',
+        { class: 'design-menu__head' },
+        h('span', {}, `Choose a ${noun(def.label)}`),
+        h('button', { type: 'button', class: 'icon-btn icon-btn--small', 'aria-label': 'Close', html: icon('close'), onclick: () => show(null) }),
+      ),
+      h(
+        'div',
+        { class: 'designs' },
+        def.styles.map((s) =>
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'design-btn',
+              onclick: () => {
+                onPick(kind, s.id);
+                show(null);
+              },
+            },
+            h('span', { html: designIcon(kind, s.id) }),
+            s.label,
+          ),
+        ),
+      ),
+    );
+    menu.querySelector('.design-btn').focus();
+  }
+  menu.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    const button = buttons.get(open);
+    show(null);
+    button?.focus();
+  });
+  for (const [kind, def] of Object.entries(kinds)) {
+    buttons.set(
+      kind,
+      h(
+        'button',
+        { type: 'button', class: 'add-btn', 'aria-expanded': 'false', 'aria-controls': id, onclick: () => show(open === kind ? null : kind) },
+        h('span', { html: icon(kind, '0 0 48 32') }),
+        def.label,
+      ),
+    );
+  }
+  return { buttons: [...buttons.values()], menu, close: () => show(null) };
+}
+
+// While locked, every control that would change the design is disabled; controls marked
+// data-always (selecting things, saving, closing) keep working.
+function applyLock(root, locked) {
+  for (const el of root.querySelectorAll('button, input, select, textarea')) {
+    if (!el.closest('[data-always]')) el.disabled = locked;
+  }
 }
 
 // Shift, Cmd or Ctrl, or the "Select several" toggle, make a click add to the selection.
@@ -220,10 +307,14 @@ export function initUI(view) {
       : 'Select a wall first to continue from its free end. Four walls in a row make a room.';
   });
 
-  const several = h('button', { type: 'button', class: 'btn btn--plain btn--small', onclick: () => store.setSeveral(!store.getUI().several) }, 'Select several');
+  const several = h(
+    'button',
+    { type: 'button', class: 'btn btn--plain btn--small', 'data-always': '', onclick: () => store.setSeveral(!store.getUI().several) },
+    'Select several',
+  );
   syncers.push(() => several.setAttribute('aria-pressed', String(store.getUI().several)));
 
-  const wallList = h('ul', { class: 'wall-list' });
+  const wallList = h('ul', { class: 'wall-list', 'data-always': '' });
   const wallCount = h('span', { class: 'section__meta' });
   let wallListKey = '';
   function renderWallList(state, ui) {
@@ -307,70 +398,16 @@ export function initUI(view) {
   // ---- Furniture ----
 
   // Each type opens a menu of its designs; picking one adds that piece.
-  const typeButtons = new Map();
-  const designMenu = h('div', { class: 'design-menu', id: 'design-menu', role: 'group', hidden: true });
-  let openType = null;
-  function showDesigns(type) {
-    openType = type;
-    for (const [t, b] of typeButtons) b.setAttribute('aria-expanded', String(t === type));
-    designMenu.hidden = !type;
-    if (!type) return;
-    const def = CATALOG[type];
-    designMenu.setAttribute('aria-label', `${def.label} designs`);
-    designMenu.replaceChildren(
-      h(
-        'div',
-        { class: 'design-menu__head' },
-        h('span', {}, `Choose a ${noun(def.label)}`),
-        h('button', { type: 'button', class: 'icon-btn icon-btn--small', 'aria-label': 'Close', html: icon('close'), onclick: () => showDesigns(null) }),
-      ),
-      h(
-        'div',
-        { class: 'designs' },
-        def.styles.map((s) =>
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'design-btn',
-              onclick: () => {
-                store.addItem(type, s.id);
-                showDesigns(null);
-              },
-            },
-            h('span', { html: designIcon(type, s.id) }),
-            s.label,
-          ),
-        ),
-      ),
-    );
-    designMenu.querySelector('.design-btn').focus();
-  }
-  designMenu.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    e.stopPropagation();
-    const button = typeButtons.get(openType);
-    showDesigns(null);
-    button?.focus();
-  });
-  const addButtons = Object.entries(CATALOG).map(([type, def]) => {
-    const button = h(
-      'button',
-      {
-        type: 'button',
-        class: 'add-btn',
-        'aria-expanded': 'false',
-        'aria-controls': 'design-menu',
-        onclick: () => showDesigns(openType === type ? null : type),
-      },
-      h('span', { html: icon(type, '0 0 48 32') }),
-      def.label,
-    );
-    typeButtons.set(type, button);
-    return button;
+  const furniture = adder({ id: 'design-menu', kinds: CATALOG, onPick: (type, style) => store.addItem(type, style) });
+  const openings = adder({
+    id: 'opening-menu',
+    kinds: OPENINGS,
+    onPick: (kind, style) => {
+      if (store.addOpening(kind, style) === false) say(`No wall has room for a ${noun(OPENINGS[kind].label)}. Make a wall longer, or move a door or window.`);
+    },
   });
 
-  const inventory = h('ol', { class: 'inventory' });
+  const inventory = h('ol', { class: 'inventory', 'data-always': '' });
   const count = h('span', { class: 'section__meta' });
   let inventoryKey = '';
   function renderInventory(state, ui) {
@@ -442,6 +479,10 @@ export function initUI(view) {
         roomDepth.el,
         h('button', { type: 'button', class: 'btn', onclick: () => store.addRoom(next.width, next.depth) }, 'Add room'),
       ),
+      h('div', { class: 'section__head section__head--list' }, h('h3', { class: 'list-title' }, 'Doors and windows')),
+      h('div', { class: 'add-grid' }, openings.buttons),
+      openings.menu,
+      h('p', { class: 'help' }, 'They go in the selected wall, or in a wall with room. Drag one along its wall, or onto another wall.'),
       h('div', { class: 'section__head section__head--list' }, h('h3', { class: 'list-title' }, 'Walls and groups'), several),
       wallList,
     ),
@@ -458,8 +499,8 @@ export function initUI(view) {
       'section',
       { class: 'section', 'aria-labelledby': 'add-heading' },
       h('h2', { id: 'add-heading' }, 'Add furniture'),
-      h('div', { class: 'add-grid' }, addButtons),
-      designMenu,
+      h('div', { class: 'add-grid' }, furniture.buttons),
+      furniture.menu,
     ),
     h(
       'section',
@@ -473,7 +514,7 @@ export function initUI(view) {
       h(
         'div',
         { class: 'file-actions' },
-        h('button', { type: 'button', class: 'btn', onclick: saveDesign }, 'Save design file'),
+        h('button', { type: 'button', class: 'btn', 'data-always': '', onclick: saveDesign }, 'Save design file'),
         h('button', { type: 'button', class: 'btn', onclick: () => fileInput.click() }, 'Open design file'),
         h('button', { type: 'button', class: 'btn btn--plain', onclick: startOver }, 'Start over'),
       ),
@@ -496,6 +537,23 @@ export function initUI(view) {
   );
   syncers.push(() => seeThrough.setAttribute('aria-pressed', String(store.getUI().cutaway)));
 
+  // Locked: look around and select things, but nothing can be moved, added or changed.
+  const lock = h('button', {
+    type: 'button',
+    class: 'lock',
+    title: 'Lock the design so nothing moves or changes by accident',
+    onclick: () => {
+      furniture.close();
+      openings.close();
+      store.setLocked(!store.getUI().locked);
+    },
+  });
+  syncers.push(() => {
+    const { locked } = store.getUI();
+    lock.setAttribute('aria-pressed', String(locked));
+    lock.innerHTML = `${icon(locked ? 'lock' : 'unlock')}<span>${locked ? 'Locked' : 'Lock'}</span>`;
+  });
+
   document.getElementById('viewbar').append(
     h(
       'div',
@@ -505,6 +563,7 @@ export function initUI(view) {
       h('button', { type: 'button', onclick: () => view.setView('eye') }, 'Eye level'),
     ),
     seeThrough,
+    lock,
     h(
       'button',
       {
@@ -518,7 +577,13 @@ export function initUI(view) {
       'Save photo',
     ),
   );
-  document.querySelector('.hint').textContent = 'Drag walls and furniture to move them. Drag empty space to look around. Scroll or pinch to zoom.';
+  const hint = document.querySelector('.hint');
+  syncers.push(() => {
+    hint.textContent = store.getUI().locked
+      ? 'Locked: look around and click things to see their measurements. Nothing can be moved or changed.'
+      : 'Drag walls, doors, windows and furniture to move them. Drag empty space to look around. Scroll or pinch to zoom.';
+  });
+  const lockNote = h('p', { class: 'lock-note' }, 'Locked. Unlock to make changes.');
 
   let inspectorKey; // undefined, so the first update always renders
   let inspectorSyncers = [];
@@ -533,6 +598,10 @@ export function initUI(view) {
     }
     for (const sync of inspectorSyncers) sync();
     inspector.classList.toggle('is-empty', !ui.sel);
+    if (ui.locked && ui.sel) inspector.prepend(lockNote);
+    else lockNote.remove();
+    applyLock(panel, ui.locked);
+    applyLock(inspector, ui.locked);
   });
 
   bindShortcuts();
@@ -551,6 +620,10 @@ function inspectorKeyFor(state, ui) {
     return w ? `wall:${w.id}:${w.group}` : 'none';
   }
   if (sel.type === 'group') return `group:${sel.id}:${store.selectedWallIds(sel).join()}`;
+  if (sel.type === 'opening') {
+    const o = store.openingById(sel.id);
+    return o ? `opening:${o.id}:${o.style}:${o.wall}` : 'none';
+  }
   return `walls:${sel.ids.join()}`;
 }
 
@@ -564,6 +637,7 @@ function buildInspector(root, state, ui) {
   if (sel?.type === 'wall' && store.wallById(sel.id)) return buildWallInspector(root, sel.id);
   if (sel?.type === 'group' && state.groups.some((g) => g.id === sel.id)) return buildGroupInspector(root, sel.id);
   if (sel?.type === 'walls') return buildWallsInspector(root, sel.ids);
+  if (sel?.type === 'opening' && store.openingById(sel.id)) return buildOpeningInspector(root, sel.id);
   return buildHelp(root);
 }
 
@@ -581,6 +655,8 @@ function buildHelp(root) {
         h('li', {}, 'Select a wall and drag the round handles at its ends to stretch or turn it. Walls joined there move with it.'),
         h('li', {}, 'Shift-click several walls and group them to move them as one. Click a grouped wall again to edit just that wall.'),
         h('li', {}, 'The floor fills in wherever walls enclose a space.'),
+        h('li', {}, 'Add doors and windows from the Walls panel, then drag them along a wall or onto another one.'),
+        h('li', {}, 'Lock, above the view, keeps everything in place while you look around and check measurements.'),
       ),
       h(
         'dl',
@@ -628,7 +704,7 @@ function buildWallInspector(root, id) {
         h(
           'div',
           { class: 'presets' },
-          h('button', { type: 'button', class: 'preset', onclick: () => store.selectGroup(group.id) }, `Select all of ${group.name}`),
+          h('button', { type: 'button', class: 'preset', 'data-always': '', onclick: () => store.selectGroup(group.id) }, `Select all of ${group.name}`),
           h('button', { type: 'button', class: 'preset', onclick: () => store.leaveGroup(id) }, 'Take out of the group'),
         ),
       ),
@@ -647,12 +723,130 @@ function buildWallInspector(root, id) {
       ),
     ),
     h('div', { class: 'inspector__group' }, color.el),
+    h('div', { class: 'inspector__group' }, h('h3', {}, 'Doors and windows'), wallOpenings(w0)),
     h('div', { class: 'inspector__group' }, h('h3', {}, 'Turn'), turnButtons((deg) => store.rotateWalls([id], deg))),
     h(
       'div',
       { class: 'inspector__actions' },
       h('button', { type: 'button', class: 'btn', onclick: () => store.duplicateWalls([id]) }, 'Duplicate'),
       h('button', { type: 'button', class: 'btn btn--danger', onclick: () => store.removeWalls([id]) }, 'Remove'),
+    ),
+  );
+  return syncers;
+}
+
+// The doors and windows in a wall, as buttons that select them.
+function wallOpenings(w) {
+  if (!takesOpenings(w)) return h('p', { class: 'help help--first' }, 'Curved walls and beams can’t have doors or windows.');
+  const list = store.getState().openings.filter((o) => o.wall === w.id);
+  return [
+    list.length
+      ? h(
+          'div',
+          { class: 'presets' },
+          list.map((o) => h('button', { type: 'button', class: 'preset', 'data-always': '', onclick: () => store.selectOpening(o.id) }, `${o.name}, ${o.width} cm`)),
+        )
+      : null,
+    h('p', { class: 'help help--first' }, list.length ? 'Pick one to change it.' : 'None yet. While this wall is selected, Door or Window in the Walls panel adds one here.'),
+  ];
+}
+
+function buildOpeningInspector(root, id) {
+  const syncers = [];
+  const current = () => store.openingById(id);
+  const o0 = current();
+  const def = OPENINGS[o0.kind];
+  const style = openingStyleOf(o0);
+  const wall = () => store.wallById(current().wall);
+  const update = (patch) => store.updateOpening(id, patch);
+  const limit = (key, i) => () => openingLimitsOf(current())[key][i];
+
+  const designs = h(
+    'div',
+    { class: 'designs', role: 'group', 'aria-label': 'Design' },
+    def.styles.map((s) =>
+      h(
+        'button',
+        { type: 'button', class: 'design-btn', 'aria-pressed': String(s.id === style.id), onclick: () => update({ style: s.id }) },
+        h('span', { html: designIcon(o0.kind, s.id) }),
+        s.label,
+      ),
+    ),
+  );
+
+  const size = [
+    measureField({ label: 'Width', min: limit('width', 0), max: limit('width', 1), get: () => current().width, set: (v) => update({ width: v }) }),
+    measureField({ label: 'Height', min: limit('height', 0), max: limit('height', 1), get: () => current().height, set: (v) => update({ height: v }) }),
+  ];
+  if (o0.kind === 'window') {
+    size.push(measureField({ label: 'Above floor', min: limit('sill', 0), max: limit('sill', 1), get: () => current().sill, set: (v) => update({ sill: v }) }));
+  }
+  // Position: from the wall's start corner to the near edge of the opening.
+  const fromCorner = measureField({
+    label: 'From corner',
+    min: 0,
+    max: () => Math.round(lengthOf(wall()) - openingSpan(current(), wall()).width),
+    live: false,
+    get: () => openingSpan(current(), wall()).a,
+    set: (v) => store.slideOpening(id, v + openingSpan(current(), wall()).width / 2),
+  });
+  syncers.push(...size.map((f) => f.sync), fromCorner.sync);
+
+  // Doors with leaves: which side the hinges are on, and which way the door opens.
+  const toggles = [];
+  if (o0.kind === 'door' && (style.id === 'single' || style.id === 'double')) {
+    const options = style.id === 'single' ? [['flip', 'Hinges on the right'], ['swap', 'Opens to the other side']] : [['swap', 'Opens to the other side']];
+    for (const [key, label] of options) {
+      const box = h('input', { type: 'checkbox' });
+      box.addEventListener('change', () => update({ [key]: box.checked }));
+      syncers.push(() => {
+        box.checked = current()[key];
+      });
+      toggles.push(h('label', { class: 'check' }, box, label));
+    }
+  }
+
+  const colors = def.colors.map((slot) => {
+    const picker = swatches({ label: slot.label, palette: slot.palette, get: () => current()[slot.key], set: (v) => update({ [slot.key]: v }) });
+    syncers.push(picker.sync);
+    return picker.el;
+  });
+
+  const host = wall();
+  root.append(
+    panelHead(h('h2', { class: 'inspector__title' }, o0.name), null, () => store.clearSelection()),
+    h(
+      'div',
+      { class: 'inspector__group' },
+      h('div', { class: 'presets' }, h('button', { type: 'button', class: 'preset', 'data-always': '', onclick: () => store.selectWall(host.id) }, `In ${host.name}`)),
+      takesOpenings(host) ? null : h('p', { class: 'help help--first' }, `Hidden while ${host.name} is curved or has a gap below. Straighten it to show this ${noun(def.label)}.`),
+    ),
+    h('div', { class: 'inspector__group' }, h('h3', {}, 'Design'), designs),
+    h(
+      'div',
+      { class: 'inspector__group' },
+      h('h3', {}, 'Size and position'),
+      h('div', { class: 'measures' }, size.map((f) => f.el), o0.kind === 'door' ? fromCorner.el : null),
+      o0.kind === 'window' ? h('div', { class: 'measures measures--gap' }, fromCorner.el) : null,
+      toggles,
+      h('p', { class: 'help' }, 'Drag it along the wall, or onto another wall. The view shows how far it is from each end of the wall.'),
+    ),
+    h('div', { class: 'inspector__group' }, colors),
+    h(
+      'div',
+      { class: 'inspector__actions' },
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn',
+          onclick: () => {
+            if (store.duplicateOpening(id) === false) say('No wall has room for a copy.');
+          },
+        },
+        'Duplicate',
+      ),
+      h('button', { type: 'button', class: 'btn btn--danger', onclick: () => store.removeOpening(id) }, 'Remove'),
     ),
   );
   return syncers;
@@ -678,7 +872,7 @@ function buildGroupInspector(root, groupId) {
       h(
         'div',
         { class: 'presets' },
-        members.map((w) => h('button', { type: 'button', class: 'preset', onclick: () => store.selectWall(w.id) }, `${w.name}, ${wallText(w)}`)),
+        members.map((w) => h('button', { type: 'button', class: 'preset', 'data-always': '', onclick: () => store.selectWall(w.id) }, `${w.name}, ${wallText(w)}`)),
       ),
       h('p', { class: 'help' }, 'Pick a wall to change just that one, or click it again in the view.'),
     ),
@@ -889,6 +1083,17 @@ function bindShortcuts() {
       else if ((e.key === 'r' || e.key === 'R') && !mod) store.updateItem(item.id, { rotation: item.rotation + (e.shiftKey ? 90 : -90) });
       else if (arrows[e.key]) store.moveItem(item.id, item.x + arrows[e.key][0], item.z + arrows[e.key][1]);
       else if ((e.key === 'd' || e.key === 'D') && mod) store.duplicateItem(item.id);
+      else return;
+      e.preventDefault();
+      return;
+    }
+
+    if (sel?.type === 'opening') {
+      const o = store.openingById(sel.id);
+      const along = { ArrowLeft: -step, ArrowDown: -step, ArrowRight: step, ArrowUp: step };
+      if (e.key === 'Delete' || e.key === 'Backspace') store.removeOpening(o.id);
+      else if (along[e.key]) store.slideOpening(o.id, o.offset + along[e.key]);
+      else if ((e.key === 'd' || e.key === 'D') && mod) store.duplicateOpening(o.id);
       else return;
       e.preventDefault();
       return;

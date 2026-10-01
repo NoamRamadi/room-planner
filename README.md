@@ -5,6 +5,7 @@ Plan a room of your apartment in 3D, right in the browser.
 - Build the layout wall by wall: set each wall's length, then connect walls by dragging their ends together
 - Group walls to move, turn and copy them as one unit (a room, a kitchen divider)
 - Give any wall its own thickness, height, curve, color, or a gap below it (a beam over an opening)
+- Put doors (single, double, sliding glass, open doorway) and windows (two panes, picture, grid, floor to ceiling) in the walls
 - The floor fills in wherever walls enclose a space; choose its pattern (planks, tiles, plain) and color
 - Add furniture in several designs, set each piece's size and colors, then drag it into place:
   - Sofa: classic, corner (with a chaise on either side), armless, Chesterfield
@@ -15,6 +16,7 @@ Plan a room of your apartment in 3D, right in the browser.
 - See each piece's size and its distance to every wall while it's selected
 - Switch between 3D view, top view (floor plan) and eye level, and save a photo of the view
 - Turn **See-through walls** on to cut away walls that stand between you and the room, or off to keep every wall standing
+- **Lock** the design when you're done, so you can look around and check measurements without moving anything by accident
 
 Your design is saved automatically in the browser. Use **Save design file** / **Open design file** to move it to another computer or share it.
 
@@ -59,6 +61,14 @@ git push
 
 Furniture can't pass through walls (it slides along them) but fits under beams.
 
+## Doors and windows
+
+Under **Walls → Doors and windows**, click **Door** or **Window** and pick a design. It goes in the selected wall, or in a wall with room for it. Drag it along its wall or onto another wall; while it's selected, the view shows its size and its distance from each end of the wall. In its panel you can set the width, height, how high a window starts above the floor, its distance from the corner, which side a door's hinges are on and which way it opens, and the colors. Doors show their swing on the floor. Doors and windows go in straight walls that stand on the floor (not curved walls or beams), and they move, turn, copy and disappear with their wall.
+
+## Lock
+
+**Lock**, above the view, freezes the design: you can still turn the view, switch views, select things to see their measurements, and save a photo or the design file, but nothing can be moved, added, removed or changed until you click **Locked** again. The lock is remembered the next time you open the app.
+
 ## Furniture designs
 
 Click **Sofa**, **Table**, **TV stand**, **TV** or **Carpet** under **Add furniture** and pick a design from the menu. To change a piece's design later, select it and pick another under **Design**; its size is kept wherever the new design allows. Each design has its own size presets. A round table has a single size, its diameter. A wall-mounted TV has a height above the floor. A corner sofa can have its chaise on the left.
@@ -82,7 +92,8 @@ Carpets lie flat on the floor: furniture can stand on them, and carpets and furn
 | File | What it does |
 | --- | --- |
 | `src/catalog.js` | Furniture types: default sizes, color palettes, size presets and the 3D models |
-| `src/walls.js` | Wall geometry: curved walls, mitred corners, snapping, the floor from enclosed areas |
+| `src/walls.js` | Wall geometry: curved walls, mitred corners, snapping, the floor from enclosed areas, walls around doors and windows |
+| `src/openings.js` | Doors and windows: designs, sizes and 3D models |
 | `src/layout.js` | Furniture placement: keeping pieces out of walls, placing new pieces, TV on stand |
 | `src/state.js` | The design (walls, groups, furniture) and selection, saving to the browser, import/export |
 | `src/scene.js` | The 3D view (three.js): walls, floor, furniture, camera views, dragging, measurements |

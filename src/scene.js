@@ -5,10 +5,24 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildItem, dimsOf, isFlat } from './catalog.js';
+import { buildOpening, buildSwing } from './openings.js';
 import { elevationOf, halfExtents } from './layout.js';
 import * as store from './state.js';
 import { PATTERN_SIZE, floorTexture } from './textures.js';
-import { boundsOf, contains, floorsOf, footprintOf, jointsOf, lengthOf, midpointOf, rayDistance, signedArea } from './walls.js';
+import {
+  boundsOf,
+  contains,
+  floorsOf,
+  footprintOf,
+  jointsOf,
+  lengthOf,
+  midpointOf,
+  openingSpan,
+  rayDistance,
+  signedArea,
+  takesOpenings,
+  wallPieces,
+} from './walls.js';
 
 const CM = 0.01; // the scene works in metres; the design in centimetres
 const STUB_H = 0.05; // height of a wall that is cut away because it blocks the view
@@ -179,10 +193,9 @@ export function createScene(container) {
   }
 
   function dropWallMesh(m) {
-    for (const mesh of [m.full, m.stub]) {
-      if (!mesh) continue;
-      wallGroup.remove(mesh);
-      mesh.geometry.dispose();
+    for (const part of [m.full, m.stub]) {
+      wallGroup.remove(part);
+      part.traverse((o) => o.isMesh && o.geometry.dispose()); // materials are shared by color
     }
   }
 
@@ -208,23 +221,30 @@ export function createScene(container) {
     for (const w of walls) {
       alive.add(w.id);
       const outline = footprints.get(w.id);
-      const key = JSON.stringify([outline, w.height, w.gap, w.color]);
+      const spans = takesOpenings(w) ? state.openings.filter((o) => o.wall === w.id).map((o) => openingSpan(o, w)) : [];
+      const key = JSON.stringify([outline, w.height, w.gap, w.color, spans]);
       let m = wallMeshes.get(w.id);
       if (m?.key !== key) {
         if (m) dropWallMesh(m);
-        const shape = planShape(outline);
-        const full = new THREE.Mesh(extrude(shape, (w.height - w.gap) * CM), wallMaterial(w.color));
-        full.position.y = w.gap * CM;
-        full.receiveShadow = true;
-        full.userData.wallId = w.id;
-        // A beam (a wall with a gap below) has no stub: seen from above, the opening shows through.
-        const stub = w.gap > 0 ? null : new THREE.Mesh(extrude(shape, STUB_H), wallMaterial(w.color));
-        if (stub) {
-          stub.userData.wallId = w.id;
-          stub.receiveShadow = true;
-          wallGroup.add(stub);
+        // The wall in solid pieces around its doors and windows. Cut away, it leaves a low stub
+        // wherever a piece stands on the floor: door gaps and beams leave none, so they show in plan.
+        const full = new THREE.Group();
+        const stub = new THREE.Group();
+        for (const piece of wallPieces(w, outline, spans)) {
+          const shape = planShape(piece.outline);
+          const solid = new THREE.Mesh(extrude(shape, (piece.y1 - piece.y0) * CM), wallMaterial(w.color));
+          solid.position.y = piece.y0 * CM;
+          solid.receiveShadow = true;
+          solid.userData.wallId = w.id;
+          full.add(solid);
+          if (piece.y0 === 0) {
+            const low = new THREE.Mesh(extrude(shape, STUB_H), wallMaterial(w.color));
+            low.receiveShadow = true;
+            low.userData.wallId = w.id;
+            stub.add(low);
+          }
         }
-        wallGroup.add(full);
+        wallGroup.add(full, stub);
         m = { key, full, stub };
         wallMeshes.set(w.id, m);
       }
@@ -286,8 +306,9 @@ export function createScene(container) {
     if (!store.getUI().cutaway) {
       for (const m of wallMeshes.values()) {
         m.full.visible = true;
-        if (m.stub) m.stub.visible = false;
+        m.stub.visible = false;
       }
+      showOpeningsWithWalls();
       return plan;
     }
     const cam = { x: p.x / CM, z: p.z / CM };
@@ -313,8 +334,9 @@ export function createScene(container) {
         }
       }
       m.full.visible = !cut;
-      if (m.stub) m.stub.visible = cut;
+      m.stub.visible = cut;
     }
+    showOpeningsWithWalls();
     return plan;
   }
 
@@ -351,6 +373,64 @@ export function createScene(container) {
       heightDim.measure(v3(hx, 0, hz), v3(hx, top, hz), fmt(top / CM), v3(1, 0, 0));
     }
     heightDim.visible = !plan; // seen from above it's only a dot
+  }
+
+  // ---- Doors and windows ----
+
+  const openingGroup = new THREE.Group();
+  scene.add(openingGroup);
+  const openingModels = new Map(); // opening id -> { key, model, swing, wallId }
+
+  function dropOpening(m) {
+    for (const part of [m.model, m.swing]) {
+      disposeTree(part);
+      openingGroup.remove(part);
+    }
+  }
+
+  // Where an opening's middle is, and which way its wall runs.
+  function openingFrame(o, w) {
+    const span = openingSpan(o, w);
+    const len = lengthOf(w);
+    const u = { x: (w.x2 - w.x1) / len, z: (w.z2 - w.z1) / len };
+    return { span, u, x: w.x1 + u.x * span.centre, z: w.z1 + u.z * span.centre, turn: Math.atan2(-u.z, u.x) };
+  }
+
+  function syncOpenings(state) {
+    const alive = new Set();
+    for (const o of state.openings) {
+      const w = state.walls.find((x) => x.id === o.wall);
+      if (!takesOpenings(w)) continue; // curved walls and beams don't show doors and windows
+      alive.add(o.id);
+      const f = openingFrame(o, w);
+      const size = { width: f.span.width * CM, height: (f.span.top - f.span.bottom) * CM };
+      const key = JSON.stringify([o.kind, o.style, o.color, o.color2, o.flip, o.swap, size, w.thickness]);
+      let m = openingModels.get(o.id);
+      if (m?.key !== key) {
+        if (m) dropOpening(m);
+        const model = buildOpening(o, size, w.thickness * CM);
+        model.userData.openingId = o.id;
+        const swing = buildSwing(o, size);
+        openingGroup.add(model, swing);
+        m = { key, model, swing };
+        openingModels.set(o.id, m);
+      }
+      m.wallId = w.id;
+      m.model.position.set(f.x * CM, f.span.bottom * CM, f.z * CM);
+      m.swing.position.set(f.x * CM, 0, f.z * CM);
+      m.model.rotation.y = m.swing.rotation.y = f.turn;
+    }
+    for (const [id, m] of openingModels) {
+      if (!alive.has(id)) {
+        dropOpening(m);
+        openingModels.delete(id);
+      }
+    }
+  }
+
+  // A door or window shows when its wall does; its swing on the floor always shows.
+  function showOpeningsWithWalls() {
+    for (const m of openingModels.values()) m.model.visible = wallMeshes.get(m.wallId)?.full.visible ?? true;
   }
 
   // ---- Furniture ----
@@ -442,6 +522,36 @@ export function createScene(container) {
     });
   }
 
+  // ---- Selected door or window: outline, size, height above the floor, distance to the wall's ends ----
+
+  const openingSel = new THREE.Group();
+  const openingBars = [0, 1, 2, 3].map(() => new Bar('sel'));
+  const [openingWidth, openingHeight] = [new Dim('sel'), new Dim('sel')];
+  const [openingSill, openingBefore, openingAfter] = [new Dim('gap'), new Dim('gap'), new Dim('gap')];
+  openingSel.add(...openingBars, openingWidth, openingHeight, openingSill, openingBefore, openingAfter);
+  scene.add(openingSel);
+
+  function updateOpeningSelection(state, ui) {
+    const o = ui.sel?.type === 'opening' ? state.openings.find((x) => x.id === ui.sel.id) : null;
+    const w = o && state.walls.find((x) => x.id === o.wall);
+    openingSel.visible = Boolean(o && takesOpenings(w));
+    if (!openingSel.visible) return;
+    // Drawn in the wall's own frame: x along it from its start, y up, on the wall's centre line.
+    const { span, turn } = openingFrame(o, w);
+    openingSel.position.set(w.x1 * CM, 0, w.z1 * CM);
+    openingSel.rotation.y = turn;
+    const [a, b, y0, y1, len] = [span.a * CM, span.b * CM, span.bottom * CM, span.top * CM, lengthOf(w) * CM];
+    const c = [v3(a, y0, 0), v3(b, y0, 0), v3(b, y1, 0), v3(a, y1, 0)];
+    openingBars.forEach((bar, i) => bar.span(c[i], c[(i + 1) % 4]));
+    const up = v3(0, 1, 0);
+    const along = v3(1, 0, 0);
+    openingWidth.measure(v3(a, y1 + 0.12, 0), v3(b, y1 + 0.12, 0), fmt(span.width), up);
+    openingHeight.measure(v3(b + 0.12, y0, 0), v3(b + 0.12, y1, 0), fmt(span.top - span.bottom), along);
+    openingSill.measure(v3(b + 0.12, 0, 0), v3(b + 0.12, y0, 0), fmt(span.bottom), along);
+    openingBefore.measure(v3(0, 0.02, 0), v3(a, 0.02, 0), fmt(span.a), up);
+    openingAfter.measure(v3(b, 0.02, 0), v3(len, 0.02, 0), fmt(lengthOf(w) - span.b), up);
+  }
+
   // ---- Selected walls: outlines, length, handles at the ends ----
 
   const wallSel = new THREE.Group();
@@ -499,7 +609,7 @@ export function createScene(container) {
     // One wall: its length alongside it, and a handle on each end for stretching and turning it.
     const one = chosen.length === 1 ? chosen[0] : null;
     wallLength.visible = Boolean(one);
-    endHandles.forEach((h) => (h.visible = Boolean(one)));
+    endHandles.forEach((h) => (h.visible = Boolean(one) && !ui.locked)); // nothing to drag while locked
     if (!one) return;
     const len = lengthOf(one);
     const n = { x: -(one.z2 - one.z1) / len, z: (one.x2 - one.x1) / len };
@@ -531,6 +641,7 @@ export function createScene(container) {
   const floorPlane = new THREE.Plane(UP, 0);
   const planeHit = new THREE.Vector3();
   let itemDrag = null;
+  let openingDrag = null;
   let wallDrag = null;
   let cornerDrag = null;
   let press = null; // a press on empty space: a click if it doesn't move
@@ -544,11 +655,12 @@ export function createScene(container) {
   // The nearest visible piece of furniture or wall under the pointer.
   function pick(e) {
     aim(e);
-    for (const hit of raycaster.intersectObjects([itemsGroup, wallGroup], true)) {
+    for (const hit of raycaster.intersectObjects([itemsGroup, openingGroup, wallGroup], true)) {
       if (!isShown(hit.object)) continue;
       let o = hit.object;
-      while (o && !o.userData.itemId && !o.userData.wallId) o = o.parent;
+      while (o && !o.userData.itemId && !o.userData.wallId && !o.userData.openingId) o = o.parent;
       if (o?.userData.itemId) return { kind: 'item', id: o.userData.itemId, point: hit.point };
+      if (o?.userData.openingId) return { kind: 'opening', id: o.userData.openingId, point: hit.point };
       if (o?.userData.wallId) return { kind: 'wall', id: o.userData.wallId, point: hit.point };
     }
     return null;
@@ -574,8 +686,13 @@ export function createScene(container) {
         container.setPointerCapture(e.pointerId);
         return;
       }
-      const hit = pick(e);
       const additive = e.shiftKey || e.metaKey || e.ctrlKey || store.getUI().several;
+      // Locked: a press only selects, on release, and dragging anywhere turns the camera.
+      if (store.getUI().locked) {
+        press = { x: e.clientX, y: e.clientY, additive };
+        return;
+      }
+      const hit = pick(e);
       if (!hit) {
         press = { x: e.clientX, y: e.clientY, additive };
         return;
@@ -591,6 +708,11 @@ export function createScene(container) {
         store.select(hit.id);
         const item = store.getSelected();
         itemDrag = { id: hit.id, pointerId: e.pointerId, dx: item.x - start.x, dz: item.z - start.z };
+      } else if (hit.kind === 'opening') {
+        store.selectOpening(hit.id);
+        const o = store.openingById(hit.id);
+        const f = openingFrame(o, store.wallById(o.wall));
+        openingDrag = { id: hit.id, pointerId: e.pointerId, dx: f.x - start.x, dz: f.z - start.z };
       } else {
         const { ids, drillIn } = store.pressWall(hit.id);
         const originals = ids.map((id) => store.wallById(id));
@@ -622,11 +744,16 @@ export function createScene(container) {
       if (p) store.moveItem(itemDrag.id, p.x + itemDrag.dx, p.z + itemDrag.dz);
       return;
     }
+    if (openingDrag && e.pointerId === openingDrag.pointerId) {
+      const p = planePoint(e, dragPlane);
+      if (p) store.moveOpening(openingDrag.id, p.x + openingDrag.dx, p.z + openingDrag.dz);
+      return;
+    }
     if (e.pointerType === 'mouse' && e.buttons === 0) container.classList.toggle('is-hovering', Boolean(pick(e)));
   });
 
   function endDrags() {
-    itemDrag = wallDrag = cornerDrag = null;
+    itemDrag = openingDrag = wallDrag = cornerDrag = null;
     showSnap(null);
     container.classList.remove('is-dragging');
   }
@@ -643,12 +770,22 @@ export function createScene(container) {
       endDrags();
       return;
     }
-    if (itemDrag && e.pointerId === itemDrag.pointerId) {
+    if ((itemDrag && e.pointerId === itemDrag.pointerId) || (openingDrag && e.pointerId === openingDrag.pointerId)) {
       endDrags();
       return;
     }
-    // A click (not an orbit) on empty space clears the selection.
-    if (press && !press.additive && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5 && !pick(e)) store.clearSelection();
+    // A click (not an orbit): while locked it selects what's under the pointer; on empty space it
+    // clears the selection.
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) {
+      const hit = pick(e);
+      if (store.getUI().locked && hit) {
+        if (hit.kind === 'item') store.select(hit.id);
+        else if (hit.kind === 'opening') store.selectOpening(hit.id);
+        else if (store.pressWall(hit.id).drillIn) store.selectWall(hit.id);
+      } else if (!hit && !press.additive) {
+        store.clearSelection();
+      }
+    }
     press = null;
   });
 
@@ -728,7 +865,7 @@ export function createScene(container) {
 
   // PNG of the current view without measurements or handles.
   function savePhoto() {
-    const overlays = [selection, gaps, roomDims, wallSel, snapMark];
+    const overlays = [selection, gaps, roomDims, wallSel, openingSel, snapMark];
     const shown = overlays.map((o) => o.visible);
     overlays.forEach((o) => (o.visible = false));
     renderer.render(scene, camera);
@@ -756,9 +893,12 @@ export function createScene(container) {
 
   store.subscribe((state, ui) => {
     buildShell(state);
+    syncOpenings(state);
     syncItems(state.items);
     updateItemSelection(state, ui);
     updateWallSelection(state, ui);
+    updateOpeningSelection(state, ui);
+    container.classList.toggle('is-locked', ui.locked);
   });
   new ResizeObserver(resize).observe(container);
   resize();

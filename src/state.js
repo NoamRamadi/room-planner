@@ -1,6 +1,7 @@
 // The design (walls, groups of walls, furniture, colors) and what's selected. Every change is saved to localStorage.
 import { CATALOG, FLOOR_PATTERNS, limitsOf, newItemOf, normalizeItem } from './catalog.js';
 import { carryStacked, findSpot, moveWithin, normAngle, preferredSpot, settle } from './layout.js';
+import { OPENINGS, newOpeningOf, normalizeOpening, openingLimitsOf } from './openings.js';
 import {
   JOIN,
   LIMITS,
@@ -12,9 +13,12 @@ import {
   jointsOf,
   lengthOf,
   midpointOf,
+  openingSpan,
+  pointToSegment,
   rectangleWalls,
   rotatePoint,
   snapTarget,
+  takesOpenings,
 } from './walls.js';
 
 const STORAGE_KEY = 'room-planner:v1';
@@ -47,15 +51,22 @@ function fresh() {
   const room = { ...DEFAULT_LOOK };
   const group = { id: newId(), name: 'Room 1' };
   const walls = rectangleWalls(400, 500).map((ends, i) => newWall(ends, room, { name: `Wall ${i + 1}`, group: group.id }));
-  return { room, walls, groups: [group], items: [] };
+  // A window in the back wall and a door near the front of the left wall.
+  const openings = [
+    { ...newOpeningOf('window', 'standard'), id: newId(), wall: walls[0].id, offset: 200 },
+    { ...newOpeningOf('door', 'single'), id: newId(), wall: walls[3].id, offset: 90 },
+  ];
+  return { room, walls, groups: [group], items: [], openings };
 }
 
 let state = loadSaved() ?? fresh();
 // sel: null, { type: 'item' | 'wall' | 'group', id }, or { type: 'walls', ids } for several walls.
 // several: clicks add to the selection instead of replacing it (for touch screens without Shift).
-// cutaway: walls between the camera and the room are cut down so you can see in (a view setting,
-// remembered separately from the design).
-let ui = { sel: null, several: false, cutaway: loadView().cutaway ?? true };
+// cutaway: walls between the camera and the room are cut down so you can see in.
+// locked: nothing can be moved or changed, only looked at and selected.
+// Both are view settings, remembered separately from the design.
+const view = loadView();
+let ui = { sel: null, several: false, cutaway: view.cutaway ?? true, locked: view.locked ?? false };
 const listeners = new Set();
 let saveTimer = 0;
 
@@ -81,13 +92,23 @@ function loadView() {
   }
 }
 
-export function setCutaway(on) {
-  ui = { ...ui, cutaway: on };
+function saveView() {
   try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway: on }));
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway: ui.cutaway, locked: ui.locked }));
   } catch {
     // Not remembered for next time, but it still applies now.
   }
+}
+
+export function setCutaway(on) {
+  ui = { ...ui, cutaway: on };
+  saveView();
+  emit();
+}
+
+export function setLocked(on) {
+  ui = { ...ui, locked: on, several: false };
+  saveView();
   emit();
 }
 
@@ -102,6 +123,14 @@ function loadSaved() {
 function nextName(list, prefix) {
   const taken = list.map((x) => Number(new RegExp(`^${prefix} (\\d+)$`).exec(x.name)?.[1] ?? 0));
   return `${prefix} ${Math.max(0, ...taken) + 1}`;
+}
+
+function uniqueIn(list, label) {
+  const taken = new Set(list.map((x) => x.name));
+  if (!taken.has(label)) return label;
+  let n = 2;
+  while (taken.has(`${label} ${n}`)) n++;
+  return `${label} ${n}`;
 }
 
 function uniqueItemName(label) {
@@ -124,6 +153,8 @@ export const getState = () => state;
 export const getUI = () => ui;
 export const getSelected = () => (ui.sel?.type === 'item' ? (state.items.find((i) => i.id === ui.sel.id) ?? null) : null);
 export const wallById = (id) => state.walls.find((w) => w.id === id);
+export const openingById = (id) => state.openings.find((o) => o.id === id);
+export const selectOpening = (id) => setSel({ type: 'opening', id });
 
 // Ids of the walls that are selected, whether one wall, a group or several.
 export function selectedWallIds(sel = ui.sel) {
@@ -184,6 +215,7 @@ export function pressWall(id) {
 
 // Floor pattern and color, and the color and height of every wall.
 export function updateRoom(patch) {
+  if (ui.locked) return null;
   let walls = state.walls;
   if ('wallColor' in patch) walls = walls.map((w) => ({ ...w, color: patch.wallColor }));
   if ('height' in patch) walls = walls.map((w) => ({ ...w, height: patch.height, gap: Math.min(w.gap, patch.height - 20) }));
@@ -200,6 +232,7 @@ function commitWalls(walls, { live = false } = {}) {
 
 // Tidy up after a drag: furniture a wall now runs through moves out of the way.
 export function finishWallEdit() {
+  if (ui.locked) return null;
   commitWalls(state.walls);
 }
 
@@ -210,6 +243,7 @@ export function hasFreeEnd(id) {
 // A new wall of the given length. With one wall selected it starts at that wall's free end, turned 90°
 // (so adding four walls in a row closes a room); otherwise it's centred on `focus`.
 export function addWall(length, focus = { x: 0, z: 0 }) {
+  if (ui.locked) return null;
   const from = ui.sel?.type === 'wall' ? wallById(ui.sel.id) : null;
   let ends;
   let group = null;
@@ -233,6 +267,7 @@ export function addWall(length, focus = { x: 0, z: 0 }) {
 
 // Four walls around a width × length room, grouped. Placed beside anything already built.
 export function addRoom(width, length) {
+  if (ui.locked) return null;
   let cx = 0;
   let cz = 0;
   if (state.walls.length) {
@@ -251,6 +286,7 @@ export function addRoom(width, length) {
 }
 
 export function updateWall(id, patch) {
+  if (ui.locked) return null;
   commitWalls(state.walls.map((w) => (w.id === id ? { ...w, ...patch } : w)));
 }
 
@@ -278,6 +314,7 @@ export function cornerAt(id, end) {
 // Drag a corner. It connects to a nearby wall end (or onto a wall); otherwise the dragged wall snaps to
 // whole centimetres and to 15° steps. Returns the point it connected to, if any.
 export function dragCorner(corner, anchor, x, z) {
+  if (ui.locked) return null;
   const skip = new Set(corner.map((e) => e.id));
   const target = snapTarget({ x, z }, state.walls, skip);
   let p = target;
@@ -296,12 +333,14 @@ export function dragCorner(corner, anchor, x, z) {
 
 // Length and angle keep the wall's start where it is and move its end, with any walls joined there.
 export function setWallLength(id, length) {
+  if (ui.locked) return null;
   const w = wallById(id);
   const u = { x: (w.x2 - w.x1) / lengthOf(w), z: (w.z2 - w.z1) / lengthOf(w) };
   commitWalls(withEndsAt(cornerAt(id, 1), w.x1 + u.x * length, w.z1 + u.z * length));
 }
 
 export function setWallAngle(id, degrees) {
+  if (ui.locked) return null;
   const w = wallById(id);
   const r = (degrees * Math.PI) / 180;
   const len = lengthOf(w);
@@ -311,6 +350,7 @@ export function setWallAngle(id, degrees) {
 // Move walls by (dx, dz) from where they were when the drag started. A moved end that comes near another
 // wall's end connects to it. Returns the connection point, if any.
 export function dragWalls(originals, dx, dz) {
+  if (ui.locked) return null;
   const ids = new Set(originals.map((w) => w.id));
   const others = state.walls.filter((w) => !ids.has(w.id));
   let best = null;
@@ -329,12 +369,14 @@ export function dragWalls(originals, dx, dz) {
 }
 
 export function nudgeWalls(ids, dx, dz) {
+  if (ui.locked) return null;
   const set = new Set(ids);
   commitWalls(state.walls.map((w) => (set.has(w.id) ? { ...w, x1: w.x1 + dx, z1: w.z1 + dz, x2: w.x2 + dx, z2: w.z2 + dz } : w)));
 }
 
 // Turn walls about their middle (one wall) or the middle of their bounds (several).
 export function rotateWalls(ids, degrees) {
+  if (ui.locked) return null;
   const set = new Set(ids);
   const moving = state.walls.filter((w) => set.has(w.id));
   if (!moving.length) return;
@@ -351,16 +393,18 @@ export function rotateWalls(ids, degrees) {
 }
 
 export function removeWalls(ids) {
+  if (ui.locked) return null;
   const set = new Set(ids);
   const walls = state.walls.filter((w) => !set.has(w.id));
   const groups = state.groups.filter((g) => walls.some((w) => w.group === g.id));
-  state = { ...state, groups };
+  state = { ...state, groups, openings: state.openings.filter((o) => !set.has(o.wall)) };
   ui = { ...ui, sel: null };
   commitWalls(walls);
 }
 
 // Copies of the walls, 50 cm along; a whole group is copied as a new group.
 export function duplicateWalls(ids) {
+  if (ui.locked) return null;
   const set = new Set(ids);
   const source = state.walls.filter((w) => set.has(w.id));
   const groupIds = [...new Set(source.map((w) => w.group).filter(Boolean))];
@@ -373,6 +417,7 @@ export function duplicateWalls(ids) {
   }
   let walls = [...state.walls];
   const copies = [];
+  const copyOf = new Map(); // original wall id -> copy's id
   for (const w of source) {
     const copy = {
       ...w,
@@ -385,9 +430,14 @@ export function duplicateWalls(ids) {
       group: newGroup ? newGroup.id : w.group,
     };
     copies.push(copy);
+    copyOf.set(w.id, copy.id);
     walls = [...walls, copy];
   }
-  state = { ...state, groups };
+  let openings = state.openings;
+  for (const o of state.openings.filter((q) => copyOf.has(q.wall))) {
+    openings = [...openings, { ...o, id: newId(), wall: copyOf.get(o.wall), name: uniqueIn(openings, o.name.replace(/ \d+$/, '')) }];
+  }
+  state = { ...state, groups, openings };
   ui = {
     ...ui,
     sel: newGroup ? { type: 'group', id: newGroup.id } : copies.length === 1 ? { type: 'wall', id: copies[0].id } : { type: 'walls', ids: copies.map((c) => c.id) },
@@ -399,6 +449,7 @@ export function duplicateWalls(ids) {
 
 // Group the selected walls. Walls already in a group move into the new one.
 export function groupWalls(ids) {
+  if (ui.locked) return null;
   const set = new Set(ids);
   const group = { id: newId(), name: nextName(state.groups, 'Group') };
   const walls = state.walls.map((w) => (set.has(w.id) ? { ...w, group: group.id } : w));
@@ -409,6 +460,7 @@ export function groupWalls(ids) {
 }
 
 export function ungroup(groupId) {
+  if (ui.locked) return null;
   const ids = state.walls.filter((w) => w.group === groupId).map((w) => w.id);
   state = {
     ...state,
@@ -420,20 +472,147 @@ export function ungroup(groupId) {
 }
 
 export function renameGroup(id, name) {
+  if (ui.locked) return null;
   state = { ...state, groups: state.groups.map((g) => (g.id === id ? { ...g, name } : g)) };
   emit();
 }
 
 export function leaveGroup(wallId) {
+  if (ui.locked) return null;
   const walls = state.walls.map((w) => (w.id === wallId ? { ...w, group: null } : w));
   state = { ...state, walls, groups: state.groups.filter((g) => walls.some((w) => w.group === g.id)) };
   emit();
+}
+
+// ---- Doors and windows ----
+
+// The side the default 3D view looks from (as in layout.js): walls on the far side are the ones you see.
+const VIEW = { x: 0.51, z: 0.86 };
+
+// Where along a wall an opening of this width fits without overlapping the wall's other openings:
+// as close to `near` (default: the middle) as possible, in 5 cm steps. Null if there's no room.
+function freeOffset(w, width, others, near) {
+  const len = lengthOf(w);
+  const taken = others.map((o) => openingSpan(o, w));
+  const fits = (c) =>
+    c - width / 2 >= 5 && c + width / 2 <= len - 5 && taken.every((t) => c + width / 2 + 5 <= t.a || c - width / 2 - 5 >= t.b);
+  const start = near ?? len / 2;
+  for (let k = 0; k <= len / 5; k++) {
+    for (const c of [start + k * 5, start - k * 5]) if (fits(c)) return c;
+  }
+  return null;
+}
+
+// Walls a new door or window could go in, best first: the selected wall if it can take one, otherwise
+// long walls you can see from the default view.
+function hostsFor() {
+  const sel = ui.sel?.type === 'wall' ? wallById(ui.sel.id) : null;
+  if (takesOpenings(sel)) return [sel];
+  const b = boundsOf(state.walls);
+  return state.walls
+    .filter(takesOpenings)
+    .map((w) => {
+      const m = midpointOf(w);
+      const seen = (m.x - b.cx) * VIEW.x + (m.z - b.cz) * VIEW.z < 0;
+      return { w, score: lengthOf(w) * (seen ? 1 : 0.6) };
+    })
+    .sort((p, q) => q.score - p.score)
+    .map((c) => c.w);
+}
+
+// Add a door or window to the selected wall, or to the best wall with room for it.
+// Returns false if no wall has room.
+export function addOpening(kind, style) {
+  if (ui.locked) return null;
+  const base = newOpeningOf(kind, style);
+  for (const w of hostsFor()) {
+    const offset = freeOffset(w, base.width, state.openings.filter((o) => o.wall === w.id));
+    if (offset == null) continue;
+    const opening = { ...base, id: newId(), wall: w.id, offset, name: uniqueIn(state.openings, base.name) };
+    state = { ...state, openings: [...state.openings, opening] };
+    ui = { ...ui, sel: { type: 'opening', id: opening.id } };
+    emit();
+    return true;
+  }
+  return false;
+}
+
+// Size, colors, hinges or design. A new design brings its own standard size, and a door or window
+// still called by its design's name takes the new design's name.
+export function updateOpening(id, patch) {
+  if (ui.locked) return null;
+  const before = openingById(id);
+  if (!before) return null;
+  if (patch.style && patch.style !== before.style) {
+    const next = newOpeningOf(before.kind, patch.style);
+    patch = { width: next.width, height: next.height, sill: next.sill, ...patch };
+    const oldName = newOpeningOf(before.kind, before.style).name;
+    if (new RegExp(`^${oldName}( \\d+)?$`).test(before.name)) patch.name = uniqueIn(state.openings, next.name);
+  }
+  state = { ...state, openings: state.openings.map((o) => (o.id === id ? normalizeOpening({ ...o, ...patch }) : o)) };
+  emit();
+}
+
+// Drag: put the opening's middle as close to (x, z) as a wall allows. It moves to another wall when
+// the point is nearer that one, and won't overlap other doors and windows.
+export function moveOpening(id, x, z) {
+  if (ui.locked) return null;
+  const o = openingById(id);
+  let best = null;
+  for (const w of state.walls.filter(takesOpenings)) {
+    const hit = pointToSegment({ x, z }, { x: w.x1, z: w.z1 }, { x: w.x2, z: w.z2 });
+    const score = hit.d - (w.id === o.wall ? 15 : 0); // stay on its own wall unless clearly nearer another
+    if (hit.d < 60 && (!best || score < best.score)) best = { w, s: hit.t * lengthOf(w), score };
+  }
+  if (!best) return null;
+  const others = state.openings.filter((q) => q.wall === best.w.id && q.id !== id);
+  const offset = freeOffset(best.w, Math.min(o.width, lengthOf(best.w) - 10), others, best.s);
+  if (offset == null || Math.abs(offset - best.s) > o.width) return null; // no room near the pointer
+  state = { ...state, openings: state.openings.map((q) => (q.id === id ? { ...q, wall: best.w.id, offset } : q)) };
+  emit();
+}
+
+// Slide along its wall, staying inside the wall.
+export function slideOpening(id, offset) {
+  if (ui.locked) return null;
+  const o = openingById(id);
+  const w = wallById(o.wall);
+  const span = openingSpan({ ...o, offset }, w);
+  state = { ...state, openings: state.openings.map((q) => (q.id === id ? { ...q, offset: span.centre } : q)) };
+  emit();
+}
+
+export function removeOpening(id) {
+  if (ui.locked) return null;
+  state = { ...state, openings: state.openings.filter((o) => o.id !== id) };
+  if (ui.sel?.type === 'opening' && ui.sel.id === id) ui = { ...ui, sel: null };
+  emit();
+}
+
+// A copy beside it on the same wall, or on another wall if this one is full.
+export function duplicateOpening(id) {
+  if (ui.locked) return null;
+  const o = openingById(id);
+  const name = uniqueIn(state.openings, o.name.replace(/ \d+$/, ''));
+  const walls = [wallById(o.wall), ...hostsFor().filter((w) => w.id !== o.wall)];
+  for (const w of walls) {
+    const near = w.id === o.wall ? o.offset + o.width + 20 : undefined;
+    const offset = freeOffset(w, o.width, state.openings.filter((q) => q.wall === w.id), near);
+    if (offset == null) continue;
+    const copy = { ...o, id: newId(), wall: w.id, offset, name };
+    state = { ...state, openings: [...state.openings, copy] };
+    ui = { ...ui, sel: { type: 'opening', id: copy.id } };
+    emit();
+    return true;
+  }
+  return false;
 }
 
 // ---- Furniture ----
 
 // A new piece of furniture in the given design (the type's first design if none is given).
 export function addItem(type, style) {
+  if (ui.locked) return null;
   const base = newItemOf(type, style);
   const draft = { id: newId(), type, x: 0, z: 0, rotation: 0, ...base, name: uniqueItemName(base.name) };
   Object.assign(draft, preferredSpot(draft, state.items, state.walls));
@@ -453,6 +632,7 @@ function replaceItem(before, after) {
 // Design, size, color, name or rotation changes. Sizes are kept within what the design allows, and
 // if the piece now runs into a wall, it moves clear of it.
 export function updateItem(id, patch) {
+  if (ui.locked) return null;
   const before = state.items.find((i) => i.id === id);
   if (!before) return;
   if ('rotation' in patch) patch = { ...patch, rotation: normAngle(patch.rotation) };
@@ -467,18 +647,21 @@ export function updateItem(id, patch) {
 }
 
 export function moveItem(id, x, z) {
+  if (ui.locked) return null;
   const before = state.items.find((i) => i.id === id);
   if (!before) return;
   replaceItem(before, moveWithin(before, x, z, state.walls, state.items));
 }
 
 export function removeItem(id) {
+  if (ui.locked) return null;
   state = { ...state, items: state.items.filter((i) => i.id !== id) };
   if (ui.sel?.type === 'item' && ui.sel.id === id) ui = { ...ui, sel: null };
   emit();
 }
 
 export function duplicateItem(id) {
+  if (ui.locked) return null;
   const source = state.items.find((i) => i.id === id);
   if (!source) return;
   const copy = { ...source, id: newId(), name: uniqueItemName(newItemOf(source.type, source.style).name), x: source.x + 30, z: source.z + 30 };
@@ -495,6 +678,7 @@ export function exportDesign() {
 }
 
 export function importDesign(text) {
+  if (ui.locked) return null;
   let data = null;
   try {
     data = sanitize(JSON.parse(text));
@@ -508,6 +692,7 @@ export function importDesign(text) {
 }
 
 export function resetDesign() {
+  if (ui.locked) return null;
   state = fresh();
   ui = { ...ui, sel: null, several: false };
   emit();
@@ -598,7 +783,28 @@ function sanitize(raw) {
     })
     .map((item, _, all) => settle(item, walls, all));
 
-  return { room, walls, groups, items };
+  const wallIds = new Set(walls.map((w) => w.id));
+  const openingIds = new Set();
+  const openings = (Array.isArray(raw.openings) ? raw.openings : [])
+    .filter((o) => o && typeof o === 'object' && Object.hasOwn(OPENINGS, o.kind) && wallIds.has(o.wall))
+    .map((o) => {
+      const def = OPENINGS[o.kind];
+      const id = typeof o.id === 'string' && !openingIds.has(o.id) ? o.id : newId();
+      openingIds.add(id);
+      const style = def.styles.some((x) => x.id === o.style) ? o.style : def.defaults.style;
+      const out = { id, kind: o.kind, wall: o.wall, style, offset: num(o.offset, [0, 10000], 50) };
+      out.name = typeof o.name === 'string' && o.name.trim() ? o.name.slice(0, 40) : newOpeningOf(o.kind, style).name;
+      const limits = openingLimitsOf(out);
+      for (const [key, fallback] of Object.entries(def.defaults)) {
+        if (key === 'style') continue;
+        if (typeof fallback === 'boolean') out[key] = o[key] === true;
+        else if (key.startsWith('color')) out[key] = hex(o[key], fallback);
+        else out[key] = num(o[key], limits[key] ?? [0, 1000], fallback);
+      }
+      return normalizeOpening(out);
+    });
+
+  return { room, walls, groups, items, openings };
 }
 
 // Walls from an older design: a room outline (v2) with curved walls, openings and open sides, or a

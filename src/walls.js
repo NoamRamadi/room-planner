@@ -446,3 +446,60 @@ export function rectangleWalls(width, length, cx = 0, cz = 0) {
     return { x1, z1, x2, z2 };
   });
 }
+
+// ---- Doors and windows ----
+
+const END_MARGIN = 5; // cm kept solid at each end of a wall
+
+// Doors and windows go in straight walls that stand on the floor (not curved walls or beams).
+export const takesOpenings = (w) => Boolean(w) && !w.curve && !w.gap;
+
+// Where a door or window sits in its wall, in cm: a–b along the wall from its start, bottom–top in
+// height. Kept inside the wall and below its top.
+export function openingSpan(o, w) {
+  const len = lengthOf(w);
+  const width = Math.max(10, Math.min(o.width, len - 2 * END_MARGIN));
+  const centre = Math.max(width / 2 + END_MARGIN, Math.min(len - width / 2 - END_MARGIN, o.offset));
+  const top = Math.min(w.height - 5, (o.kind === 'window' ? o.sill : 0) + o.height);
+  const bottom = o.kind === 'window' ? Math.max(0, Math.min(o.sill, top - 10)) : 0;
+  return { a: centre - width / 2, b: centre + width / 2, centre, width, bottom, top };
+}
+
+// The solid parts of a straight wall around its doors and windows: full height beside them, a lintel
+// above, and wall below a window's sill. Each piece is a floor outline (cm) and a height range.
+export function wallPieces(w, outline, spans) {
+  if (!spans.length) return [{ outline, y0: w.gap, y1: w.height }];
+  const len = lengthOf(w);
+  const u = { x: (w.x2 - w.x1) / len, z: (w.z2 - w.z1) / len };
+  const n = left(u);
+  const h = w.thickness / 2;
+  const [L0, L1, R1, R0] = outline; // a straight wall's outline: its left side, then its right side back
+  // Left and right sides of the wall at distance s; the ends keep their mitred corners.
+  const across = (s) => {
+    if (s <= 0) return [L0, R0];
+    if (s >= len) return [L1, R1];
+    const p = { x: w.x1 + u.x * s, z: w.z1 + u.z * s };
+    return [
+      { x: p.x + n.x * h, z: p.z + n.z * h },
+      { x: p.x - n.x * h, z: p.z - n.z * h },
+    ];
+  };
+  const strip = (s0, s1) => {
+    const [a0, b0] = across(s0);
+    const [a1, b1] = across(s1);
+    return [a0, a1, b1, b0];
+  };
+  const pieces = [];
+  let s = 0;
+  for (const o of [...spans].sort((p, q) => p.a - q.a)) {
+    if (o.a > s) pieces.push({ outline: strip(s, o.a), y0: 0, y1: w.height });
+    const a = Math.max(o.a, s);
+    if (o.b > a) {
+      if (o.bottom > 0) pieces.push({ outline: strip(a, o.b), y0: 0, y1: o.bottom });
+      if (o.top < w.height) pieces.push({ outline: strip(a, o.b), y0: o.top, y1: w.height });
+    }
+    s = Math.max(s, o.b);
+  }
+  if (s < len) pieces.push({ outline: strip(s, len), y0: 0, y1: w.height });
+  return pieces;
+}

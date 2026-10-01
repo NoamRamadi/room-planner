@@ -528,6 +528,83 @@ h3 {
   }
 }
 
+/* ---- Lock button in the view bar ---- */
+
+.lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--plaster);
+  box-shadow: 0 6px 18px -10px rgb(38 41 45 / 0.4);
+  font-size: 13px;
+  font-weight: 520;
+  cursor: pointer;
+}
+
+.lock:hover {
+  background: var(--plaster-deep);
+}
+
+.lock svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lock[aria-pressed='true'] {
+  border-color: var(--graphite);
+  background: var(--graphite);
+  color: var(--plaster);
+}
+
+.lock[aria-pressed='true'] svg {
+  color: var(--tape);
+}
+
+.lock-note {
+  margin: 0;
+  padding: 8px 20px;
+  background: var(--graphite);
+  color: var(--plaster);
+  font-size: 12.5px;
+}
+
+/* Controls that would change the design, while locked. */
+.chip:disabled,
+.add-btn:disabled,
+.design-btn:disabled,
+.preset:disabled,
+.segmented button:disabled,
+.icon-btn:disabled,
+.chip--custom:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.measure:has(input:disabled) {
+  cursor: default;
+}
+
+.measure input:disabled {
+  color: var(--pencil);
+}
+
+.check:has(input:disabled),
+.inspector__name:disabled {
+  cursor: default;
+}
+
+.stage.is-locked.is-hovering canvas {
+  cursor: pointer;
+}
+
 /* ---- Add furniture ---- */
 
 .add-grid {
