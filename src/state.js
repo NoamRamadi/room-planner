@@ -65,8 +65,9 @@ let state = loadSaved() ?? fresh();
 // cutaway: walls between the camera and the room are cut down so you can see in.
 // locked: nothing can be moved or changed, only looked at and selected.
 // Both are view settings, remembered separately from the design.
+// drawing: the wall drawing tool is open (the rest of the app waits until it closes).
 const view = loadView();
-let ui = { sel: null, several: false, cutaway: view.cutaway ?? true, locked: view.locked ?? false };
+let ui = { sel: null, several: false, cutaway: view.cutaway ?? true, locked: view.locked ?? false, drawing: false };
 const listeners = new Set();
 let saveTimer = 0;
 
@@ -103,6 +104,11 @@ function saveView() {
 export function setCutaway(on) {
   ui = { ...ui, cutaway: on };
   saveView();
+  emit();
+}
+
+export function setDrawing(on) {
+  ui = { ...ui, drawing: on, several: false, sel: on ? null : ui.sel };
   emit();
 }
 
@@ -263,6 +269,22 @@ export function addWall(length, focus = { x: 0, z: 0 }) {
   const wall = newWall(ends, state.room, { name: nextName(state.walls, 'Wall'), group });
   ui = { ...ui, sel: { type: 'wall', id: wall.id } };
   commitWalls([...state.walls, wall]);
+}
+
+// Walls drawn with the drawing tool ({ x1, z1, x2, z2, thickness, height } each), added in one go and
+// selected together, ready to group.
+export function addDrawnWalls(segments) {
+  if (ui.locked) return null;
+  let walls = [...state.walls];
+  const ids = [];
+  for (const s of segments) {
+    const { x1, z1, x2, z2, thickness, height } = s;
+    const wall = newWall({ x1, z1, x2, z2 }, state.room, { name: nextName(walls, 'Wall'), thickness, height });
+    walls = [...walls, wall];
+    ids.push(wall.id);
+  }
+  ui = { ...ui, drawing: false, sel: ids.length > 1 ? { type: 'walls', ids } : ids.length ? { type: 'wall', id: ids[0] } : null };
+  commitWalls(walls);
 }
 
 // Four walls around a width × length room, grouped. Placed beside anything already built.

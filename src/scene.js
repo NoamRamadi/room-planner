@@ -675,7 +675,7 @@ export function createScene(container) {
   container.addEventListener(
     'pointerdown',
     (e) => {
-      if (e.button !== 0 || !e.isPrimary) return;
+      if (store.getUI().drawing || e.button !== 0 || !e.isPrimary) return; // the drawing tool handles its own
       tween = null;
       const end = e.target.closest?.('[data-end]');
       if (end) {
@@ -725,6 +725,7 @@ export function createScene(container) {
   );
 
   container.addEventListener('pointermove', (e) => {
+    if (store.getUI().drawing) return;
     if (cornerDrag && e.pointerId === cornerDrag.pointerId) {
       const p = planePoint(e, floorPlane);
       if (p) showSnap(store.dragCorner(cornerDrag.corner, cornerDrag.anchor, p.x, p.z));
@@ -759,6 +760,7 @@ export function createScene(container) {
   }
 
   container.addEventListener('pointerup', (e) => {
+    if (store.getUI().drawing) return;
     if (cornerDrag && e.pointerId === cornerDrag.pointerId) {
       if (cornerDrag.moved) store.finishWallEdit();
       endDrags();
@@ -904,6 +906,7 @@ export function createScene(container) {
   resize();
 
   renderer.setAnimationLoop(() => {
+    if (store.getUI().drawing) return; // the floor plan covers the view; nothing to draw
     if (tween) stepTween();
     controls.update();
     placeRoomDims(updateCutaway());

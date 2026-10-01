@@ -2,7 +2,8 @@
 
 Plan a room of your apartment in 3D, right in the browser.
 
-- Build the layout wall by wall: set each wall's length, then connect walls by dragging their ends together
+- **Draw walls** on a flat floor plan with a grid: click the corners of a room or a whole apartment
+- Or build the layout wall by wall: set each wall's length, then connect walls by dragging their ends together
 - Group walls to move, turn and copy them as one unit (a room, a kitchen divider)
 - Give any wall its own thickness, height, curve, color, or a gap below it (a beam over an opening)
 - Put doors (single, double, sliding glass, open doorway) and windows (two panes, picture, grid, floor to ceiling) in the walls
@@ -49,6 +50,18 @@ git push
 
 `npm run build` also creates a `dist/` folder of plain static files that works on any other static host.
 
+## Drawing walls
+
+Click **Draw walls** at the top of the Walls panel to swap the 3D view for a floor plan seen from above, on a grid of squares (the corner of the plan says how big a square is; it gets finer as you zoom in). Your existing walls show in grey, with gaps for doors and windows.
+
+- **Draw:** click to start a wall, then click at each corner; every click ends one wall and starts the next.
+- **End a line:** click its last corner again (a double-click), press Enter or Esc, or use **Finish line**. Clicking where the line started closes the room.
+- **Snapping:** corners snap to the ends of other walls, onto other walls (at whole centimetres), and to a 10 cm grid; walls snap to straight and 45° directions, with a guide line. Hold Alt to place a corner freely.
+- **Exact lengths:** while drawing a wall, type its length (for example `350`) and press Enter.
+- **Thickness and height:** set them in the toolbar; they apply to the walls you draw next.
+- **Move around:** drag to pan, scroll or pinch to zoom. **Undo** or Backspace removes the last wall.
+- **Done** adds the new walls and takes you back to the 3D view with them selected, ready to group. **Cancel** throws them away.
+
 ## Building walls
 
 - **Add wall:** set the length and click **Add wall**. With a wall selected, the new wall starts at that wall's end, turned 90°, so four walls in a row make a closed room. With nothing selected, it appears in the middle of the view.
@@ -92,6 +105,8 @@ Carpets lie flat on the floor: furniture can stand on them, and carpets and furn
 | File | What it does |
 | --- | --- |
 | `src/catalog.js` | Furniture types: default sizes, color palettes, size presets and the 3D models |
+| `src/draw.js` | The wall drawing tool: the floor plan, grid, snapping and its toolbar |
+| `src/dom.js` | Small helpers for building the panels (elements, measuring-tape number fields) |
 | `src/walls.js` | Wall geometry: curved walls, mitred corners, snapping, the floor from enclosed areas, walls around doors and windows |
 | `src/openings.js` | Doors and windows: designs, sizes and 3D models |
 | `src/layout.js` | Furniture placement: keeping pieces out of walls, placing new pieces, TV on stand |

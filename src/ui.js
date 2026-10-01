@@ -1,6 +1,8 @@
 // Side panel, inspector (selected furniture, wall, group or several walls), camera bar and keyboard shortcuts.
 import { CATALOG, FLOOR_FINISHES, FLOOR_PATTERNS, WALL_PAINTS, dimsOf, isFlat, isOnWall, limitsOf, presetsOf, styleOf, tvScreen } from './catalog.js';
 import { OPENINGS, openingLimitsOf, openingStyleOf } from './openings.js';
+import { h, measureField } from './dom.js';
+import { createDrawMode } from './draw.js';
 import * as store from './state.js';
 import { LIMITS, angleOf, lengthOf, maxCurve, openingSpan, takesOpenings } from './walls.js';
 
@@ -65,58 +67,6 @@ const designIcon = (type, style) => `<svg viewBox="0 0 48 32" aria-hidden="true"
 
 // "a sofa", "a table", "a TV stand": lower case except for TV.
 const noun = (label) => (/^TV/.test(label) ? label : label.toLowerCase());
-
-function h(tag, attrs = {}, ...children) {
-  const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(attrs)) {
-    if (value == null || value === false) continue;
-    if (key.startsWith('on')) el.addEventListener(key.slice(2), value);
-    else if (key === 'html') el.innerHTML = value;
-    else el.setAttribute(key, value === true ? '' : value);
-  }
-  el.append(...children.flat(Infinity).filter((c) => c != null && c !== false));
-  return el;
-}
-
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-
-// A number field drawn like a strip of measuring tape. `live` applies valid values while typing;
-// otherwise the value is applied on Enter or when the field loses focus. min/max may be functions.
-function measureField({ label, unit = 'cm', min, max, live = true, get, set }) {
-  const lo = () => (typeof min === 'function' ? min() : min);
-  const hi = () => (typeof max === 'function' ? max() : max);
-  // Phone number pads have no minus key, so fields that take negatives get the full keyboard.
-  const input = h('input', { type: 'number', inputmode: lo() < 0 ? null : 'numeric', step: 1 });
-  const commit = () => {
-    let v = Number(input.value);
-    if (input.value === '' || !Number.isFinite(v)) v = get();
-    v = clamp(Math.round(v), lo(), hi());
-    input.value = v;
-    if (v !== Math.round(get())) set(v);
-  };
-  input.addEventListener('input', () => {
-    const v = Number(input.value);
-    if (live && input.value !== '' && v >= lo() && v <= hi()) set(Math.round(v));
-  });
-  input.addEventListener('change', commit);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') commit();
-  });
-  const el = h(
-    'label',
-    { class: 'measure' },
-    h('span', { class: 'measure__label' }, label),
-    h('span', { class: 'measure__value' }, input, h('span', { class: 'measure__unit' }, unit)),
-  );
-  return {
-    el,
-    sync() {
-      input.min = lo();
-      input.max = hi();
-      if (document.activeElement !== input) input.value = Math.round(get());
-    },
-  };
-}
 
 // A row of named color chips plus a chip that opens the system color picker.
 function swatches({ label, palette, get, set }) {
@@ -290,6 +240,13 @@ export function initUI(view) {
   const room = () => store.getState().room;
 
   // ---- Walls: add walls one by one, or a whole room; list of groups and walls ----
+
+  // Drawing walls on a floor plan; Done brings you back to the 3D view with the new walls.
+  const draw = createDrawMode(document.getElementById('stage'), {
+    onClose: (added) => {
+      if (added) view.setView('overview');
+    },
+  });
 
   const next = { length: 300, width: 400, depth: 500 }; // sizes for the next wall or room
   const nextLength = measureField({ label: 'Length', min: LIMITS.length[0], max: LIMITS.length[1], get: () => next.length, set: (v) => (next.length = v) });
@@ -470,7 +427,13 @@ export function initUI(view) {
       'section',
       { class: 'section', 'aria-labelledby': 'walls-heading' },
       h('div', { class: 'section__head' }, h('h2', { id: 'walls-heading' }, 'Walls'), wallCount),
-      h('div', { class: 'adder' }, nextLength.el, h('button', { type: 'button', class: 'btn btn--tape', onclick: () => store.addWall(next.length, view.focus()) }, 'Add wall')),
+      h(
+        'div',
+        { class: 'draw-entry' },
+        h('button', { type: 'button', class: 'btn btn--tape', onclick: () => draw.open() }, 'Draw walls'),
+        h('p', { class: 'help help--first' }, 'Draw walls corner by corner on a floor plan.'),
+      ),
+      h('div', { class: 'adder' }, nextLength.el, h('button', { type: 'button', class: 'btn', onclick: () => store.addWall(next.length, view.focus()) }, 'Add wall')),
       addWallHelp,
       h(
         'div',
@@ -597,11 +560,12 @@ export function initUI(view) {
       inspectorSyncers = buildInspector(inspector, state, ui);
     }
     for (const sync of inspectorSyncers) sync();
-    inspector.classList.toggle('is-empty', !ui.sel);
+    inspector.classList.toggle('is-empty', !ui.sel && !ui.drawing);
     if (ui.locked && ui.sel) inspector.prepend(lockNote);
     else lockNote.remove();
-    applyLock(panel, ui.locked);
-    applyLock(inspector, ui.locked);
+    applyLock(panel, ui.locked || ui.drawing);
+    applyLock(inspector, ui.locked || ui.drawing);
+    document.querySelector('.app').classList.toggle('is-drawing', ui.drawing);
   });
 
   bindShortcuts();
@@ -609,6 +573,7 @@ export function initUI(view) {
 
 // The inspector is rebuilt only when what it shows changes; values in between update in place.
 function inspectorKeyFor(state, ui) {
+  if (ui.drawing) return 'drawing';
   const sel = ui.sel;
   if (!sel) return 'none';
   if (sel.type === 'item') {
@@ -629,6 +594,7 @@ function inspectorKeyFor(state, ui) {
 
 function buildInspector(root, state, ui) {
   root.replaceChildren();
+  if (ui.drawing) return buildDrawHelp(root);
   const sel = ui.sel;
   if (sel?.type === 'item') {
     const item = state.items.find((i) => i.id === sel.id);
@@ -639,6 +605,39 @@ function buildInspector(root, state, ui) {
   if (sel?.type === 'walls') return buildWallsInspector(root, sel.ids);
   if (sel?.type === 'opening' && store.openingById(sel.id)) return buildOpeningInspector(root, sel.id);
   return buildHelp(root);
+}
+
+function buildDrawHelp(root) {
+  root.append(
+    h(
+      'div',
+      { class: 'inspector__empty' },
+      h('h2', { class: 'inspector__title' }, 'Drawing walls'),
+      h(
+        'ul',
+        { class: 'tips' },
+        h('li', {}, 'Click on the plan to start a wall, then click at each corner. Each click ends one wall and starts the next.'),
+        h('li', {}, 'To end a line, click its last corner again, press Enter, or use Finish line. Clicking where the line started closes the room.'),
+        h('li', {}, 'Corners snap to the ends of other walls, to points along them, and to the 10 cm grid. Walls snap to straight and 45° directions. Hold Alt to place freely.'),
+        h('li', {}, 'While drawing a wall, type its length and press Enter.'),
+        h('li', {}, 'Set the thickness and height above the plan before drawing; they apply to the walls you draw next.'),
+        h('li', {}, 'Done adds the new walls and selects them, ready to group. Cancel throws them away.'),
+      ),
+      h(
+        'dl',
+        { class: 'keys' },
+        [
+          ['Click', 'Place a corner'],
+          ['Drag', 'Move around the plan'],
+          ['Scroll or pinch', 'Zoom'],
+          ['Numbers, Enter', 'Exact length'],
+          ['Enter or Esc', 'End the line'],
+          ['Backspace', 'Undo the last wall'],
+        ].map(([key, what]) => [h('dt', {}, key), h('dd', {}, what)]),
+      ),
+    ),
+  );
+  return [];
 }
 
 function buildHelp(root) {
@@ -654,6 +653,7 @@ function buildHelp(root) {
         h('li', {}, 'Drag a wall to move it. Its ends connect to nearby walls.'),
         h('li', {}, 'Select a wall and drag the round handles at its ends to stretch or turn it. Walls joined there move with it.'),
         h('li', {}, 'Shift-click several walls and group them to move them as one. Click a grouped wall again to edit just that wall.'),
+        h('li', {}, 'The quickest way to lay out a room or a whole apartment is Draw walls: click its corners on a floor plan.'),
         h('li', {}, 'The floor fills in wherever walls enclose a space.'),
         h('li', {}, 'Add doors and windows from the Walls panel, then drag them along a wall or onto another one.'),
         h('li', {}, 'Lock, above the view, keeps everything in place while you look around and check measurements.'),
@@ -1067,7 +1067,8 @@ function buildItemInspector(root, item) {
 function bindShortcuts() {
   window.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
-    const { sel, several } = store.getUI();
+    const { sel, several, drawing } = store.getUI();
+    if (drawing) return; // the drawing tool has its own keys
     if (e.key === 'Escape') {
       if (several) store.setSeveral(false);
       store.clearSelection();
