@@ -99,6 +99,7 @@ Carpets lie flat on the floor: furniture can stand on them, and carpets and furn
 | Duplicate | Ctrl/Cmd+D, or the Duplicate button |
 | Deselect | Esc, or click empty space |
 | Select several walls | Shift-click (or Select several), then group with Ctrl/Cmd+G; ungroup with Ctrl/Cmd+Shift+G |
+| Hide or show the side panels | The tabs on the left and right edges of the view, or `[` and `]` (on phones the panels stay below the view) |
 
 ## Code
 

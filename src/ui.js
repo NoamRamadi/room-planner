@@ -15,6 +15,8 @@ const ICONS = {
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  chevronLeft: '<path d="M15 5l-7 7 7 7"/>',
+  chevronRight: '<path d="M9 5l7 7-7 7"/>',
   door: '<path d="M15 30V3h18v27"/><path d="M10 30h28"/><path d="M29 16v2"/>',
   window: '<rect x="8" y="4" width="32" height="22"/><path d="M24 4v22"/><path d="M5 28h38"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
@@ -548,6 +550,41 @@ export function initUI(view) {
   });
   const lockNote = h('p', { class: 'lock-note' }, 'Locked. Unlock to make changes.');
 
+  // A tab on each edge of the view hides or shows that side panel, and the view grows into the space.
+  const app = document.querySelector('.app');
+  const edgeTab = (side) =>
+    h('button', {
+      type: 'button',
+      class: `edge-toggle edge-toggle--${side}`,
+      'aria-controls': side === 'left' ? 'panel' : 'inspector',
+      onclick: () => store.setPanel(side, !store.getUI()[`${side}Open`]),
+    });
+  const leftTab = edgeTab('left');
+  const rightTab = edgeTab('right');
+  app.append(leftTab, rightTab);
+  // On narrow screens the panels stack under the view and always show.
+  const stacked = matchMedia('(max-width: 820px)');
+  const syncPanels = () => {
+    const { leftOpen, rightOpen, sel } = store.getUI();
+    app.classList.toggle('is-left-closed', !leftOpen);
+    app.classList.toggle('is-right-closed', !rightOpen);
+    panel.inert = !leftOpen && !stacked.matches;
+    inspector.inert = !rightOpen && !stacked.matches;
+    const label = (open, what, key) => `${open ? 'Hide' : 'Show'} ${what} (${key})`;
+    leftTab.setAttribute('aria-expanded', String(leftOpen));
+    leftTab.title = label(leftOpen, 'the side panel', '[');
+    leftTab.setAttribute('aria-label', leftTab.title);
+    leftTab.innerHTML = icon(leftOpen ? 'chevronLeft' : 'chevronRight');
+    rightTab.setAttribute('aria-expanded', String(rightOpen));
+    rightTab.title = label(rightOpen, 'the details panel', ']');
+    rightTab.setAttribute('aria-label', rightTab.title);
+    rightTab.innerHTML = icon(rightOpen ? 'chevronRight' : 'chevronLeft');
+    // With the details panel hidden, a dot on its tab says there's something selected to see.
+    rightTab.classList.toggle('has-details', !rightOpen && Boolean(sel));
+  };
+  syncers.push(syncPanels);
+  stacked.addEventListener('change', syncPanels);
+
   let inspectorKey; // undefined, so the first update always renders
   let inspectorSyncers = [];
   store.subscribe((state, ui) => {
@@ -668,6 +705,7 @@ function buildHelp(root) {
           ['Arrow keys', 'Nudge 1 cm (Shift: 10 cm)'],
           ['Shift + click', 'Select several walls'],
           ['Ctrl/Cmd + G', 'Group selected walls'],
+          ['[ and ]', 'Hide or show the side panels'],
           ['Delete', 'Remove'],
           ['Esc', 'Deselect'],
         ].map(([key, what]) => [h('dt', {}, key), h('dd', {}, what)]),
@@ -1067,7 +1105,13 @@ function buildItemInspector(root, item) {
 function bindShortcuts() {
   window.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
-    const { sel, several, drawing } = store.getUI();
+    const { sel, several, drawing, leftOpen, rightOpen } = store.getUI();
+    if ((e.key === '[' || e.key === ']') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      if (e.key === '[') store.setPanel('left', !leftOpen);
+      else store.setPanel('right', !rightOpen);
+      return;
+    }
     if (drawing) return; // the drawing tool has its own keys
     if (e.key === 'Escape') {
       if (several) store.setSeveral(false);

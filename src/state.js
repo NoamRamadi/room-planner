@@ -66,8 +66,17 @@ let state = loadSaved() ?? fresh();
 // locked: nothing can be moved or changed, only looked at and selected.
 // Both are view settings, remembered separately from the design.
 // drawing: the wall drawing tool is open (the rest of the app waits until it closes).
+// leftOpen, rightOpen: the side panels are showing (also remembered).
 const view = loadView();
-let ui = { sel: null, several: false, cutaway: view.cutaway ?? true, locked: view.locked ?? false, drawing: false };
+let ui = {
+  sel: null,
+  several: false,
+  cutaway: view.cutaway ?? true,
+  locked: view.locked ?? false,
+  drawing: false,
+  leftOpen: view.leftOpen ?? true,
+  rightOpen: view.rightOpen ?? true,
+};
 const listeners = new Set();
 let saveTimer = 0;
 
@@ -95,7 +104,8 @@ function loadView() {
 
 function saveView() {
   try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway: ui.cutaway, locked: ui.locked }));
+    const { cutaway, locked, leftOpen, rightOpen } = ui;
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway, locked, leftOpen, rightOpen }));
   } catch {
     // Not remembered for next time, but it still applies now.
   }
@@ -103,6 +113,13 @@ function saveView() {
 
 export function setCutaway(on) {
   ui = { ...ui, cutaway: on };
+  saveView();
+  emit();
+}
+
+// Show or hide a side panel: 'left' (rooms, walls and furniture) or 'right' (details of the selection).
+export function setPanel(side, open) {
+  ui = { ...ui, [side === 'left' ? 'leftOpen' : 'rightOpen']: open };
   saveView();
   emit();
 }
