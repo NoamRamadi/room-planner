@@ -724,6 +724,33 @@ h3 {
   }
 }
 
+/* ---- Undo and redo in the view bar ---- */
+
+.history button {
+  display: grid;
+  place-items: center;
+  padding: 5px 8px;
+}
+
+.history svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.history button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.history button:disabled:hover {
+  background: transparent;
+}
+
 /* ---- Lock button in the view bar ---- */
 
 .lock {

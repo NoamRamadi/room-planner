@@ -683,6 +683,7 @@ export function createScene(container) {
         e.preventDefault();
         const anchor = { id: end.dataset.wall, end: Number(end.dataset.end) };
         cornerDrag = { corner: store.cornerAt(anchor.id, anchor.end), anchor, pointerId: e.pointerId, moved: false };
+        store.beginGesture(); // the whole drag is one step to undo
         container.setPointerCapture(e.pointerId);
         return;
       }
@@ -704,6 +705,7 @@ export function createScene(container) {
       }
       dragPlane.set(UP, -hit.point.y);
       const start = { x: hit.point.x / CM, z: hit.point.z / CM, sx: e.clientX, sy: e.clientY };
+      store.beginGesture(); // the whole drag is one step to undo
       if (hit.kind === 'item') {
         store.select(hit.id);
         const item = store.getSelected();
@@ -755,6 +757,7 @@ export function createScene(container) {
 
   function endDrags() {
     itemDrag = openingDrag = wallDrag = cornerDrag = null;
+    store.endGesture();
     showSnap(null);
     container.classList.remove('is-dragging');
   }

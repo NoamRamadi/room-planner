@@ -19,6 +19,7 @@ Plan a room of your apartment in 3D, right in the browser.
 - Switch between 3D view, top view (floor plan) and eye level, and save a photo of the view
 - Turn **See-through walls** on to cut away walls that stand between you and the room, or off to keep every wall standing
 - **Lock** the design when you're done, so you can look around and check measurements without moving anything by accident
+- **Undo and redo** any change: the arrows at the start of the bar above the view, or Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z
 
 Your design is saved automatically in the browser. Use **Save design file** / **Open design file** to move it to another computer or share it.
 
@@ -102,6 +103,7 @@ Carpets lie flat on the floor: furniture can stand on them, and carpets and furn
 | Duplicate | Ctrl/Cmd+D, or the Duplicate button |
 | Deselect | Esc, or click empty space |
 | Select several walls | Shift-click (or Select several), then group with Ctrl/Cmd+G; ungroup with Ctrl/Cmd+Shift+G |
+| Undo / redo | The arrows above the view, Ctrl/Cmd+Z, and Shift+Ctrl/Cmd+Z (or Ctrl+Y). A whole drag, or a run of typing in one field, is one step; the last 100 steps are kept while the page is open |
 | Hide or show the side panels | The tabs on the left and right edges of the view, or `[` and `]` (on phones the panels stay below the view) |
 
 ## Code

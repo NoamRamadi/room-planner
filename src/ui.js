@@ -21,6 +21,8 @@ const ICONS = {
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>',
+  redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h4"/>',
   chevronLeft: '<path d="M15 5l-7 7 7 7"/>',
   chevronRight: '<path d="M9 5l7 7-7 7"/>',
   door: '<path d="M15 30V3h18v27"/><path d="M10 30h28"/><path d="M29 16v2"/>',
@@ -577,7 +579,17 @@ export function initUI(view) {
     lock.innerHTML = `${icon(locked ? 'lock' : 'unlock')}<span>${locked ? 'Locked' : 'Lock'}</span>`;
   });
 
+  // Undo and redo: every change to the design, one drag or one run of typing at a time.
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+  const undoBtn = h('button', { type: 'button', 'aria-label': 'Undo', title: `Undo (${mac ? '⌘Z' : 'Ctrl+Z'})`, html: icon('undo'), onclick: () => store.undo() });
+  const redoBtn = h('button', { type: 'button', 'aria-label': 'Redo', title: `Redo (${mac ? '⇧⌘Z' : 'Ctrl+Y'})`, html: icon('redo'), onclick: () => store.redo() });
+  syncers.push(() => {
+    undoBtn.disabled = !store.canUndo();
+    redoBtn.disabled = !store.canRedo();
+  });
+
   document.getElementById('viewbar').append(
+    h('div', { class: 'segmented segmented--stage history', role: 'group', 'aria-label': 'History' }, undoBtn, redoBtn),
     h(
       'div',
       { class: 'segmented segmented--stage', role: 'group', 'aria-label': 'Camera' },
@@ -763,6 +775,8 @@ function buildHelp(root) {
           ['Arrow keys', 'Nudge 1 cm (Shift: 10 cm)'],
           ['Shift + click', 'Select several walls'],
           ['Ctrl/Cmd + G', 'Group selected walls'],
+          ['Ctrl/Cmd + Z', 'Undo'],
+          ['Shift + Ctrl/Cmd + Z', 'Redo'],
           ['[ and ]', 'Hide or show the side panels'],
           ['Delete', 'Remove'],
           ['Esc', 'Deselect'],
@@ -1183,6 +1197,17 @@ function bindShortcuts() {
       return;
     }
     if (drawing) return; // the drawing tool has its own keys
+    const undoKey = (e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z');
+    if ((undoKey && e.shiftKey) || (e.ctrlKey && (e.key === 'y' || e.key === 'Y'))) {
+      e.preventDefault();
+      store.redo();
+      return;
+    }
+    if (undoKey) {
+      e.preventDefault();
+      store.undo();
+      return;
+    }
     if (e.key === 'Escape') {
       if (several) store.setSeveral(false);
       store.clearSelection();

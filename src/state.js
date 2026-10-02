@@ -81,10 +81,75 @@ const listeners = new Set();
 let saveTimer = 0;
 
 function emit() {
+  if (state !== committed) record();
+  nextKey = null;
   for (const fn of listeners) fn(state, ui);
   clearTimeout(saveTimer);
   saveTimer = setTimeout(save, 250);
 }
+
+// ---- Undo and redo ----
+// The design is never edited in place, so history keeps earlier designs as they were. A drag (a
+// gesture) is one step, and so is a run of quick changes to the same thing (typing a size, dragging
+// a slider or a color picker), marked by the key the change sets in `nextKey`.
+
+const HISTORY = 100;
+const past = [];
+const future = [];
+let committed = state; // the design as of the last step in history
+let gesture = { open: false, recorded: false };
+let nextKey = null;
+let last = { key: null, time: 0 };
+
+function record() {
+  const now = performance.now();
+  const merge = (gesture.open && gesture.recorded) || (nextKey !== null && nextKey === last.key && now - last.time < 1000);
+  if (!merge) {
+    past.push(committed);
+    if (past.length > HISTORY) past.shift();
+    future.length = 0;
+  }
+  if (gesture.open) gesture.recorded = true;
+  last = { key: nextKey, time: now };
+  committed = state;
+}
+
+// Drags call these around their moves, so the whole drag undoes in one step.
+export function beginGesture() {
+  gesture = { open: true, recorded: false };
+}
+
+export function endGesture() {
+  gesture = { open: false, recorded: false };
+  last = { key: null, time: 0 };
+}
+
+export const canUndo = () => past.length > 0 && !ui.locked && !ui.drawing;
+export const canRedo = () => future.length > 0 && !ui.locked && !ui.drawing;
+
+// After stepping through history, keep only the parts of the selection that still exist.
+function stillThere(sel) {
+  if (!sel) return null;
+  const has = (list, id) => list.some((x) => x.id === id);
+  if (sel.type === 'item') return has(state.items, sel.id) ? sel : null;
+  if (sel.type === 'wall') return has(state.walls, sel.id) ? sel : null;
+  if (sel.type === 'group') return has(state.groups, sel.id) ? sel : null;
+  if (sel.type === 'opening') return has(state.openings, sel.id) ? sel : null;
+  const ids = sel.ids.filter((id) => has(state.walls, id));
+  return ids.length > 1 ? { type: 'walls', ids } : ids.length ? { type: 'wall', id: ids[0] } : null;
+}
+
+function travel(from, to) {
+  if (ui.locked || ui.drawing || !from.length) return;
+  to.push(state);
+  state = committed = from.pop();
+  last = { key: null, time: 0 };
+  ui = { ...ui, sel: stillThere(ui.sel) };
+  emit();
+}
+
+export const undo = () => travel(past, future);
+export const redo = () => travel(future, past);
 
 function save() {
   try {
@@ -239,6 +304,7 @@ export function pressWall(id) {
 // Floor pattern and color, and the color and height of every wall.
 export function updateRoom(patch) {
   if (ui.locked) return null;
+  nextKey = `room:${Object.keys(patch).sort()}`;
   let walls = state.walls;
   if ('wallColor' in patch) walls = walls.map((w) => ({ ...w, color: patch.wallColor }));
   if ('height' in patch) walls = walls.map((w) => ({ ...w, height: patch.height, gap: Math.min(w.gap, patch.height - 20) }));
@@ -326,6 +392,7 @@ export function addRoom(width, length) {
 
 export function updateWall(id, patch) {
   if (ui.locked) return null;
+  nextKey = `wall:${id}:${Object.keys(patch).sort()}`;
   commitWalls(state.walls.map((w) => (w.id === id ? { ...w, ...patch } : w)));
 }
 
@@ -409,6 +476,7 @@ export function dragWalls(originals, dx, dz) {
 
 export function nudgeWalls(ids, dx, dz) {
   if (ui.locked) return null;
+  nextKey = `nudge:${ids}`;
   const set = new Set(ids);
   commitWalls(state.walls.map((w) => (set.has(w.id) ? { ...w, x1: w.x1 + dx, z1: w.z1 + dz, x2: w.x2 + dx, z2: w.z2 + dz } : w)));
 }
@@ -512,6 +580,7 @@ export function ungroup(groupId) {
 
 export function renameGroup(id, name) {
   if (ui.locked) return null;
+  nextKey = `group-name:${id}`;
   state = { ...state, groups: state.groups.map((g) => (g.id === id ? { ...g, name } : g)) };
   emit();
 }
@@ -580,6 +649,7 @@ export function addOpening(kind, style) {
 // still called by its design's name takes the new design's name.
 export function updateOpening(id, patch) {
   if (ui.locked) return null;
+  nextKey = `opening:${id}:${Object.keys(patch).sort()}`;
   const before = openingById(id);
   if (!before) return null;
   if (patch.style && patch.style !== before.style) {
@@ -614,6 +684,7 @@ export function moveOpening(id, x, z) {
 // Slide along its wall, staying inside the wall.
 export function slideOpening(id, offset) {
   if (ui.locked) return null;
+  nextKey = `slide:${id}`;
   const o = openingById(id);
   const w = wallById(o.wall);
   const span = openingSpan({ ...o, offset }, w);
@@ -672,6 +743,7 @@ function replaceItem(before, after) {
 // if the piece now runs into a wall, it moves clear of it.
 export function updateItem(id, patch) {
   if (ui.locked) return null;
+  nextKey = `item:${id}:${Object.keys(patch).sort()}`;
   const before = state.items.find((i) => i.id === id);
   if (!before) return;
   if ('rotation' in patch) patch = { ...patch, rotation: normAngle(patch.rotation) };
@@ -687,6 +759,7 @@ export function updateItem(id, patch) {
 
 export function moveItem(id, x, z) {
   if (ui.locked) return null;
+  nextKey = `move:${id}`;
   const before = state.items.find((i) => i.id === id);
   if (!before) return;
   replaceItem(before, moveWithin(before, x, z, state.walls, state.items));
