@@ -14,6 +14,7 @@ Plan a room of your apartment in 3D, right in the browser.
   - TV stand: cabinet, open shelves, floating, sideboard
   - TV: centre stand, feet, wall-mounted (at a height you set), curved
   - Carpet: bordered, round, striped, classic (Persian-style, with fringes), geometric, shaggy; in two colors of your choice
+- Design a kitchen: kitchen cabinets (base cabinet, drawers, wall cabinet, tall pantry, open shelf), sink units (single, double, farmhouse), cooking (freestanding range, hob with oven, extractor hood, tall oven), fridges (single door, fridge-freezer, side by side, under-counter, retro), dishwashers (integrated, freestanding), kitchen islands (plain, with breakfast bar, island table) and bar stools (wooden, metal, with backrest)
 - Design a bathroom: toilets (with cistern, wall-hung, bidet), sinks (pedestal, vanity, wall-hung, double, countertop bowl), showers (enclosure, curved corner, walk-in, shower cabin, shower head), bathtubs (built-in, freestanding, with shower screen), washing machines (front-loading, top-loading, washer and dryer) and bathroom cabinets (tall, mirror cabinet, open shelves)
 - See each piece's size and its distance to every wall while it's selected
 - Switch between 3D view, top view (floor plan) and eye level, and save a photo of the view
@@ -86,9 +87,11 @@ Under **Walls → Doors and windows**, click **Door** or **Window** and pick a d
 
 ## Furniture designs
 
-Under **Add furniture**, pick **Living room** or **Bathroom**, click a type and pick a design from the menu. To change a piece's design later, select it and pick another under **Design**; its size is kept wherever the new design allows. Each design has its own size presets. A round table has a single size, its diameter. A wall-mounted TV has a height above the floor. A corner sofa can have its chaise on the left.
+Under **Add furniture**, pick **Living room**, **Kitchen** or **Bathroom**, click a type and pick a design from the menu. To change a piece's design later, select it and pick another under **Design**; its size is kept wherever the new design allows. Each design has its own size presets. A round table has a single size, its diameter. A wall-mounted TV has a height above the floor. A corner sofa can have its chaise on the left.
 
 Bathroom pieces find their own place: toilets, sinks, washing machines and cabinets line up along a wall, showers and bathtubs go into corners, a mirror cabinet hangs over the sink, and none of them block a door (tall ones stay clear of windows too). A mirror cabinet and a shower head hang on the wall at a height you set (**Above floor**).
+
+Kitchen pieces line up the same way, side by side along a wall, so adding a few base cabinets, a sink unit, a hob and a dishwasher makes a kitchen run. Wall cabinets hang over the base units, an extractor hood over the cooker, each taking the width of the unit below it; tall pieces (fridges, pantries, oven towers) keep clear of hanging cabinets and windows. A kitchen island goes in the middle of the floor and bar stools line up along its front, facing it. Cabinets have separate **Fronts** and **Countertop** colors; appliances come in stainless steel, white, black, graphite or cream.
 
 Carpets lie flat on the floor: furniture can stand on them, and carpets and furniture never push each other out of the way (walls still stop a carpet). A carpet's pattern is drawn at its real size in its **Main** and **Pattern** colors, and its presets include a runner. Designs saved by earlier versions open as a group of walls.
 
@@ -115,7 +118,7 @@ Carpets lie flat on the floor: furniture can stand on them, and carpets and furn
 | `src/dom.js` | Small helpers for building the panels (elements, measuring-tape number fields) |
 | `src/walls.js` | Wall geometry: curved walls, mitred corners, snapping, the floor from enclosed areas, walls around doors and windows |
 | `src/openings.js` | Doors and windows: designs, sizes and 3D models |
-| `src/layout.js` | Furniture placement: keeping pieces out of walls, placing new pieces, TV on stand |
+| `src/layout.js` | Furniture placement: keeping pieces out of walls, placing new pieces (along walls, in corners, hanging over other pieces, stools at the island, TV on stand) |
 | `src/state.js` | The design (walls, groups, furniture) and selection, saving to the browser, import/export |
 | `src/scene.js` | The 3D view (three.js): walls, floor, furniture, camera views, dragging, measurements |
 | `src/ui.js` | The side panels, buttons and keyboard shortcuts |

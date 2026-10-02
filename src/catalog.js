@@ -108,6 +108,33 @@ const APPLIANCES = [
   { name: 'Black', hex: '#1e1f22' },
 ];
 
+const FRONTS = [
+  { name: 'White', hex: '#f2f1ec' },
+  { name: 'Light grey', hex: '#cfd2d3' },
+  { name: 'Sage', hex: '#9fae94' },
+  { name: 'Navy', hex: '#2f3c56' },
+  { name: 'Charcoal', hex: '#3b3e43' },
+  { name: 'Oak', hex: '#b88f5d' },
+  { name: 'Walnut', hex: '#5d4030' },
+];
+
+const WORKTOPS = [
+  { name: 'White quartz', hex: '#efeee9' },
+  { name: 'Marble', hex: '#e2e0da' },
+  { name: 'Concrete', hex: '#a7a8a5' },
+  { name: 'Black granite', hex: '#2b2c2f' },
+  { name: 'Oak block', hex: '#c09a6b' },
+  { name: 'Terrazzo', hex: '#d9d2c5' },
+];
+
+const FINISHES = [
+  { name: 'Stainless steel', hex: '#c3c6c9' },
+  { name: 'White', hex: '#f2f2ef' },
+  { name: 'Black', hex: '#1e1f22' },
+  { name: 'Graphite', hex: '#4a4c50' },
+  { name: 'Cream', hex: '#ece3c8' },
+];
+
 const TV_FINISHES = [
   { name: 'Black', hex: '#1d1e21' },
   { name: 'Graphite', hex: '#4a4c50' },
@@ -134,8 +161,10 @@ const TV_SIZES = [
 ];
 
 // Each type comes in several designs (`styles`). A design can bring its own starting size and colors
-// (`defaults`), size limits and size presets; `name` is what a new piece of that design is called.
-// `surface`: other items can stand on it. `stackable`: rests on a surface when placed over one.
+// (`defaults`), size limits, size presets and color choices; `name` is what a new piece of that
+// design is called. `surface`: other items can stand on it. `stackable`: rests on a surface when
+// placed over one. `room`: the furniture set it's listed under. `place`: where a new one goes
+// ('wall', 'corner', or 'island' for stools); a hanging design's `over` lists what it hangs above.
 export const CATALOG = {
   sofa: {
     label: 'Sofa',
@@ -623,6 +652,7 @@ export const CATALOG = {
         label: 'Mirror cabinet',
         name: 'Mirror cabinet',
         onWall: true, // `mount` is the height of its bottom edge
+        over: ['sink'], // hung above a sink, if there is one
         defaults: { w: 60, d: 15, h: 70 },
         presets: [
           { name: '60 cm', w: 60, d: 15, h: 70 },
@@ -643,6 +673,312 @@ export const CATALOG = {
     ],
     build: buildBathCabinet,
   },
+
+  // ---- Kitchen ----
+
+  kitchen: {
+    label: 'Kitchen cabinet',
+    room: 'kitchen',
+    place: 'wall',
+    defaults: { style: 'base', w: 60, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9', mount: 145 },
+    limits: { w: [30, 300], d: [15, 70], h: [20, 240], mount: [40, 220] },
+    colors: [
+      { key: 'color', label: 'Fronts', palette: FRONTS },
+      { key: 'color2', label: 'Countertop', palette: WORKTOPS },
+    ],
+    styles: [
+      {
+        id: 'base',
+        label: 'Base cabinet',
+        name: 'Base cabinet',
+        limits: { d: [45, 70], h: [70, 100] },
+        presets: [
+          { name: '40 cm', w: 40, d: 60, h: 90 },
+          { name: '60 cm', w: 60, d: 60, h: 90 },
+          { name: '80 cm', w: 80, d: 60, h: 90 },
+          { name: '120 cm', w: 120, d: 60, h: 90 },
+        ],
+      },
+      {
+        id: 'drawers',
+        label: 'Drawers',
+        name: 'Drawer cabinet',
+        limits: { d: [45, 70], h: [70, 100] },
+        presets: [
+          { name: '40 cm', w: 40, d: 60, h: 90 },
+          { name: '60 cm', w: 60, d: 60, h: 90 },
+          { name: '80 cm', w: 80, d: 60, h: 90 },
+        ],
+      },
+      {
+        id: 'wall',
+        label: 'Wall cabinet',
+        name: 'Wall cabinet',
+        onWall: true, // `mount` is the height of its bottom edge
+        over: ['kitchen', 'sinkunit', 'dishwasher'], // hung above a base unit with nothing above it yet
+        defaults: { w: 60, d: 35, h: 70 },
+        limits: { d: [25, 40], h: [30, 100] },
+        colors: [{ key: 'color', label: 'Fronts', palette: FRONTS }],
+        presets: [
+          { name: '40 cm', w: 40, d: 35, h: 70 },
+          { name: '60 cm', w: 60, d: 35, h: 70 },
+          { name: '80 cm', w: 80, d: 35, h: 70 },
+        ],
+      },
+      {
+        id: 'tall',
+        label: 'Tall pantry',
+        name: 'Pantry',
+        defaults: { h: 210 },
+        limits: { d: [45, 70], h: [150, 240] },
+        colors: [{ key: 'color', label: 'Fronts', palette: FRONTS }],
+        presets: [
+          { name: '40 cm', w: 40, d: 60, h: 210 },
+          { name: '60 cm', w: 60, d: 60, h: 210 },
+        ],
+      },
+      {
+        id: 'shelf',
+        label: 'Open shelf',
+        name: 'Kitchen shelf',
+        onWall: true,
+        defaults: { w: 80, d: 25, h: 40, mount: 150, color: '#b88f5d' },
+        limits: { d: [15, 35], h: [20, 60] },
+        colors: [{ key: 'color', label: 'Shelves', palette: FRONTS }],
+        presets: [
+          { name: '60 cm', w: 60, d: 25, h: 40 },
+          { name: '80 cm', w: 80, d: 25, h: 40 },
+          { name: '120 cm', w: 120, d: 25, h: 40 },
+        ],
+      },
+    ],
+    build: buildKitchenCabinet,
+  },
+  sinkunit: {
+    label: 'Sink unit',
+    room: 'kitchen',
+    place: 'wall',
+    defaults: { style: 'single', w: 80, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9' },
+    limits: { w: [50, 200], d: [50, 70], h: [80, 100] },
+    colors: [
+      { key: 'color', label: 'Fronts', palette: FRONTS },
+      { key: 'color2', label: 'Countertop', palette: WORKTOPS },
+    ],
+    styles: [
+      {
+        id: 'single',
+        label: 'Single bowl',
+        name: 'Sink unit',
+        presets: [
+          { name: '60 cm', w: 60, d: 60, h: 90 },
+          { name: '80 cm', w: 80, d: 60, h: 90 },
+        ],
+      },
+      {
+        id: 'double',
+        label: 'Double bowl',
+        name: 'Double sink unit',
+        defaults: { w: 120 },
+        limits: { w: [90, 200] },
+        presets: [
+          { name: '100 cm', w: 100, d: 60, h: 90 },
+          { name: '120 cm', w: 120, d: 60, h: 90 },
+        ],
+      },
+      {
+        id: 'farmhouse',
+        label: 'Farmhouse',
+        name: 'Farmhouse sink',
+        defaults: { w: 90, color: '#9fae94', color2: '#c09a6b' },
+        presets: [
+          { name: '80 cm', w: 80, d: 60, h: 90 },
+          { name: '90 cm', w: 90, d: 60, h: 90 },
+        ],
+      },
+    ],
+    build: buildSinkUnit,
+  },
+  cooking: {
+    label: 'Cooking',
+    room: 'kitchen',
+    place: 'wall',
+    defaults: { style: 'range', w: 60, d: 60, h: 90, color: '#c3c6c9', color2: '#f2f1ec', color3: '#efeee9', mount: 150 },
+    limits: { w: [45, 120], d: [30, 70], h: [40, 240], mount: [120, 200] },
+    colors: [
+      { key: 'color', label: 'Appliance', palette: FINISHES },
+      { key: 'color2', label: 'Fronts', palette: FRONTS },
+      { key: 'color3', label: 'Countertop', palette: WORKTOPS },
+    ],
+    styles: [
+      {
+        id: 'range',
+        label: 'Freestanding range',
+        name: 'Range cooker',
+        limits: { d: [55, 70], h: [85, 100] },
+        colors: [{ key: 'color', label: 'Appliance', palette: FINISHES }],
+        presets: [
+          { name: '60 cm', w: 60, d: 60, h: 90 },
+          { name: '90 cm', w: 90, d: 60, h: 90 },
+        ],
+      },
+      {
+        id: 'hob',
+        label: 'Hob with oven',
+        name: 'Hob and oven',
+        limits: { d: [55, 70], h: [80, 100] },
+        presets: [
+          { name: '60 cm', w: 60, d: 60, h: 90 },
+          { name: '80 cm', w: 80, d: 60, h: 90 },
+        ],
+      },
+      {
+        id: 'hood',
+        label: 'Extractor hood',
+        name: 'Extractor hood',
+        onWall: true, // `mount` is the height of its bottom edge
+        over: ['cooking'], // hung above the cooker
+        defaults: { d: 50, h: 90 },
+        limits: { d: [30, 60], h: [40, 120] },
+        colors: [{ key: 'color', label: 'Appliance', palette: FINISHES }],
+        presets: [
+          { name: '60 cm', w: 60, d: 50, h: 90 },
+          { name: '90 cm', w: 90, d: 50, h: 90 },
+        ],
+      },
+      {
+        id: 'oven',
+        label: 'Tall oven',
+        name: 'Oven tower',
+        defaults: { h: 210 },
+        limits: { d: [55, 70], h: [150, 240] },
+        colors: [
+          { key: 'color', label: 'Appliance', palette: FINISHES },
+          { key: 'color2', label: 'Fronts', palette: FRONTS },
+        ],
+        presets: [{ name: '60 cm', w: 60, d: 60, h: 210 }],
+      },
+    ],
+    build: buildCooking,
+  },
+  fridge: {
+    label: 'Fridge',
+    room: 'kitchen',
+    place: 'wall',
+    defaults: { style: 'combi', w: 60, d: 65, h: 185, color: '#c3c6c9' },
+    limits: { w: [45, 120], d: [55, 80], h: [80, 210] },
+    colors: [{ key: 'color', label: 'Finish', palette: FINISHES }],
+    styles: [
+      { id: 'single', label: 'Single door', name: 'Fridge', presets: [{ name: 'Standard', w: 60, d: 65, h: 185 }] },
+      {
+        id: 'combi',
+        label: 'Fridge-freezer',
+        name: 'Fridge-freezer',
+        presets: [
+          { name: '60 cm', w: 60, d: 65, h: 185 },
+          { name: '70 cm', w: 70, d: 68, h: 200 },
+        ],
+      },
+      { id: 'american', label: 'Side by side', name: 'American fridge', defaults: { w: 91, d: 72, h: 178 }, presets: [{ name: 'Standard', w: 91, d: 72, h: 178 }] },
+      { id: 'under', label: 'Under-counter', name: 'Under-counter fridge', defaults: { w: 60, d: 60, h: 85 }, presets: [{ name: 'Standard', w: 60, d: 60, h: 85 }] },
+      { id: 'retro', label: 'Retro', name: 'Retro fridge', defaults: { w: 60, d: 70, h: 150, color: '#ece3c8' }, presets: [{ name: 'Standard', w: 60, d: 70, h: 150 }] },
+    ],
+    build: buildFridge,
+  },
+  dishwasher: {
+    label: 'Dishwasher',
+    room: 'kitchen',
+    place: 'wall',
+    defaults: { style: 'integrated', w: 60, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9' },
+    limits: { w: [45, 60], d: [55, 65], h: [80, 90] },
+    colors: [
+      { key: 'color', label: 'Front', palette: FRONTS },
+      { key: 'color2', label: 'Countertop', palette: WORKTOPS },
+    ],
+    styles: [
+      {
+        id: 'integrated',
+        label: 'Integrated',
+        name: 'Dishwasher',
+        presets: [
+          { name: 'Slim', w: 45, d: 60, h: 90 },
+          { name: 'Standard', w: 60, d: 60, h: 90 },
+        ],
+      },
+      {
+        id: 'freestanding',
+        label: 'Freestanding',
+        name: 'Freestanding dishwasher',
+        defaults: { h: 85, color: '#c3c6c9' },
+        colors: [{ key: 'color', label: 'Finish', palette: FINISHES }],
+        presets: [
+          { name: 'Slim', w: 45, d: 60, h: 85 },
+          { name: 'Standard', w: 60, d: 60, h: 85 },
+        ],
+      },
+    ],
+    build: buildDishwasher,
+  },
+  island: {
+    label: 'Kitchen island',
+    room: 'kitchen',
+    defaults: { style: 'island', w: 180, d: 90, h: 90, color: '#2f3c56', color2: '#efeee9' },
+    limits: { w: [80, 400], d: [60, 150], h: [75, 110] },
+    colors: [
+      { key: 'color', label: 'Fronts', palette: FRONTS },
+      { key: 'color2', label: 'Countertop', palette: WORKTOPS },
+    ],
+    styles: [
+      {
+        id: 'island',
+        label: 'Island',
+        name: 'Kitchen island',
+        presets: [
+          { name: 'Small', w: 120, d: 80, h: 90 },
+          { name: 'Medium', w: 180, d: 90, h: 90 },
+          { name: 'Large', w: 240, d: 100, h: 90 },
+        ],
+      },
+      {
+        id: 'bar',
+        label: 'With breakfast bar',
+        name: 'Island with bar',
+        defaults: { w: 200, d: 100 },
+        presets: [
+          { name: 'Medium', w: 180, d: 100, h: 90 },
+          { name: 'Large', w: 240, d: 110, h: 90 },
+        ],
+      },
+      {
+        id: 'table',
+        label: 'Island table',
+        name: 'Island table',
+        defaults: { w: 160, d: 80, color: '#b88f5d', color2: '#c09a6b' },
+        presets: [
+          { name: 'Medium', w: 160, d: 80, h: 90 },
+          { name: 'Large', w: 220, d: 90, h: 90 },
+        ],
+      },
+    ],
+    surface: true,
+    build: buildIsland,
+  },
+  stool: {
+    label: 'Bar stool',
+    room: 'kitchen',
+    place: 'island', // in a row along the seating side of the island, if there is one
+    defaults: { style: 'wood', w: 40, d: 40, h: 75, color: '#b88f5d', color2: '#26272a' },
+    limits: { w: [30, 55], d: [30, 55], h: [55, 85] },
+    colors: [
+      { key: 'color', label: 'Seat', palette: [...WOODS, ...FABRICS.slice(0, 4)] },
+      { key: 'color2', label: 'Frame', palette: TRIMS },
+    ],
+    styles: [
+      { id: 'wood', label: 'Wooden', name: 'Bar stool', presets: [{ name: 'Counter', w: 40, d: 40, h: 65 }, { name: 'Bar', w: 40, d: 40, h: 75 }] },
+      { id: 'metal', label: 'Metal', name: 'Metal stool', defaults: { color: '#3b3e43' }, presets: [{ name: 'Counter', w: 40, d: 40, h: 65 }, { name: 'Bar', w: 40, d: 40, h: 75 }] },
+      { id: 'back', label: 'With backrest', name: 'Bar chair', defaults: { w: 44, d: 44, color: '#5d6673' }, presets: [{ name: 'Counter', w: 44, d: 44, h: 65 }, { name: 'Bar', w: 44, d: 44, h: 75 }] },
+    ],
+    build: buildStool,
+  },
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -650,6 +986,8 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 export const styleOf = (item) => CATALOG[item.type].styles.find((s) => s.id === item.style) ?? CATALOG[item.type].styles[0];
 export const limitsOf = (item) => ({ ...CATALOG[item.type].limits, ...styleOf(item).limits });
 export const presetsOf = (item) => styleOf(item).presets ?? CATALOG[item.type].presets;
+// The colors that can be set: a design can have fewer (a hood has no countertop).
+export const colorsOf = (item) => styleOf(item).colors ?? CATALOG[item.type].colors;
 // Hangs on a wall (a wall-mounted TV) rather than standing on the floor or on furniture.
 export const isOnWall = (item) => Boolean(styleOf(item).onWall);
 export const isStackable = (item) => Boolean(CATALOG[item.type].stackable) && !isOnWall(item);
@@ -977,7 +1315,7 @@ function buildTvStand(dims, item) {
 // Thin dark lines on the front of a body, between doors or drawers.
 function grooves(g, material, { w, x0 = -w / 2, y0, bodyH, z, cols, rows = 1 }) {
   for (let i = 1; i < cols; i++) g.add(block(0.006, bodyH - 0.03, 0.004, material, { x: x0 + (i * w) / cols, y: y0 + 0.015, z }));
-  for (let j = 1; j < rows; j++) g.add(block(w - 0.03, 0.006, 0.004, material, { y: y0 + (j * bodyH) / rows, z }));
+  for (let j = 1; j < rows; j++) g.add(block(w - 0.03, 0.006, 0.004, material, { x: x0 + w / 2, y: y0 + (j * bodyH) / rows, z }));
 }
 
 function cabinetStand({ w, d, h }, item) {
@@ -1646,5 +1984,424 @@ function buildBathCabinet({ w, d, h }, item) {
     const x = cols === 1 ? w / 2 - 0.05 : i === 0 ? -0.04 : 0.04;
     for (const y of [plinth + bodyH * 0.38, plinth + bodyH * 0.58]) g.add(block(0.012, 0.12, 0.02, handles, { x, y, z: d / 2 + 0.01 }));
   }
+  return g;
+}
+
+// ---- Kitchen ----
+
+const painted = (hex) => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.42 });
+const stone = (hex) => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.3 });
+// Stainless steel shines; other appliance finishes are enamel.
+const appliance = (hex) => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.3, metalness: hex === '#c3c6c9' ? 0.55 : 0.1 });
+const darkGlass = () => new THREE.MeshStandardMaterial({ color: '#16181b', roughness: 0.08, metalness: 0.3 });
+const steel = () => metal('#b9bcbf');
+const PLINTH = 0.1;
+const WORKTOP = 0.04;
+
+// A cylinder from point a to point b (arrays [x, y, z]): a slanted leg, a rail.
+function rod(a, b, radius, material) {
+  const from = new THREE.Vector3(...a);
+  const dir = new THREE.Vector3(...b).sub(from);
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, dir.length(), 12), material);
+  mesh.position.copy(from).addScaledVector(dir, 0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  return mesh;
+}
+
+// A bar handle across a front at z, centred at (x, y); upright ones run up the front.
+function barHandle(g, material, { x = 0, y, z, length, upright = false }) {
+  g.add(upright ? block(0.012, length, 0.02, material, { x, y: y - length / 2, z: z + 0.01 }) : block(length, 0.012, 0.02, material, { x, y, z: z + 0.01 }));
+}
+
+// A kitchen base unit: a recessed plinth, the carcass, fronts with handles, and a countertop.
+// `layout`: 'doors' (a drawer over doors), 'drawers', 'panel' (one front, as on a dishwasher),
+// 'sink' (doors only, below `apron` taken by a farmhouse sink's front), or 'plain' (fronts added by
+// the caller).
+function baseCabinet(g, { w, d, h }, { fronts, top, layout = 'doors', apron = 0 }) {
+  const body = painted(fronts);
+  const line = shade(fronts, 0.45);
+  const handle = steel();
+  const bodyH = h - PLINTH - WORKTOP;
+  const z = d / 2 - 0.01; // the fronts, set back under the countertop's edge
+  g.add(block(w - 0.02, PLINTH, d - 0.08, shade(fronts, 0.55), { z: -0.04 }));
+  g.add(block(w, bodyH, d - 0.02, body, { y: PLINTH, z: -0.01 }));
+  g.add(block(w, WORKTOP, d, stone(top), { y: h - WORKTOP }));
+
+  const cols = w > 0.65 ? 2 : 1;
+  const colW = w / cols;
+  const handleW = Math.min(0.16, colW * 0.5);
+  const doorTop = PLINTH + bodyH - apron;
+  if (layout === 'drawers') {
+    // Three drawers, deeper towards the floor.
+    const cuts = [0.42, 0.75].map((k) => PLINTH + bodyH * k);
+    for (const y of cuts) g.add(block(w - 0.02, 0.006, 0.004, line, { y, z }));
+    for (const edge of [...cuts, PLINTH + bodyH]) barHandle(g, handle, { y: edge - 0.05, z, length: Math.min(0.3, w * 0.5) });
+    return;
+  }
+  if (layout === 'plain') return;
+  if (layout === 'panel') {
+    barHandle(g, handle, { y: doorTop - 0.05, z, length: Math.min(0.3, w * 0.5) });
+    return;
+  }
+  let below = doorTop;
+  if (layout === 'doors') {
+    below = doorTop - 0.16;
+    g.add(block(w - 0.02, 0.006, 0.004, line, { y: below, z }));
+    barHandle(g, handle, { y: doorTop - 0.07, z, length: Math.min(0.3, w * 0.5) });
+  }
+  grooves(g, line, { w, y0: PLINTH, bodyH: below - PLINTH, z, cols });
+  for (let i = 0; i < cols; i++) {
+    const x = cols === 1 ? w / 2 - 0.06 : (i === 0 ? -1 : 1) * 0.06;
+    barHandle(g, handle, { x, y: below - 0.1, z, length: Math.min(0.14, handleW), upright: true });
+  }
+}
+
+function buildKitchenCabinet({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const style = item.style;
+  if (style === 'base' || style === 'drawers') {
+    baseCabinet(g, { w, d, h }, { fronts: item.color, top: item.color2, layout: style === 'drawers' ? 'drawers' : 'doors' });
+    return g;
+  }
+  const body = painted(item.color);
+  const line = shade(item.color, 0.45);
+  const handle = steel();
+
+  if (style === 'shelf') {
+    // Two floating shelves with a few jars and bowls on them.
+    const t = 0.03;
+    const shelf = wood(item.color);
+    for (const y of [0, h - t]) g.add(block(w, t, d, shelf, { y }));
+    const jar = ceramic('#e9e6df');
+    const rnd = seeded(Math.round(w * 100));
+    for (let x = -w / 2 + 0.08; x < w / 2 - 0.06; x += 0.1 + rnd() * 0.08) {
+      const tall = Math.min(h - 2 * t - 0.03, 0.08 + rnd() * 0.1);
+      g.add(post(0.03, 0.03, tall, jar, x, -d * 0.1, t, 18));
+    }
+    g.add(oval(Math.min(0.24, w * 0.3), 0.06, Math.min(0.2, d * 0.8), jar, { x: w * 0.2, y: h, taper: 0.6 }));
+    return g;
+  }
+
+  if (style === 'wall') {
+    // A box on the wall with doors, the handles along their bottom edge.
+    g.add(block(w, h, d, body, { r: 0.004 }));
+    const cols = w > 0.65 ? 2 : 1;
+    grooves(g, line, { w, y0: 0, bodyH: h, z: d / 2, cols });
+    for (let i = 0; i < cols; i++) barHandle(g, handle, { x: -w / 2 + (w / cols) * (i + 0.5), y: 0.04, z: d / 2, length: Math.min(0.14, (w / cols) * 0.5) });
+    return g;
+  }
+
+  // Tall pantry: doors above and below on a plinth.
+  const bodyH = h - PLINTH;
+  g.add(block(w - 0.02, PLINTH, d - 0.06, shade(item.color, 0.55), { z: -0.03 }));
+  g.add(block(w, bodyH, d, body, { y: PLINTH, r: 0.004 }));
+  const cols = w > 0.65 ? 2 : 1;
+  const split = PLINTH + bodyH * 0.38;
+  g.add(block(w - 0.02, 0.006, 0.004, line, { y: split, z: d / 2 }));
+  grooves(g, line, { w, y0: PLINTH, bodyH, z: d / 2, cols });
+  for (let i = 0; i < cols; i++) {
+    const x = cols === 1 ? w / 2 - 0.06 : (i === 0 ? -1 : 1) * 0.06;
+    for (const y of [split - 0.12, split + 0.12]) barHandle(g, handle, { x, y, z: d / 2, length: 0.16, upright: true });
+  }
+  return g;
+}
+
+// A tall tap curving over the sink at (x, y, z), its spout reaching forward (+z).
+function gooseneck(g, material, { x = 0, y, z, height = 0.26, reach = 0.2 }) {
+  g.add(post(0.018, 0.024, height, material, x, z, y, 16));
+  const r = reach / 2;
+  const arc = new THREE.Mesh(new THREE.TorusGeometry(r, 0.012, 10, 24, Math.PI), material);
+  arc.rotation.y = Math.PI / 2;
+  arc.position.set(x, y + height, z + r);
+  g.add(arc);
+  g.add(post(0.014, 0.012, 0.05, material, x, z + reach, y + height - 0.05, 12));
+}
+
+// A sink bowl set into the countertop at height y: a rim and a darker bowl.
+function sinkBowl(g, { bw, bd, x = 0, y, z }) {
+  g.add(block(bw + 0.03, 0.004, bd + 0.03, metal('#c6c9cc'), { x, y, z, r: 0.002 }));
+  g.add(block(bw, 0.004, bd, new THREE.MeshStandardMaterial({ color: '#a9adb1', roughness: 0.35, metalness: 0.4 }), { x, y: y + 0.001, z, r: 0.002 }));
+}
+
+function buildSinkUnit({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const chrome = steel();
+  const bd = Math.min(0.42, d - 0.16);
+  const bz = 0.02;
+  if (item.style === 'farmhouse') {
+    // A deep ceramic sink whose front shows below the countertop.
+    const bw = Math.min(0.76, w - 0.1);
+    const apron = 0.24;
+    baseCabinet(g, { w, d, h }, { fronts: item.color, top: item.color2, layout: 'sink', apron });
+    g.add(block(bw, apron + 0.02, d - 0.06, ceramic('#f4f3ef'), { y: h - apron, z: 0.04, r: 0.012 }));
+    g.add(block(bw - 0.05, 0.004, d - 0.16, ceramic('#dcdbd6'), { y: h + 0.02, z: 0.05 }));
+    gooseneck(g, chrome, { y: h, z: -d / 2 + 0.05 });
+    return g;
+  }
+  baseCabinet(g, { w, d, h }, { fronts: item.color, top: item.color2, layout: 'sink' });
+  if (item.style === 'double') {
+    const bw = Math.min(0.42, (w - 0.24) / 2);
+    for (const s of [-1, 1]) sinkBowl(g, { bw, bd, x: s * (bw / 2 + 0.03), y: h, z: bz });
+  } else {
+    sinkBowl(g, { bw: Math.min(0.5, w - 0.2), bd, y: h, z: bz });
+  }
+  gooseneck(g, chrome, { y: h, z: -d / 2 + 0.06 });
+  return g;
+}
+
+// Control knobs in a row along a front at z, centred at height y.
+function knobs(g, material, { w, y, z, count }) {
+  for (let i = 0; i < count; i++) {
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.025, 20), material);
+    knob.rotation.x = Math.PI / 2;
+    knob.position.set(-w / 2 + (w * (i + 0.5)) / count, y, z + 0.012);
+    g.add(knob);
+  }
+}
+
+// An oven at y0, oh tall: a dark glass door with a bar handle along its top.
+function ovenFront(g, finish, { w, y0, oh, z }) {
+  g.add(block(w - 0.02, oh, 0.02, finish, { y: y0, z: z + 0.01 }));
+  g.add(block(w - 0.1, oh * 0.55, 0.006, darkGlass(), { y: y0 + oh * 0.12, z: z + 0.021 }));
+  barHandle(g, steel(), { y: y0 + oh - 0.05, z: z + 0.02, length: w - 0.12 });
+}
+
+// Cooking zones on a hob at height y: gas burners, or rings drawn on black glass.
+function burners(g, { w, d, y, z = 0, gas }) {
+  const cols = w > 0.75 ? 3 : 2;
+  const ring = new THREE.MeshStandardMaterial({ color: gas ? '#25272a' : '#55585d', roughness: 0.4 });
+  for (let i = 0; i < cols; i++) {
+    for (const row of [-1, 1]) {
+      const x = -w / 2 + (w * (i + 0.5)) / cols;
+      const r = (cols === 3 && i === 1 ? 0.06 : 0.045) * (row < 0 ? 1.1 : 0.85);
+      if (gas) {
+        g.add(post(r, r + 0.005, 0.014, ring, x, z + row * d * 0.22, y, 24));
+        g.add(post(r * 0.45, r * 0.45, 0.02, metal('#8f9397'), x, z + row * d * 0.22, y, 18));
+      } else {
+        const zone = new THREE.Mesh(new THREE.RingGeometry(r * 0.94, r, 40), ring);
+        zone.rotation.x = -Math.PI / 2;
+        zone.position.set(x, y + 0.002, z + row * d * 0.22);
+        g.add(zone);
+      }
+    }
+  }
+}
+
+function buildCooking({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const finish = appliance(item.color);
+  const style = item.style;
+
+  if (style === 'hood') {
+    // A slanted canopy at the bottom and a chimney up the wall.
+    const canopyH = Math.min(0.26, h * 0.6);
+    const shape = new THREE.Shape();
+    // Drawn as a side view (across: from the wall at the left to the front at the right; up), then
+    // extruded across the hood's width.
+    shape.moveTo(0, 0);
+    shape.lineTo(d, 0);
+    shape.lineTo(d, 0.05);
+    shape.lineTo(Math.min(d, 0.26), canopyH);
+    shape.lineTo(0, canopyH);
+    shape.closePath();
+    const canopy = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: w, bevelEnabled: false }), finish);
+    canopy.rotation.y = -Math.PI / 2;
+    canopy.position.set(w / 2, 0, -d / 2);
+    g.add(canopy);
+    if (h > canopyH) g.add(block(Math.min(0.3, w * 0.45), h - canopyH, Math.min(0.24, d), finish, { y: canopyH, z: -d / 2 + Math.min(0.24, d) / 2 }));
+    g.add(block(w - 0.06, 0.004, d - 0.06, darkGlass(), { y: -0.002, z: 0 })); // the grease filter underneath
+    return g;
+  }
+
+  if (style === 'oven') {
+    // A tall housing in the cabinet fronts: a door below, the oven, a compact oven above, a door on top.
+    const body = painted(item.color2);
+    const line = shade(item.color2, 0.45);
+    g.add(block(w - 0.02, PLINTH, d - 0.06, shade(item.color2, 0.55), { z: -0.03 }));
+    g.add(block(w, h - PLINTH, d - 0.02, body, { y: PLINTH, z: -0.01 }));
+    const z = d / 2 - 0.01;
+    const ovenY = Math.min(0.85, h - 1.05);
+    ovenFront(g, finish, { w, y0: ovenY, oh: 0.6, z });
+    ovenFront(g, finish, { w, y0: ovenY + 0.62, oh: 0.42, z });
+    g.add(block(w - 0.02, 0.006, 0.004, line, { y: ovenY - 0.004, z }));
+    barHandle(g, steel(), { y: ovenY - 0.06, z, length: Math.min(0.3, w * 0.5) });
+    if (h - ovenY - 1.06 > 0.12) {
+      g.add(block(w - 0.02, 0.006, 0.004, line, { y: ovenY + 1.06, z }));
+      barHandle(g, steel(), { y: ovenY + 1.12, z, length: Math.min(0.3, w * 0.5) });
+    }
+    return g;
+  }
+
+  if (style === 'hob') {
+    // An oven under the counter, a drawer below it, and a glass hob on top.
+    baseCabinet(g, { w, d, h }, { fronts: item.color2, top: item.color3, layout: 'plain' });
+    const oh = Math.min(0.6, h - PLINTH - WORKTOP - 0.16);
+    const ovenY = h - WORKTOP - oh - 0.01;
+    ovenFront(g, finish, { w, y0: ovenY, oh, z: d / 2 - 0.01 });
+    barHandle(g, steel(), { y: ovenY - 0.06, z: d / 2 - 0.01, length: Math.min(0.3, w * 0.5) });
+    const hw = Math.min(w - 0.08, 0.78);
+    g.add(block(hw, 0.006, Math.min(0.52, d - 0.08), darkGlass(), { y: h, z: 0.01, r: 0.003 }));
+    burners(g, { w: hw, d: Math.min(0.52, d - 0.08), y: h + 0.006, z: 0.01, gas: false });
+    return g;
+  }
+
+  // Freestanding range: a storage drawer at the bottom, the oven, knobs, gas burners and a backguard.
+  const top = h - 0.02;
+  g.add(block(w, top, d - 0.02, finish, { z: -0.01, r: 0.006 }));
+  const z = d / 2 - 0.01;
+  g.add(block(w - 0.03, 0.006, 0.004, shade(item.color, 0.45), { y: 0.14, z: z + 0.002 }));
+  ovenFront(g, finish, { w, y0: 0.15, oh: top - 0.3, z });
+  knobs(g, metal('#2a2c2f'), { w: w - 0.1, y: top - 0.07, z: z + 0.002, count: w > 0.75 ? 6 : 4 });
+  g.add(block(w, 0.02, d - 0.02, new THREE.MeshStandardMaterial({ color: '#1f2124', roughness: 0.35 }), { y: top, z: -0.01 }));
+  burners(g, { w: w - 0.06, d, y: h, z: 0.01, gas: true });
+  g.add(block(w, 0.08, 0.02, finish, { y: h, z: -d / 2 + 0.01 }));
+  return g;
+}
+
+function buildFridge({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const finish = appliance(item.color);
+  const line = shade(item.color, 0.45);
+  const handle = steel();
+  const z = d / 2;
+  const style = item.style;
+
+  if (style === 'retro') {
+    // Rounded, on short legs, with a small freezer door on top and chunky chrome handles.
+    const legH = 0.05;
+    for (const [sx, sz] of CORNERS) g.add(leg(0.015, 0.012, legH, metal('#c9ccd0'), sx * (w / 2 - 0.06), sz * (d / 2 - 0.08)));
+    g.add(block(w, h - legH, d, finish, { y: legH, r: 0.06 }));
+    const split = legH + (h - legH) * 0.7;
+    g.add(block(w - 0.06, 0.008, 0.004, line, { y: split, z }));
+    const chrome = metal('#d5d8db');
+    for (const [y, len] of [[split - 0.08, 0.22], [split + 0.04, 0.12]]) g.add(block(0.03, len, 0.035, chrome, { x: -w / 2 + 0.06, y: y - (y < split ? len : 0), z: z + 0.01, r: 0.012 }));
+    return g;
+  }
+
+  g.add(block(w, h, d, finish, { r: 0.012 }));
+  if (style === 'american') {
+    // Two tall doors side by side: the freezer on the left with a water and ice dispenser.
+    const x = -w * 0.08;
+    g.add(block(0.008, h - 0.04, 0.004, line, { x, y: 0.02, z }));
+    g.add(block(0.2, 0.3, 0.006, darkGlass(), { x: -w / 2 + (w / 2 + x) / 2, y: h * 0.52, z: z + 0.002 }));
+    for (const s of [-1, 1]) barHandle(g, handle, { x: x + s * 0.04, y: h * 0.78, z, length: h * 0.5, upright: true });
+    return g;
+  }
+  if (style === 'under') {
+    barHandle(g, handle, { y: h - 0.06, z, length: w * 0.6 });
+    return g;
+  }
+  if (style === 'single') {
+    barHandle(g, handle, { x: -w / 2 + 0.05, y: h * 0.72, z, length: 0.4, upright: true });
+    return g;
+  }
+  // Fridge-freezer: the fridge on top, the freezer drawers below.
+  const split = h * 0.38;
+  g.add(block(w - 0.02, 0.008, 0.004, line, { y: split, z }));
+  g.add(block(w - 0.02, 0.006, 0.004, line, { y: split / 2, z }));
+  barHandle(g, handle, { x: -w / 2 + 0.05, y: split + 0.45, z, length: 0.4, upright: true });
+  barHandle(g, handle, { y: split - 0.04, z, length: w * 0.5 });
+  barHandle(g, handle, { y: split / 2 - 0.04, z, length: w * 0.5 });
+  return g;
+}
+
+function buildDishwasher({ w, d, h }, item) {
+  const g = new THREE.Group();
+  if (item.style === 'integrated') {
+    // Behind a cabinet front, under the countertop.
+    baseCabinet(g, { w, d, h }, { fronts: item.color, top: item.color2, layout: 'panel' });
+    return g;
+  }
+  const finish = appliance(item.color);
+  g.add(block(w, h, d, finish, { r: 0.01 }));
+  g.add(block(w - 0.04, 0.07, 0.006, new THREE.MeshStandardMaterial({ color: '#2a2c2f', roughness: 0.25 }), { y: h - 0.1, z: d / 2 }));
+  g.add(block(w - 0.03, 0.006, 0.004, shade(item.color, 0.45), { y: 0.1, z: d / 2 }));
+  barHandle(g, steel(), { y: h - 0.16, z: d / 2, length: w * 0.6 });
+  return g;
+}
+
+function buildIsland({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const body = painted(item.color);
+  const line = shade(item.color, 0.45);
+  const top = stone(item.color2);
+  const handle = steel();
+  const style = item.style;
+  const bodyH = h - PLINTH - WORKTOP;
+  // The cabinet: the working side faces back (-z); the front (+z) is where people sit.
+  const overhang = style === 'bar' ? Math.min(0.3, d * 0.35) : 0.03;
+  const cw = style === 'table' ? Math.max(0.5, w * 0.55) : w - 0.06;
+  const cx = style === 'table' ? -w / 2 + cw / 2 : 0;
+  const cd = d - overhang - 0.03;
+  const cz = -d / 2 + 0.03 + cd / 2;
+  g.add(block(cw - 0.08, PLINTH, cd - 0.08, shade(item.color, 0.55), { x: cx, z: cz }));
+  g.add(block(cw, bodyH, cd, body, { x: cx, y: PLINTH, z: cz }));
+  g.add(block(w, WORKTOP, d, top, { y: h - WORKTOP }));
+
+  // Drawers on the working side, plain doors on the other.
+  const cols = Math.max(1, Math.round(cw / 0.6));
+  const back = cz - cd / 2;
+  grooves(g, line, { w: cw, x0: cx - cw / 2, y0: PLINTH, bodyH, z: back, cols, rows: 3 });
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < 3; j++) {
+      const x = cx - cw / 2 + (cw * (i + 0.5)) / cols;
+      g.add(block(Math.min(0.2, (cw / cols) * 0.5), 0.012, 0.02, handle, { x, y: PLINTH + (bodyH * (j + 1)) / 3 - 0.05, z: back - 0.01 }));
+    }
+  }
+  if (style !== 'bar') grooves(g, line, { w: cw, x0: cx - cw / 2, y0: PLINTH, bodyH, z: cz + cd / 2, cols });
+
+  if (style === 'table') {
+    // The countertop runs on as a table, down to the floor at the end in one piece.
+    g.add(block(WORKTOP, h - WORKTOP, d, top, { x: w / 2 - WORKTOP / 2 }));
+  }
+  return g;
+}
+
+function buildStool({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const frame = trim(item.color2);
+  const style = item.style;
+  const r = Math.min(w, d) / 2;
+  const seatT = 0.045;
+  const seatY = h - seatT;
+
+  if (style === 'wood') {
+    // A round wooden seat on four splayed legs, with a metal foot ring.
+    const seat = wood(item.color);
+    g.add(post(r * 0.92, r * 0.88, seatT, seat, 0, 0, seatY, 32));
+    for (const [sx, sz] of CORNERS) {
+      const a = [sx * r * 0.45, seatY, sz * r * 0.45];
+      const b = [sx * r * 0.82, 0, sz * r * 0.82];
+      g.add(rod(a, b, 0.016, seat));
+    }
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 0.72, 0.008, 8, 32), frame);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = h * 0.33;
+    g.add(ring);
+    return g;
+  }
+
+  if (style === 'metal') {
+    // A round padded seat on a single column with a foot ring and a round base.
+    g.add(post(r * 0.9, r * 0.9, seatT, leather(item.color), 0, 0, seatY, 32));
+    g.add(post(0.025, 0.025, seatY, frame, 0, 0, 0, 16));
+    g.add(post(r * 0.85, r * 0.9, 0.015, frame, 0, 0, 0, 32));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 0.65, 0.009, 8, 32), frame);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = h * 0.38;
+    g.add(ring);
+    return g;
+  }
+
+  // Bar chair: a padded seat and backrest on four thin legs with a foot rail.
+  const soft = fabric(item.color);
+  g.add(block(w * 0.94, seatT + 0.02, d * 0.9, soft, { y: seatY - 0.02, z: 0.01, r: 0.02 }));
+  g.add(block(w * 0.94, 0.26, 0.05, soft, { y: h + 0.04, z: -d / 2 + 0.04, r: 0.02 }));
+  for (const [sx, sz] of CORNERS) {
+    g.add(leg(0.01, 0.01, seatY, frame, sx * (w / 2 - 0.04), sz * (d / 2 - 0.04)));
+    if (sz < 0) g.add(rod([sx * (w / 2 - 0.04), seatY, -d / 2 + 0.04], [sx * (w / 2 - 0.05), h + 0.08, -d / 2 + 0.03], 0.009, frame));
+  }
+  g.add(block(w - 0.08, 0.016, 0.016, frame, { y: h * 0.3, z: d / 2 - 0.04 }));
+  for (const s of [-1, 1]) g.add(block(0.016, 0.016, d - 0.08, frame, { x: s * (w / 2 - 0.04), y: h * 0.3 }));
   return g;
 }

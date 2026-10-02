@@ -448,7 +448,7 @@ export function createScene(container) {
     const alive = new Set();
     for (const item of items) {
       alive.add(item.id);
-      const key = [item.type, item.style, item.flip, item.w, item.d, item.h, item.inches, item.color, item.color2].join('|');
+      const key = [item.type, item.style, item.flip, item.w, item.d, item.h, item.inches, item.color, item.color2, item.color3].join('|');
       let model = models.get(item.id);
       if (model?.key !== key) {
         if (model) removeModel(model);

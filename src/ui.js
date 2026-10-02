@@ -1,5 +1,5 @@
 // Side panel, inspector (selected furniture, wall, group or several walls), camera bar and keyboard shortcuts.
-import { CATALOG, FLOOR_FINISHES, FLOOR_PATTERNS, WALL_PAINTS, dimsOf, isFlat, isOnWall, limitsOf, presetsOf, styleOf, tvScreen } from './catalog.js';
+import { CATALOG, FLOOR_FINISHES, FLOOR_PATTERNS, WALL_PAINTS, colorsOf, dimsOf, isFlat, isOnWall, limitsOf, presetsOf, styleOf, tvScreen } from './catalog.js';
 import { OPENINGS, openingLimitsOf, openingStyleOf } from './openings.js';
 import { h, measureField } from './dom.js';
 import { createDrawMode } from './draw.js';
@@ -17,6 +17,13 @@ const ICONS = {
   bathtub: '<path d="M5 14h38v4a7 7 0 0 1-7 7H12a7 7 0 0 1-7-7z"/><path d="M9 14V8a3 3 0 0 1 6 0"/><path d="M12 25l-2 3M36 25l2 3"/>',
   washer: '<rect x="11" y="2" width="26" height="28" rx="2"/><path d="M11 8h26M15 5h4"/><circle cx="24" cy="19" r="6"/>',
   bathcabinet: '<rect x="15" y="2" width="18" height="28" rx="1"/><path d="M15 15h18M29 8v3M29 19v3"/>',
+  kitchen: '<path d="M7 9h34v3H7z"/><path d="M9 12v15h30V12M9 16h30M24 16v11M21 14h6M21 20v3M27 20v3"/><path d="M11 27v2h26v-2"/>',
+  sinkunit: '<path d="M5 13h12l2 3h10l2-3h12v3H5z"/><path d="M7 16v13h34V16M24 16v13M21 21v3M27 21v3"/><path d="M24 13V6a3 3 0 0 1 6 0v1"/>',
+  cooking: '<rect x="12" y="7" width="24" height="23" rx="1"/><path d="M12 12h24M16 9.5h.01M21 9.5h.01M27 9.5h.01M32 9.5h.01"/><rect x="16" y="15" width="16" height="10"/><path d="M15 4h7M26 4h7"/>',
+  fridge: '<rect x="14" y="2" width="20" height="28" rx="2"/><path d="M14 12h20M18 5v4M18 15v6"/>',
+  dishwasher: '<rect x="11" y="4" width="26" height="26" rx="1"/><path d="M11 10h26M14 7h6M19 14h10M15 20h18M15 25h18"/>',
+  island: '<path d="M3 11h42v3H3z"/><rect x="6" y="14" width="36" height="13"/><path d="M18 14v13M30 14v13M10 18.5h4M22 18.5h4M34 18.5h4"/>',
+  stool: '<ellipse cx="24" cy="7" rx="9" ry="2.5"/><path d="M18 9l-3 21M30 9l3 21M16.5 20h15"/>',
   rug: '<rect x="10" y="4" width="28" height="24" rx="1"/><rect x="14" y="8" width="20" height="16"/><path d="M13 4V1M18 4V1M23 4V1M28 4V1M33 4V1M13 28v3M18 28v3M23 28v3M28 28v3M33 28v3"/>',
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
@@ -83,6 +90,31 @@ Object.assign(DESIGN_ICONS, {
   'bathcabinet:tall': ICONS.bathcabinet,
   'bathcabinet:mirror': '<rect x="10" y="5" width="28" height="21" rx="1"/><path d="M24 5v21"/><path d="M14 10l4-3M28 10l4-3"/>',
   'bathcabinet:shelves': '<rect x="14" y="2" width="20" height="28"/><path d="M14 9h20M14 16h20M14 23h20"/>',
+  'kitchen:base': ICONS.kitchen,
+  'kitchen:drawers': '<path d="M7 9h34v3H7z"/><path d="M9 12v15h30V12M9 17h30M9 22h30M21 14.5h6M21 19.5h6M21 24.5h6"/><path d="M11 27v2h26v-2"/>',
+  'kitchen:wall': '<path d="M3 3h42" stroke-dasharray="2 3"/><rect x="10" y="6" width="28" height="17"/><path d="M24 6v17M18 20h3M27 20h3"/>',
+  'kitchen:tall': '<rect x="15" y="1" width="18" height="27"/><path d="M15 11h18M29 6v3M29 13v4"/><path d="M16 28v2h16v-2"/>',
+  'kitchen:shelf': '<path d="M3 3h42" stroke-dasharray="2 3"/><path d="M6 14h36M6 27h36"/><path d="M10 14V9h4v5M17 14V7h4v7M30 27c0-3 2-4 5-4s5 1 5 4"/>',
+  'sinkunit:single': ICONS.sinkunit,
+  'sinkunit:double': '<path d="M3 13h6l2 3h9l2-3h4l2 3h9l2-3h6v3H3z"/><path d="M5 16v13h38V16M24 16v13M21 21v3M27 21v3"/><path d="M24 13V6a3 3 0 0 1 6 0v1"/>',
+  'sinkunit:farmhouse': '<path d="M5 13h8M35 13h8M5 16h8M35 16h8M5 13v3M43 13v3"/><rect x="13" y="11" width="22" height="9" rx="1"/><path d="M7 16v13h34V16M13 20H7M41 20h-6M24 20v9M21 23v3M27 23v3"/><path d="M24 11V5a3 3 0 0 1 6 0v1"/>',
+  'cooking:range': ICONS.cooking,
+  'cooking:hob': '<path d="M5 9h38v3H5z"/><path d="M14 9V7h20v2"/><path d="M7 12v17h34V12"/><rect x="11" y="14" width="26" height="10" rx="1"/><path d="M15 16.5h18M7 26.5h34"/>',
+  'cooking:hood': '<path d="M3 3h42" stroke-dasharray="2 3"/><path d="M19 3v12M29 3v12"/><path d="M19 15l-11 8h32l-11-8z"/><path d="M8 23v3h32v-3"/>',
+  'cooking:oven': '<rect x="15" y="1" width="18" height="29"/><rect x="17" y="7" width="14" height="10" rx="1"/><rect x="17" y="18.5" width="14" height="6" rx="1"/><path d="M15 26.5h18M20 4h8"/>',
+  'fridge:single': '<rect x="14" y="2" width="20" height="28" rx="2"/><path d="M18 7v8"/>',
+  'fridge:combi': ICONS.fridge,
+  'fridge:american': '<rect x="8" y="2" width="32" height="28" rx="2"/><path d="M22 2v28M19 8v12M25 8v12"/><rect x="11" y="12" width="6" height="7" rx="1"/>',
+  'fridge:under': '<path d="M7 10h34v3H7z"/><rect x="11" y="13" width="26" height="16" rx="1"/><path d="M17 16.5h14"/>',
+  'fridge:retro': '<rect x="13" y="2" width="22" height="25" rx="6"/><path d="M13 10h22M17 5v3M17 13v5"/><path d="M16 27v3M32 27v3"/>',
+  'dishwasher:integrated': '<path d="M7 7h34v3H7z"/><rect x="9" y="10" width="30" height="17"/><path d="M18 13.5h12"/><path d="M11 27v2h26v-2"/>',
+  'dishwasher:freestanding': ICONS.dishwasher,
+  'island:island': ICONS.island,
+  'island:bar': '<path d="M3 11h42v3H3z"/><rect x="6" y="14" width="24" height="13"/><path d="M18 14v13M10 18.5h4M22 18.5h4"/><path d="M36 18h6M39 18v12M36 30h6"/>',
+  'island:table': '<path d="M3 11h42v3H3z"/><rect x="5" y="14" width="20" height="13"/><path d="M15 14v13M8.5 18.5h3M18.5 18.5h3"/><path d="M42 14v16h3V14"/>',
+  'stool:wood': ICONS.stool,
+  'stool:metal': '<ellipse cx="24" cy="7" rx="9" ry="2.5"/><path d="M24 9.5v19M17 30h14M19 21h10"/>',
+  'stool:back': '<path d="M17 3v11M31 3v11M17 6h14"/><path d="M15 14h18v3H15z"/><path d="M17 17l-1 13M31 17l1 13M16.5 24h15"/>',
   'door:single': ICONS.door,
   'door:double': '<path d="M9 30V3h30v27M24 3v27"/><path d="M5 30h38"/><path d="M21 16v2M27 16v2"/>',
   'door:sliding': '<path d="M7 30V3h34v27"/><path d="M10 6h15v24M23 6h15v24"/><path d="M3 30h42"/>',
@@ -386,10 +418,11 @@ export function initUI(view) {
 
   // ---- Furniture ----
 
-  // Each type opens a menu of its designs; picking one adds that piece. Furniture comes in two sets,
-  // living room and bathroom, one shown at a time.
+  // Each type opens a menu of its designs; picking one adds that piece. Furniture comes in sets by
+  // room (living room, kitchen, bathroom), one shown at a time.
   const rooms = [
     { id: 'living', label: 'Living room' },
+    { id: 'kitchen', label: 'Kitchen' },
     { id: 'bath', label: 'Bathroom' },
   ];
   const furnitureFor = (room) =>
@@ -1136,7 +1169,7 @@ function buildItemInspector(root, item) {
   }
 
   // Colors
-  const colorPickers = def.colors.map((slot) => {
+  const colorPickers = colorsOf(item).map((slot) => {
     const picker = swatches({
       label: slot.label,
       palette: slot.palette,

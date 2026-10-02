@@ -1,6 +1,6 @@
 // Furniture rules: footprints, not passing through walls, stacking and auto-placement. All values in cm.
-import { CATALOG, dimsOf, isFlat, isOnWall, isStackable } from './catalog.js';
-import { boundsOf, boxesOf, boxesOverlap, contains, floorsOf, midpointOf, openingSpan, signedArea } from './walls.js';
+import { CATALOG, dimsOf, isFlat, isOnWall, isStackable, limitsOf, styleOf } from './catalog.js';
+import { boundsOf, boxesOf, boxesOverlap, contains, floorsOf, lengthOf, midpointOf, openingSpan, signedArea } from './walls.js';
 
 const rad = (deg) => (deg * Math.PI) / 180;
 const deg = (r) => (r * 180) / Math.PI;
@@ -192,6 +192,34 @@ function againstWall(item, s) {
   return { x: s.mid.x + s.n.x * off, z: s.mid.z + s.n.z * off, rotation: normAngle(Math.round(deg(Math.atan2(s.n.x, s.n.z)))) };
 }
 
+// Floor-standing and hanging pieces get in each other's way only where their heights overlap: a
+// base cabinet fits under a wall cabinet, a fridge doesn't.
+function blockersOf(item, items) {
+  const bottom = elevationOf(item, items);
+  const top = bottom + dimsOf(item).h;
+  return items.filter((o) => {
+    if (o.id === item.id || isFlat(o) || isStackable(o)) return false;
+    const from = elevationOf(o, items);
+    return from < top && from + dimsOf(o).h > bottom;
+  });
+}
+
+// Is a window in the way of a hanging piece at this spot?
+function coversWindow(spot, walls, openings, items) {
+  const { w, d, h } = dimsOf(spot);
+  const bottom = elevationOf(spot, items);
+  return openings.some((o) => {
+    const wall = o.kind === 'window' && walls.find((x) => x.id === o.wall);
+    if (!wall) return false;
+    const len = lengthOf(wall);
+    const u = { x: (wall.x2 - wall.x1) / len, z: (wall.z2 - wall.z1) / len };
+    const along = (spot.x - wall.x1) * u.x + (spot.z - wall.z1) * u.z;
+    const across = Math.abs((spot.x - wall.x1) * u.z - (spot.z - wall.z1) * u.x);
+    const span = openingSpan(o, wall);
+    return across < wall.thickness / 2 + d + 5 && along + w / 2 > span.a && along - w / 2 < span.b && bottom < span.top && bottom + h > span.bottom;
+  });
+}
+
 // The first free place along the room's walls, backed against a wall and facing into the room:
 // along each wall from its middle outward (or from its corners inward, for `corner` pieces such as
 // showers). Doors stay clear, and so do windows unless the piece is low enough to sit under them.
@@ -201,8 +229,7 @@ function alongWalls(item, items, walls, openings, { corner = false } = {}) {
   const { w, d, h } = dimsOf(item);
   const bottom = elevationOf(item, items);
   const top = bottom + h;
-  const hangs = isOnWall(item);
-  const blockers = items.filter((o) => o.id !== item.id && !isFlat(o) && !isOnWall(o) && !isStackable(o));
+  const blockers = blockersOf(item, items);
   for (const s of roomWalls(walls, floor, centroid(floor))) {
     const u = { x: (s.w.x2 - s.w.x1) / s.len, z: (s.w.z2 - s.w.z1) / s.len };
     const reach = s.len / 2 - w / 2 - 7; // stay clear of the walls at each end
@@ -217,17 +244,60 @@ function alongWalls(item, items, walls, openings, { corner = false } = {}) {
       const off = s.w.thickness / 2 + d / 2 + 1;
       const spot = { ...item, x: s.mid.x + u.x * t + s.n.x * off, z: s.mid.z + u.z * t + s.n.z * off, rotation: normAngle(Math.round(deg(Math.atan2(s.n.x, s.n.z)))) };
       if (hitsWall(spot, walls, items)) continue;
-      if (!hangs && blockers.some((o) => overlaps(spot, o))) continue;
+      if (blockers.some((o) => overlaps(spot, o))) continue;
       return { x: spot.x, z: spot.z, rotation: spot.rotation };
     }
   }
   return null;
 }
 
-// Where a new piece naturally goes: bathroom pieces along the walls (showers and baths in corners, a
-// mirror cabinet over the sink), the TV stand against the main wall, the TV on a free stand (or on
-// the main wall if it's wall-mounted), the sofa against the opposite wall facing it, anything else in
-// the middle of the floor.
+// On the wall right behind the first piece it hangs `over` (a mirror cabinet over the sink, a hood
+// over the cooker, wall cabinets over the base units) that is low enough and has nothing hanging above
+// it yet, unless that would cover a window. It takes that piece's width where it can.
+function overSpot(item, items, walls, openings) {
+  const over = styleOf(item).over;
+  if (!over) return null;
+  const hanging = items.filter((o) => isOnWall(o) && o.id !== item.id);
+  for (const base of items) {
+    if (!over.includes(base.type) || isOnWall(base) || dimsOf(base).h > item.mount) continue;
+    if (hanging.some((t) => containsPoint(base, t.x, t.z))) continue;
+    const r = rad(base.rotation);
+    const back = dimsOf(base).d / 2 - dimsOf(item).d / 2;
+    const [lo, hi] = limitsOf(item).w;
+    const spot = { x: base.x - Math.sin(r) * back, z: base.z - Math.cos(r) * back, rotation: base.rotation, w: Math.min(hi, Math.max(lo, dimsOf(base).w)) };
+    if (!coversWindow({ ...item, ...spot }, walls, openings, items)) return spot;
+  }
+  return null;
+}
+
+// Bar stools in a row along the island's front (its seating side), facing it.
+function atIsland(item, items, walls) {
+  const { w, d } = dimsOf(item);
+  const blockers = blockersOf(item, items);
+  for (const island of items.filter((o) => o.type === 'island')) {
+    const size = dimsOf(island);
+    const lz = size.d / 2 + d / 2 + 2;
+    const spacing = Math.max(w + 12, 55);
+    const seats = Math.max(1, Math.floor((size.w - 10) / spacing));
+    const a = rad(island.rotation);
+    for (let k = 0; k < seats; k++) {
+      const lx = (k - (seats - 1) / 2) * spacing;
+      const spot = {
+        ...item,
+        x: island.x + Math.cos(a) * lx + Math.sin(a) * lz,
+        z: island.z - Math.sin(a) * lx + Math.cos(a) * lz,
+        rotation: normAngle(island.rotation + 180),
+      };
+      if (!hitsWall(spot, walls, items) && !blockers.some((o) => overlaps(spot, o))) return { x: spot.x, z: spot.z, rotation: spot.rotation };
+    }
+  }
+  return null;
+}
+
+// Where a new piece naturally goes: bathroom and kitchen pieces along the walls (showers and baths in
+// corners, hanging pieces over what they belong above), bar stools at the island, the TV stand against
+// the main wall, the TV on a free stand (or on the main wall if it's wall-mounted), the sofa against
+// the opposite wall facing it, anything else in the middle of the floor.
 export function preferredSpot(item, items, walls, openings = []) {
   const floor = mainFloor(walls);
   if (!floor) {
@@ -235,15 +305,11 @@ export function preferredSpot(item, items, walls, openings = []) {
     return { x: b.cx, z: b.cz, rotation: 0 };
   }
   const place = CATALOG[item.type].place;
-  if (place) {
-    const sink = item.type === 'bathcabinet' && isOnWall(item) && items.find((o) => o.type === 'sink');
-    if (sink) {
-      // Hang it on the wall right behind the sink.
-      const r = (sink.rotation * Math.PI) / 180;
-      const back = dimsOf(sink).d / 2 - dimsOf(item).d / 2;
-      return { x: sink.x - Math.sin(r) * back, z: sink.z - Math.cos(r) * back, rotation: sink.rotation };
-    }
-    const spot = alongWalls(item, items, walls, openings, { corner: place === 'corner' });
+  if (place === 'island') {
+    const spot = atIsland(item, items, walls);
+    if (spot) return spot;
+  } else if (place) {
+    const spot = overSpot(item, items, walls, openings) ?? alongWalls(item, items, walls, openings, { corner: place === 'corner' });
     if (spot) return spot;
   }
   const centre = centroid(floor);
