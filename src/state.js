@@ -654,7 +654,7 @@ export function addItem(type, style) {
   if (ui.locked) return null;
   const base = newItemOf(type, style);
   const draft = { id: newId(), type, x: 0, z: 0, rotation: 0, ...base, name: uniqueItemName(base.name) };
-  Object.assign(draft, preferredSpot(draft, state.items, state.walls));
+  Object.assign(draft, preferredSpot(draft, state.items, state.walls, state.openings));
   const item = findSpot(draft, state.items, state.walls);
   state = { ...state, items: [...state.items, item] };
   ui = { ...ui, sel: { type: 'item', id: item.id } };

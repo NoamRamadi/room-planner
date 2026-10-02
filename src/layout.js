@@ -1,6 +1,6 @@
 // Furniture rules: footprints, not passing through walls, stacking and auto-placement. All values in cm.
 import { CATALOG, dimsOf, isFlat, isOnWall, isStackable } from './catalog.js';
-import { boundsOf, boxesOf, boxesOverlap, contains, floorsOf, midpointOf, signedArea } from './walls.js';
+import { boundsOf, boxesOf, boxesOverlap, contains, floorsOf, midpointOf, openingSpan, signedArea } from './walls.js';
 
 const rad = (deg) => (deg * Math.PI) / 180;
 const deg = (r) => (r * 180) / Math.PI;
@@ -192,14 +192,59 @@ function againstWall(item, s) {
   return { x: s.mid.x + s.n.x * off, z: s.mid.z + s.n.z * off, rotation: normAngle(Math.round(deg(Math.atan2(s.n.x, s.n.z)))) };
 }
 
-// Where a new piece naturally goes: the TV stand against the main wall, the TV on a free stand (or on
+// The first free place along the room's walls, backed against a wall and facing into the room:
+// along each wall from its middle outward (or from its corners inward, for `corner` pieces such as
+// showers). Doors stay clear, and so do windows unless the piece is low enough to sit under them.
+function alongWalls(item, items, walls, openings, { corner = false } = {}) {
+  const floor = mainFloor(walls);
+  if (!floor) return null;
+  const { w, d, h } = dimsOf(item);
+  const bottom = elevationOf(item, items);
+  const top = bottom + h;
+  const hangs = isOnWall(item);
+  const blockers = items.filter((o) => o.id !== item.id && !isFlat(o) && !isOnWall(o) && !isStackable(o));
+  for (const s of roomWalls(walls, floor, centroid(floor))) {
+    const u = { x: (s.w.x2 - s.w.x1) / s.len, z: (s.w.z2 - s.w.z1) / s.len };
+    const reach = s.len / 2 - w / 2 - 7; // stay clear of the walls at each end
+    if (reach < 0) continue;
+    const spans = openings.filter((o) => o.wall === s.w.id).map((o) => ({ kind: o.kind, ...openingSpan(o, s.w) }));
+    const offsets = [];
+    for (let t = 0; t <= reach; t += 5) offsets.push(corner ? reach - t : t);
+    for (const t of offsets.flatMap((t) => (t ? [t, -t] : [0]))) {
+      const along = s.len / 2 + t; // distance of the piece's middle from the wall's start
+      const inTheWay = spans.some((o) => along + w / 2 > o.a && along - w / 2 < o.b && (o.kind === 'door' || (bottom < o.top && top > o.bottom)));
+      if (inTheWay) continue;
+      const off = s.w.thickness / 2 + d / 2 + 1;
+      const spot = { ...item, x: s.mid.x + u.x * t + s.n.x * off, z: s.mid.z + u.z * t + s.n.z * off, rotation: normAngle(Math.round(deg(Math.atan2(s.n.x, s.n.z)))) };
+      if (hitsWall(spot, walls, items)) continue;
+      if (!hangs && blockers.some((o) => overlaps(spot, o))) continue;
+      return { x: spot.x, z: spot.z, rotation: spot.rotation };
+    }
+  }
+  return null;
+}
+
+// Where a new piece naturally goes: bathroom pieces along the walls (showers and baths in corners, a
+// mirror cabinet over the sink), the TV stand against the main wall, the TV on a free stand (or on
 // the main wall if it's wall-mounted), the sofa against the opposite wall facing it, anything else in
 // the middle of the floor.
-export function preferredSpot(item, items, walls) {
+export function preferredSpot(item, items, walls, openings = []) {
   const floor = mainFloor(walls);
   if (!floor) {
     const b = boundsOf(walls);
     return { x: b.cx, z: b.cz, rotation: 0 };
+  }
+  const place = CATALOG[item.type].place;
+  if (place) {
+    const sink = item.type === 'bathcabinet' && isOnWall(item) && items.find((o) => o.type === 'sink');
+    if (sink) {
+      // Hang it on the wall right behind the sink.
+      const r = (sink.rotation * Math.PI) / 180;
+      const back = dimsOf(sink).d / 2 - dimsOf(item).d / 2;
+      return { x: sink.x - Math.sin(r) * back, z: sink.z - Math.cos(r) * back, rotation: sink.rotation };
+    }
+    const spot = alongWalls(item, items, walls, openings, { corner: place === 'corner' });
+    if (spot) return spot;
   }
   const centre = centroid(floor);
   const sides = roomWalls(walls, floor, centre);

@@ -827,6 +827,25 @@ h3 {
   grid-column: 1 / -1;
 }
 
+.add-btn {
+  text-align: center;
+}
+
+.section__head--tabs {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.section__head--tabs h2 {
+  margin-bottom: 0;
+}
+
+.section__head--tabs .segmented button {
+  padding: 4px 9px;
+  font-size: 12.5px;
+}
+
 .add-btn:hover {
   border-color: var(--graphite);
   background: var(--plaster-deep);

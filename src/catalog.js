@@ -78,6 +78,36 @@ const RUG_SIZES = [
   { name: 'Runner', w: 80, d: 250 },
 ];
 
+const CERAMICS = [
+  { name: 'White', hex: '#f4f4f1' },
+  { name: 'Ivory', hex: '#ebe5d6' },
+  { name: 'Light grey', hex: '#cfd1d2' },
+  { name: 'Sand', hex: '#d8c9ad' },
+  { name: 'Black', hex: '#2a2b2e' },
+];
+
+const SEATS = [
+  { name: 'White', hex: '#f4f4f1' },
+  { name: 'Black', hex: '#2a2b2e' },
+  { name: 'Grey', hex: '#9a9c9f' },
+  { name: 'Oak', hex: '#b88f5d' },
+  { name: 'Walnut', hex: '#5d4030' },
+];
+
+const FITTINGS = [
+  { name: 'Chrome', hex: '#d5d8db' },
+  { name: 'Matt black', hex: '#26272a' },
+  { name: 'Brushed gold', hex: '#c2a061' },
+  { name: 'White', hex: '#f4f4f1' },
+];
+
+const APPLIANCES = [
+  { name: 'White', hex: '#f2f2ef' },
+  { name: 'Silver', hex: '#b9bbbe' },
+  { name: 'Graphite', hex: '#4a4c50' },
+  { name: 'Black', hex: '#1e1f22' },
+];
+
 const TV_FINISHES = [
   { name: 'Black', hex: '#1d1e21' },
   { name: 'Graphite', hex: '#4a4c50' },
@@ -327,6 +357,291 @@ export const CATALOG = {
     presets: RUG_SIZES,
     flat: true, // lies on the floor: furniture stands on it, and it never gets in anything's way
     build: buildRug,
+  },
+
+  // ---- Bathroom: `place` says where a new one goes: along a wall, or into a corner ----
+
+  toilet: {
+    label: 'Toilet',
+    room: 'bath',
+    place: 'wall',
+    defaults: { style: 'floor', w: 38, d: 68, h: 78, color: '#f4f4f1', color2: '#f4f4f1' },
+    limits: { w: [30, 50], d: [45, 80], h: [35, 100] },
+    colors: [
+      { key: 'color', label: 'Ceramic', palette: CERAMICS },
+      { key: 'color2', label: 'Seat', palette: SEATS },
+    ],
+    styles: [
+      {
+        id: 'floor',
+        label: 'With cistern',
+        name: 'Toilet',
+        presets: [
+          { name: 'Compact', w: 36, d: 60, h: 75 },
+          { name: 'Standard', w: 38, d: 68, h: 78 },
+        ],
+      },
+      {
+        id: 'wall',
+        label: 'Wall-hung',
+        name: 'Wall-hung toilet',
+        defaults: { w: 36, d: 54, h: 42 },
+        presets: [
+          { name: 'Short', w: 36, d: 49, h: 42 },
+          { name: 'Standard', w: 36, d: 54, h: 42 },
+        ],
+      },
+      { id: 'bidet', label: 'Bidet', name: 'Bidet', defaults: { w: 36, d: 54, h: 40 }, presets: [{ name: 'Standard', w: 36, d: 54, h: 40 }] },
+    ],
+    build: buildToilet,
+  },
+  sink: {
+    label: 'Sink',
+    room: 'bath',
+    place: 'wall',
+    defaults: { style: 'pedestal', w: 60, d: 46, h: 85, color: '#f4f4f1', color2: '#b88f5d' },
+    limits: { w: [35, 200], d: [30, 65], h: [60, 100] },
+    colors: [
+      { key: 'color', label: 'Ceramic', palette: CERAMICS },
+      { key: 'color2', label: 'Cabinet or counter', palette: WOODS },
+    ],
+    styles: [
+      {
+        id: 'pedestal',
+        label: 'Pedestal',
+        name: 'Sink',
+        presets: [
+          { name: 'Small', w: 50, d: 40, h: 85 },
+          { name: 'Standard', w: 60, d: 46, h: 85 },
+        ],
+      },
+      {
+        id: 'vanity',
+        label: 'On a cabinet',
+        name: 'Vanity',
+        defaults: { w: 80, d: 47, h: 85 },
+        presets: [
+          { name: '60 cm', w: 60, d: 46, h: 85 },
+          { name: '80 cm', w: 80, d: 47, h: 85 },
+          { name: '100 cm', w: 100, d: 48, h: 85 },
+        ],
+      },
+      {
+        id: 'wall',
+        label: 'Wall-hung',
+        name: 'Wall-hung sink',
+        defaults: { w: 55, d: 42, h: 85 },
+        presets: [
+          { name: 'Small', w: 45, d: 35, h: 85 },
+          { name: 'Standard', w: 55, d: 42, h: 85 },
+        ],
+      },
+      {
+        id: 'double',
+        label: 'Double',
+        name: 'Double vanity',
+        defaults: { w: 140, d: 50, h: 85 },
+        limits: { w: [110, 200] },
+        presets: [
+          { name: '120 cm', w: 120, d: 50, h: 85 },
+          { name: '140 cm', w: 140, d: 50, h: 85 },
+          { name: '160 cm', w: 160, d: 50, h: 85 },
+        ],
+      },
+      {
+        id: 'vessel',
+        label: 'Countertop bowl',
+        name: 'Countertop sink',
+        defaults: { w: 80, d: 46, h: 90, color2: '#5d4030' },
+        presets: [
+          { name: '60 cm', w: 60, d: 46, h: 90 },
+          { name: '80 cm', w: 80, d: 46, h: 90 },
+          { name: '120 cm', w: 120, d: 50, h: 90 },
+        ],
+      },
+    ],
+    build: buildSink,
+  },
+  shower: {
+    label: 'Shower',
+    room: 'bath',
+    place: 'corner',
+    defaults: { style: 'enclosure', w: 90, d: 90, h: 200, color: '#d5d8db', color2: '#f4f4f1', mount: 100 },
+    limits: { w: [70, 200], d: [70, 160], h: [180, 230], mount: [60, 140] },
+    colors: [
+      { key: 'color', label: 'Fittings', palette: FITTINGS },
+      { key: 'color2', label: 'Tray and panels', palette: CERAMICS },
+    ],
+    styles: [
+      {
+        id: 'enclosure',
+        label: 'Enclosure',
+        name: 'Shower',
+        presets: [
+          { name: '80 × 80', w: 80, d: 80 },
+          { name: '90 × 90', w: 90, d: 90 },
+          { name: '120 × 80', w: 120, d: 80 },
+        ],
+      },
+      {
+        id: 'quadrant',
+        label: 'Curved corner',
+        name: 'Corner shower',
+        round: true, // a quarter circle: as deep as it is wide
+        presets: [
+          { name: '80 cm', w: 80, d: 80 },
+          { name: '90 cm', w: 90, d: 90 },
+          { name: '100 cm', w: 100, d: 100 },
+        ],
+      },
+      {
+        id: 'walkin',
+        label: 'Walk-in',
+        name: 'Walk-in shower',
+        defaults: { w: 140, d: 90 },
+        presets: [
+          { name: '120 × 80', w: 120, d: 80 },
+          { name: '140 × 90', w: 140, d: 90 },
+          { name: '160 × 90', w: 160, d: 90 },
+        ],
+      },
+      {
+        id: 'cabin',
+        label: 'Shower cabin',
+        name: 'Shower cabin',
+        defaults: { h: 215 },
+        presets: [
+          { name: '80 × 80', w: 80, d: 80 },
+          { name: '90 × 90', w: 90, d: 90 },
+          { name: '100 × 80', w: 100, d: 80 },
+        ],
+      },
+      {
+        id: 'head',
+        label: 'Shower head',
+        name: 'Shower head',
+        onWall: true, // `mount` is the height of the mixer; the head is `h` above it
+        defaults: { w: 25, d: 35, h: 110 },
+        limits: { w: [15, 40], d: [20, 50], h: [60, 140] },
+        presets: [
+          { name: 'Hand shower', w: 20, d: 25, h: 90 },
+          { name: 'Rain shower', w: 30, d: 45, h: 115 },
+        ],
+      },
+    ],
+    build: buildShower,
+  },
+  bathtub: {
+    label: 'Bathtub',
+    room: 'bath',
+    place: 'corner',
+    defaults: { style: 'builtin', w: 170, d: 75, h: 58, color: '#f4f4f1', color2: '#d5d8db' },
+    limits: { w: [120, 200], d: [65, 100], h: [45, 70] },
+    colors: [
+      { key: 'color', label: 'Tub', palette: CERAMICS },
+      { key: 'color2', label: 'Fittings', palette: FITTINGS },
+    ],
+    styles: [
+      {
+        id: 'builtin',
+        label: 'Built-in',
+        name: 'Bathtub',
+        presets: [
+          { name: '150 cm', w: 150, d: 70, h: 58 },
+          { name: '170 cm', w: 170, d: 75, h: 58 },
+          { name: '180 cm', w: 180, d: 80, h: 58 },
+        ],
+      },
+      {
+        id: 'freestanding',
+        label: 'Freestanding',
+        name: 'Freestanding bath',
+        defaults: { w: 170, d: 78, h: 62 },
+        presets: [
+          { name: '160 cm', w: 160, d: 75, h: 60 },
+          { name: '170 cm', w: 170, d: 78, h: 62 },
+          { name: '180 cm', w: 180, d: 80, h: 62 },
+        ],
+      },
+      {
+        id: 'screen',
+        label: 'With shower screen',
+        name: 'Shower bath',
+        presets: [
+          { name: '170 cm', w: 170, d: 75, h: 58 },
+          { name: '180 cm', w: 180, d: 80, h: 58 },
+        ],
+      },
+    ],
+    build: buildBathtub,
+  },
+  washer: {
+    label: 'Washing machine',
+    room: 'bath',
+    place: 'wall',
+    defaults: { style: 'front', w: 60, d: 60, h: 85, color: '#f2f2ef' },
+    limits: { w: [40, 70], d: [40, 75], h: [80, 200] },
+    colors: [{ key: 'color', label: 'Body', palette: APPLIANCES }],
+    styles: [
+      {
+        id: 'front',
+        label: 'Front-loading',
+        name: 'Washing machine',
+        presets: [
+          { name: 'Slim', w: 60, d: 45, h: 85 },
+          { name: 'Standard', w: 60, d: 60, h: 85 },
+        ],
+      },
+      { id: 'top', label: 'Top-loading', name: 'Top-loading washer', defaults: { w: 40, d: 60, h: 90 }, presets: [{ name: 'Standard', w: 40, d: 60, h: 90 }] },
+      { id: 'stack', label: 'Washer and dryer', name: 'Washer and dryer', defaults: { h: 172 }, presets: [{ name: 'Standard', w: 60, d: 60, h: 172 }] },
+    ],
+    build: buildWasher,
+  },
+  bathcabinet: {
+    label: 'Bathroom cabinet',
+    room: 'bath',
+    place: 'wall',
+    defaults: { style: 'tall', w: 40, d: 33, h: 170, color: '#ecebe6', color2: '#a9abad', mount: 120 },
+    limits: { w: [30, 150], d: [12, 60], h: [40, 220], mount: [40, 200] },
+    colors: [
+      { key: 'color', label: 'Body', palette: WOODS },
+      { key: 'color2', label: 'Handles', palette: TRIMS },
+    ],
+    styles: [
+      {
+        id: 'tall',
+        label: 'Tall cabinet',
+        name: 'Tall cabinet',
+        presets: [
+          { name: 'Narrow', w: 30, d: 33, h: 160 },
+          { name: 'Standard', w: 40, d: 33, h: 170 },
+          { name: 'Wide', w: 60, d: 35, h: 180 },
+        ],
+      },
+      {
+        id: 'mirror',
+        label: 'Mirror cabinet',
+        name: 'Mirror cabinet',
+        onWall: true, // `mount` is the height of its bottom edge
+        defaults: { w: 60, d: 15, h: 70 },
+        presets: [
+          { name: '60 cm', w: 60, d: 15, h: 70 },
+          { name: '80 cm', w: 80, d: 15, h: 70 },
+          { name: '100 cm', w: 100, d: 15, h: 70 },
+        ],
+      },
+      {
+        id: 'shelves',
+        label: 'Open shelves',
+        name: 'Bathroom shelves',
+        defaults: { w: 60, d: 30, h: 150 },
+        presets: [
+          { name: 'Low', w: 60, d: 30, h: 90 },
+          { name: 'Tall', w: 60, d: 30, h: 150 },
+        ],
+      },
+    ],
+    build: buildBathCabinet,
   },
 };
 
@@ -1036,6 +1351,300 @@ function buildRug({ w, d, h }, item) {
       const strip = along ? block(w * 0.96, 0.003, 0.05, fringe, { z: s * (d / 2 + 0.025) }) : block(0.05, 0.003, d * 0.96, fringe, { x: s * (w / 2 + 0.025) });
       g.add(strip);
     }
+  }
+  return g;
+}
+
+// ---- Bathroom ----
+
+const ceramic = (hex) => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.15, metalness: 0.02 });
+const metal = (hex) => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.18, metalness: 0.9 });
+const glassPane = (frosted = false) =>
+  new THREE.MeshStandardMaterial({
+    color: frosted ? '#eef3f4' : '#cfe1e8',
+    roughness: frosted ? 0.6 : 0.05,
+    metalness: 0.1,
+    transparent: true,
+    opacity: frosted ? 0.55 : 0.22,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+
+// An oval block w × d, h tall, its bottom at y; `taper` narrows its bottom (a bowl).
+function oval(w, h, d, material, { x = 0, y = 0, z = 0, taper = 1 } = {}) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5 * taper, h, 40), material);
+  mesh.scale.set(w, 1, d);
+  mesh.position.set(x, y + h / 2, z);
+  return mesh;
+}
+
+// A tap: an upright with a spout reaching forward (+z), standing at (x, y, z).
+function tap(g, material, { x = 0, y, z, reach = 0.12, height = 0.14 }) {
+  g.add(post(0.016, 0.02, height, material, x, z, y, 16));
+  const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, reach, 12), material);
+  spout.rotation.x = Math.PI / 2;
+  spout.position.set(x, y + height - 0.012, z + reach / 2);
+  g.add(spout);
+}
+
+// A shower on the wall at z: mixer at `bottom`, a riser up the wall, and an arm with the head at `top`.
+function showerHead(g, fit, { x = 0, z, bottom, top, rain = false }) {
+  g.add(block(0.14, 0.06, 0.05, fit, { x, y: bottom, z: z + 0.025, r: 0.01 }));
+  g.add(post(0.012, 0.012, top - bottom, fit, x, z + 0.03, bottom, 12));
+  const arm = rain ? 0.35 : 0.2;
+  g.add(block(0.02, 0.02, arm, fit, { x, y: top - 0.02, z: z + 0.03 + arm / 2 }));
+  if (rain) g.add(block(0.26, 0.012, 0.26, fit, { x, y: top - 0.035, z: z + 0.03 + arm - 0.1, r: 0.004 }));
+  else g.add(post(0.09, 0.06, 0.035, fit, x, z + 0.03 + arm, top - 0.06, 24));
+}
+
+function buildToilet({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const white = ceramic(item.color);
+  const seat = new THREE.MeshStandardMaterial({ color: item.color2, roughness: 0.35 });
+  const style = item.style;
+  const rim = style === 'floor' ? 0.42 : h; // seat height
+  const bowlD = style === 'floor' ? d - 0.17 : d; // a floor toilet's cistern takes the back
+  const bz = d / 2 - bowlD / 2;
+  g.add(oval(w, 0.17, bowlD, white, { y: rim - 0.17, z: bz, taper: 0.8 }));
+  if (style === 'wall') {
+    // Hung from the wall, with the flush plate on the wall above.
+    g.add(block(w * 0.7, 0.16, bowlD * 0.5, white, { y: rim - 0.3, z: -d / 2 + bowlD * 0.25, r: 0.05 }));
+    g.add(block(0.22, 0.15, 0.012, white, { y: 0.95, z: -d / 2 + 0.006 }));
+    for (const s of [-1, 1]) g.add(block(0.085, 0.11, 0.008, metal('#d5d8db'), { x: s * 0.048, y: 0.97, z: -d / 2 + 0.014 }));
+  } else {
+    g.add(block(w * 0.5, rim - 0.17, bowlD * 0.55, white, { z: bz - bowlD * 0.05, r: 0.04 }));
+  }
+  if (style === 'bidet') {
+    tap(g, metal('#d5d8db'), { y: rim, z: -d / 2 + 0.07, reach: 0.08, height: 0.08 });
+  } else {
+    g.add(oval(w * 0.98, 0.02, bowlD * 0.94, seat, { y: rim, z: bz + 0.005 }));
+    g.add(oval(w * 0.95, 0.015, bowlD * 0.9, seat, { y: rim + 0.02, z: bz + 0.01 }));
+  }
+  if (style === 'floor') {
+    g.add(block(w * 0.95, h - rim + 0.06, 0.17, white, { y: rim - 0.06, z: -d / 2 + 0.085, r: 0.02 }));
+    g.add(post(0.022, 0.022, 0.008, metal('#d5d8db'), 0, -d / 2 + 0.085, h, 20));
+  }
+  return g;
+}
+
+function buildSink({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const white = ceramic(item.color);
+  const bowl = new THREE.MeshStandardMaterial({ color: new THREE.Color(item.color).multiplyScalar(0.86), roughness: 0.2 });
+  const chrome = metal('#d5d8db');
+  const style = item.style;
+  // A basin: a rounded block with an oval bowl set into its top, and a tap at the back.
+  const basin = (bw, x, top, withBlock = true) => {
+    if (withBlock) g.add(block(bw, 0.14, d, white, { x, y: top - 0.14, r: 0.025 }));
+    g.add(oval(Math.min(bw * 0.7, 0.5), 0.004, d * 0.58, bowl, { x, y: top - 0.002, z: 0.03 }));
+    tap(g, chrome, { x, y: top, z: -d / 2 + 0.06, reach: 0.11 });
+  };
+
+  if (style === 'pedestal') {
+    basin(w, 0, h);
+    g.add(post(0.07, 0.1, h - 0.14, white, 0, -d * 0.1, 0, 24));
+  } else if (style === 'wall') {
+    basin(w, 0, h);
+    g.add(post(0.02, 0.02, 0.28, chrome, 0, -d * 0.2, h - 0.42, 12)); // the trap under it
+  } else if (style === 'vessel') {
+    // A bowl standing on a wall-mounted counter, with a tall tap.
+    const counter = h - 0.14;
+    g.add(block(w, 0.04, d, wood(item.color2), { y: counter - 0.04, r: 0.005 }));
+    g.add(oval(Math.min(0.42, w * 0.6), 0.14, Math.min(0.36, d * 0.8), white, { y: counter, z: 0.02, taper: 0.6 }));
+    g.add(oval(Math.min(0.36, w * 0.52), 0.004, Math.min(0.3, d * 0.68), bowl, { y: h - 0.006, z: 0.02 }));
+    tap(g, chrome, { y: counter, z: -d / 2 + 0.07, height: 0.28, reach: 0.16 });
+  } else {
+    // Vanity: a cabinet on a plinth, with one or two basins in the countertop.
+    const plinth = 0.08;
+    const bodyH = h - 0.14 - plinth;
+    g.add(block(w - 0.04, plinth, d - 0.08, shade(item.color2, 0.6), { z: -0.02 }));
+    g.add(block(w, bodyH, d - 0.02, wood(item.color2), { y: plinth, z: -0.01, r: 0.006 }));
+    const doors = style === 'double' ? 4 : w > 0.7 ? 2 : 1;
+    grooves(g, shade(item.color2, 0.45), { w, y0: plinth, bodyH, z: d / 2 - 0.01, cols: doors });
+    for (let i = 0; i < doors; i++) {
+      const x = -w / 2 + (w / doors) * (i + 0.5) + (i % 2 ? -1 : 1) * (w / doors) * 0.35;
+      g.add(block(0.012, 0.1, 0.018, trim('#a9abad'), { x: doors === 1 ? w * 0.35 : x, y: plinth + bodyH - 0.16, z: d / 2 }));
+    }
+    if (style === 'double') {
+      g.add(block(w, 0.14, d, white, { y: h - 0.14, r: 0.02 }));
+      for (const s of [-1, 1]) basin(w / 2, (s * w) / 4, h, false);
+    } else {
+      basin(w, 0, h);
+    }
+  }
+  return g;
+}
+
+function buildShower({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const fit = metal(item.color);
+  const tray = ceramic(item.color2);
+  const style = item.style;
+  if (style === 'head') {
+    showerHead(g, fit, { z: -d / 2, bottom: 0, top: h, rain: w >= 0.28 });
+    return g;
+  }
+  const trayH = style === 'walkin' ? 0.02 : 0.05;
+
+  if (style === 'quadrant') {
+    // A quarter circle in the corner behind it: tray, curved glass and a rail along its top.
+    const slice = (r, height, y, material, open) => {
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, height, 36, 1, open, 0, Math.PI / 2), material);
+      mesh.position.set(-w / 2, y + height / 2, -d / 2);
+      return mesh;
+    };
+    g.add(slice(w, trayH, 0, tray, false));
+    g.add(slice(w - 0.01, h - trayH, trayH, glassPane(), true));
+    g.add(slice(w - 0.01, 0.02, h - 0.02, fit, true));
+    showerHead(g, fit, { x: -w * 0.15, z: -d / 2, bottom: 1.0, top: h - 0.08 });
+    return g;
+  }
+
+  g.add(block(w, trayH, d, tray, { r: 0.008 }));
+  if (style === 'walkin') {
+    // One fixed pane, held by a bar to the wall behind, and a rain shower.
+    const gw = w * 0.6;
+    g.add(block(gw, h - trayH, 0.008, glassPane(), { x: w / 2 - gw / 2, y: trayH, z: d / 2 - 0.03 }));
+    g.add(block(0.015, 0.015, d - 0.03, fit, { x: w / 2 - 0.01, y: h - 0.03, z: -0.015 }));
+    g.add(block(gw, 0.012, 0.015, fit, { x: w / 2 - gw / 2, y: trayH, z: d / 2 - 0.03 }));
+    showerHead(g, fit, { x: -w * 0.1, z: -d / 2, bottom: 1.0, top: h - 0.05, rain: true });
+    return g;
+  }
+
+  // Enclosure and cabin: glass on the front and the right, framed at the top and the corner.
+  const cabin = style === 'cabin';
+  const glass = glassPane(cabin);
+  g.add(block(w, h - trayH, 0.008, glass, { y: trayH, z: d / 2 - 0.02 }));
+  g.add(block(0.008, h - trayH, d, glass, { x: w / 2 - 0.02, y: trayH }));
+  g.add(block(w, 0.02, 0.02, fit, { y: h - 0.02, z: d / 2 - 0.02 }));
+  g.add(block(0.02, 0.02, d, fit, { x: w / 2 - 0.02, y: h - 0.02 }));
+  g.add(block(0.02, h - trayH, 0.02, fit, { x: w / 2 - 0.02, y: trayH, z: d / 2 - 0.02 }));
+  g.add(block(0.015, 0.3, 0.03, fit, { x: w * 0.1, y: 0.95, z: d / 2 }));
+  if (cabin) {
+    // Solid panels at the back and left, and a roof.
+    g.add(block(w, h - trayH, 0.02, tray, { y: trayH, z: -d / 2 + 0.01 }));
+    g.add(block(0.02, h - trayH, d, tray, { x: -w / 2 + 0.01, y: trayH }));
+    g.add(block(w, 0.03, d, tray, { y: h - 0.03 }));
+  }
+  showerHead(g, fit, { x: -w * 0.2, z: -d / 2 + (cabin ? 0.02 : 0), bottom: 1.0, top: h - (cabin ? 0.12 : 0.08) });
+  return g;
+}
+
+function buildBathtub({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const tub = ceramic(item.color);
+  const fit = metal(item.color2);
+  const inside = new THREE.MeshStandardMaterial({ color: new THREE.Color(item.color).multiplyScalar(0.93), roughness: 0.15 });
+
+  if (item.style === 'freestanding') {
+    // An oval shell on four small feet, with a tap on the rim.
+    const shell = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5, 0.42, h - 0.06, 48, 1, true),
+      new THREE.MeshStandardMaterial({ color: item.color, roughness: 0.15, side: THREE.DoubleSide }),
+    );
+    shell.scale.set(w, 1, d);
+    shell.position.y = 0.06 + (h - 0.06) / 2;
+    const lip = new THREE.Mesh(new THREE.RingGeometry(0.46, 0.5, 48), tub);
+    lip.rotation.x = -Math.PI / 2;
+    lip.scale.set(w, d, 1);
+    lip.position.y = h;
+    g.add(shell, lip, oval(w * 0.8, 0.02, d * 0.78, inside, { y: 0.08 }));
+    for (const [sx, sz] of CORNERS) g.add(post(0.025, 0.02, 0.07, fit, sx * w * 0.3, sz * d * 0.24));
+    tap(g, fit, { y: h, z: -d / 2 + 0.06 });
+    return g;
+  }
+
+  // Built in: four sides around a raised floor, so it reads as hollow from above.
+  const t = 0.07;
+  g.add(block(w, h, t, tub, { z: -d / 2 + t / 2 }));
+  g.add(block(w, h, t, tub, { z: d / 2 - t / 2 }));
+  for (const s of [-1, 1]) g.add(block(t, h, d - 2 * t, tub, { x: s * (w / 2 - t / 2) }));
+  g.add(block(w - 2 * t, 0.12, d - 2 * t, inside, {}));
+  tap(g, fit, { x: -w / 2 + 0.14, y: h, z: -d / 2 + 0.035, reach: 0.12 });
+  if (item.style === 'screen') {
+    // A glass screen on the rim at the tap end, and a shower on the wall behind it.
+    g.add(block(w * 0.45, 1.4, 0.008, glassPane(), { x: -w / 2 + w * 0.225, y: h, z: d / 2 - 0.03 }));
+    g.add(block(w * 0.45, 0.015, 0.02, fit, { x: -w / 2 + w * 0.225, y: h, z: d / 2 - 0.03 }));
+    showerHead(g, fit, { x: -w / 2 + 0.3, z: -d / 2, bottom: h + 0.3, top: h + 1.4 });
+  }
+  return g;
+}
+
+function buildWasher({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const body = new THREE.MeshStandardMaterial({ color: item.color, roughness: 0.3, metalness: 0.1 });
+  const panel = new THREE.MeshStandardMaterial({ color: '#2a2c2f', roughness: 0.25, metalness: 0.2 });
+  const door = new THREE.MeshStandardMaterial({ color: '#1a1d22', roughness: 0.05, metalness: 0.4 });
+  const chrome = metal('#c9ccd0');
+
+  // One machine, uh tall from y0: a control strip with a dial at the top, and a round door.
+  const machine = (y0, uh, doorScale) => {
+    g.add(block(w, uh, d, body, { y: y0, r: 0.015 }));
+    g.add(block(w - 0.04, 0.08, 0.006, panel, { y: y0 + uh - 0.11, z: d / 2 }));
+    const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.02, 20), chrome);
+    dial.rotation.x = Math.PI / 2;
+    dial.position.set(w * 0.25, y0 + uh - 0.07, d / 2 + 0.012);
+    g.add(dial);
+    const r = Math.min(w, uh) * doorScale;
+    const cy = y0 + (uh - 0.12) / 2;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.018, 12, 40), chrome);
+    ring.position.set(0, cy, d / 2 + 0.01);
+    const glass = new THREE.Mesh(new THREE.CircleGeometry(r - 0.01, 40), door);
+    glass.position.set(0, cy, d / 2 + 0.004);
+    g.add(ring, glass);
+  };
+
+  if (item.style === 'top') {
+    // Loaded from above: a lid on top and the controls along the back.
+    g.add(block(w, h, d, body, { r: 0.015 }));
+    g.add(block(w - 0.06, 0.006, d * 0.55, panel, { y: h, z: d * 0.12 }));
+    g.add(block(w - 0.04, 0.006, 0.1, panel, { y: h, z: -d / 2 + 0.07 }));
+  } else if (item.style === 'stack') {
+    machine(0, h / 2 - 0.005, 0.3);
+    machine(h / 2 + 0.005, h / 2 - 0.005, 0.26);
+  } else {
+    machine(0, h, 0.32);
+  }
+  return g;
+}
+
+function buildBathCabinet({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const body = wood(item.color);
+  const handles = trim(item.color2);
+  const groove = shade(item.color, 0.45);
+
+  if (item.style === 'mirror') {
+    // Hung on the wall: a shallow box with mirror doors.
+    g.add(block(w, h, d, body, { r: 0.005 }));
+    // A light, slightly blue-grey silver: a fully metallic mirror only reflects the dark surroundings.
+    const mirror = new THREE.MeshStandardMaterial({ color: '#d4dde1', roughness: 0.1, metalness: 0.45 });
+    const doors = w > 0.5 ? 2 : 1;
+    for (let i = 0; i < doors; i++) {
+      g.add(block(w / doors - 0.006, h - 0.02, 0.006, mirror, { x: -w / 2 + (w / doors) * (i + 0.5), y: 0.01, z: d / 2 + 0.003 }));
+    }
+    return g;
+  }
+
+  if (item.style === 'shelves') {
+    const t = 0.02;
+    for (const s of [-1, 1]) g.add(block(t, h, d, body, { x: s * (w / 2 - t / 2) }));
+    g.add(block(w - 2 * t, h, 0.01, shade(item.color, 0.85), { z: -d / 2 + 0.005 }));
+    const shelves = Math.max(3, Math.round(h / 0.35));
+    for (let k = 0; k <= shelves; k++) g.add(block(w - 2 * t, t, d - 0.01, body, { y: ((h - t) * k) / shelves, z: 0.005 }));
+    return g;
+  }
+
+  // Tall cabinet: doors above and below on a recessed plinth.
+  const plinth = 0.06;
+  const bodyH = h - plinth;
+  g.add(block(w - 0.04, plinth, d - 0.04, groove, {}));
+  g.add(block(w, bodyH, d, body, { y: plinth, r: 0.005 }));
+  const cols = w > 0.55 ? 2 : 1;
+  grooves(g, groove, { w, y0: plinth, bodyH, z: d / 2, cols, rows: 2 });
+  for (let i = 0; i < cols; i++) {
+    const x = cols === 1 ? w / 2 - 0.05 : i === 0 ? -0.04 : 0.04;
+    for (const y of [plinth + bodyH * 0.38, plinth + bodyH * 0.58]) g.add(block(0.012, 0.12, 0.02, handles, { x, y, z: d / 2 + 0.01 }));
   }
   return g;
 }

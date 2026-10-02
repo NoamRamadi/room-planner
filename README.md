@@ -14,6 +14,7 @@ Plan a room of your apartment in 3D, right in the browser.
   - TV stand: cabinet, open shelves, floating, sideboard
   - TV: centre stand, feet, wall-mounted (at a height you set), curved
   - Carpet: bordered, round, striped, classic (Persian-style, with fringes), geometric, shaggy; in two colors of your choice
+- Design a bathroom: toilets (with cistern, wall-hung, bidet), sinks (pedestal, vanity, wall-hung, double, countertop bowl), showers (enclosure, curved corner, walk-in, shower cabin, shower head), bathtubs (built-in, freestanding, with shower screen), washing machines (front-loading, top-loading, washer and dryer) and bathroom cabinets (tall, mirror cabinet, open shelves)
 - See each piece's size and its distance to every wall while it's selected
 - Switch between 3D view, top view (floor plan) and eye level, and save a photo of the view
 - Turn **See-through walls** on to cut away walls that stand between you and the room, or off to keep every wall standing
@@ -84,7 +85,9 @@ Under **Walls → Doors and windows**, click **Door** or **Window** and pick a d
 
 ## Furniture designs
 
-Click **Sofa**, **Table**, **TV stand**, **TV** or **Carpet** under **Add furniture** and pick a design from the menu. To change a piece's design later, select it and pick another under **Design**; its size is kept wherever the new design allows. Each design has its own size presets. A round table has a single size, its diameter. A wall-mounted TV has a height above the floor. A corner sofa can have its chaise on the left.
+Under **Add furniture**, pick **Living room** or **Bathroom**, click a type and pick a design from the menu. To change a piece's design later, select it and pick another under **Design**; its size is kept wherever the new design allows. Each design has its own size presets. A round table has a single size, its diameter. A wall-mounted TV has a height above the floor. A corner sofa can have its chaise on the left.
+
+Bathroom pieces find their own place: toilets, sinks, washing machines and cabinets line up along a wall, showers and bathtubs go into corners, a mirror cabinet hangs over the sink, and none of them block a door (tall ones stay clear of windows too). A mirror cabinet and a shower head hang on the wall at a height you set (**Above floor**).
 
 Carpets lie flat on the floor: furniture can stand on them, and carpets and furniture never push each other out of the way (walls still stop a carpet). A carpet's pattern is drawn at its real size in its **Main** and **Pattern** colors, and its presets include a runner. Designs saved by earlier versions open as a group of walls.
 

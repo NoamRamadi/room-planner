@@ -11,6 +11,12 @@ const ICONS = {
   table: '<rect x="4" y="9" width="40" height="3" rx="1"/><path d="M8 12v15M40 12v15"/>',
   tvstand: '<rect x="4" y="11" width="40" height="14" rx="1"/><path d="M24 11v14M12 16h5M31 16h5M8 25v3M40 25v3"/>',
   tv: '<rect x="7" y="3" width="34" height="20" rx="1"/><path d="M24 23v4M17 28h14"/>',
+  toilet: '<rect x="9" y="3" width="9" height="13" rx="1"/><path d="M9 16h27a8 8 0 0 1-8 8h-4v5H15v-5c-4-1-6-4-6-8z"/>',
+  sink: '<path d="M7 12h34l-3 7H10z"/><path d="M21 19v10h6V19"/><path d="M24 12V7h5"/>',
+  shower: '<rect x="8" y="4" width="32" height="25" rx="1"/><path d="M26 4v25"/><path d="M12 9h7M15.5 9v3M14 15v1M15.5 15v2M17 15v1"/>',
+  bathtub: '<path d="M5 14h38v4a7 7 0 0 1-7 7H12a7 7 0 0 1-7-7z"/><path d="M9 14V8a3 3 0 0 1 6 0"/><path d="M12 25l-2 3M36 25l2 3"/>',
+  washer: '<rect x="11" y="2" width="26" height="28" rx="2"/><path d="M11 8h26M15 5h4"/><circle cx="24" cy="19" r="6"/>',
+  bathcabinet: '<rect x="15" y="2" width="18" height="28" rx="1"/><path d="M15 15h18M29 8v3M29 19v3"/>',
   rug: '<rect x="10" y="4" width="28" height="24" rx="1"/><rect x="14" y="8" width="20" height="16"/><path d="M13 4V1M18 4V1M23 4V1M28 4V1M33 4V1M13 28v3M18 28v3M23 28v3M28 28v3M33 28v3"/>',
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
@@ -53,6 +59,28 @@ const DESIGN_ICONS = {
 };
 
 Object.assign(DESIGN_ICONS, {
+  'toilet:floor': ICONS.toilet,
+  'toilet:wall': '<path d="M7 3v26"/><path d="M7 13h29a8 8 0 0 1-8 8H7"/><rect x="11" y="4" width="6" height="5"/>',
+  'toilet:bidet': '<path d="M9 14h27a8 8 0 0 1-8 8h-4v6H15v-6c-4-1-6-4-6-8z"/><path d="M13 14v-4h4"/>',
+  'sink:pedestal': ICONS.sink,
+  'sink:vanity': '<path d="M6 9h36v4H6z"/><rect x="7" y="13" width="34" height="15"/><path d="M24 13v15M21 19v3M27 19v3M24 9V5h4"/>',
+  'sink:wall': '<path d="M6 3v26"/><path d="M6 12h30l-3 7H6"/><path d="M15 19v6H6M24 12V8h4"/>',
+  'sink:double': '<path d="M3 9h42v4H3z"/><rect x="4" y="13" width="40" height="15"/><path d="M24 13v15M14 9V5h3M34 9V5h3"/>',
+  'sink:vessel': '<path d="M5 19h38v3H5z"/><path d="M15 11h18c0 5-4 8-9 8s-9-3-9-8z"/><path d="M31 11V4h5"/>',
+  'shower:enclosure': ICONS.shower,
+  'shower:quadrant': '<path d="M8 29V4"/><path d="M8 4c18 0 32 11 32 25"/><path d="M4 29h40"/><path d="M12 8h6M15 8v3"/>',
+  'shower:walkin': '<path d="M4 29h40"/><path d="M28 29V5M28 5H18"/><path d="M8 5h10M13 5v3M11 11v1M13 11v2M15 11v1"/>',
+  'shower:cabin': '<rect x="10" y="2" width="28" height="27" rx="2"/><path d="M10 6h28M26 6v23"/><path d="M14 10h6"/>',
+  'shower:head': '<path d="M16 29V6h11"/><path d="M27 6v3M23 10h8M25 13v2M27 13v3M29 13v2"/><path d="M12 21h8"/>',
+  'bathtub:builtin': '<rect x="4" y="13" width="40" height="13" rx="1"/><path d="M9 13V7a3 3 0 0 1 6 0"/>',
+  'bathtub:freestanding': ICONS.bathtub,
+  'bathtub:screen': '<rect x="4" y="16" width="40" height="11" rx="1"/><path d="M8 16V3h12v13"/>',
+  'washer:front': ICONS.washer,
+  'washer:top': '<rect x="13" y="6" width="22" height="24" rx="2"/><path d="M13 12h22M17 9h14"/><path d="M16 4h16"/>',
+  'washer:stack': '<rect x="14" y="1" width="20" height="14" rx="1"/><rect x="14" y="17" width="20" height="14" rx="1"/><circle cx="24" cy="9" r="3.5"/><circle cx="24" cy="25" r="3.5"/>',
+  'bathcabinet:tall': ICONS.bathcabinet,
+  'bathcabinet:mirror': '<rect x="10" y="5" width="28" height="21" rx="1"/><path d="M24 5v21"/><path d="M14 10l4-3M28 10l4-3"/>',
+  'bathcabinet:shelves': '<rect x="14" y="2" width="20" height="28"/><path d="M14 9h20M14 16h20M14 23h20"/>',
   'door:single': ICONS.door,
   'door:double': '<path d="M9 30V3h30v27M24 3v27"/><path d="M5 30h38"/><path d="M21 16v2M27 16v2"/>',
   'door:sliding': '<path d="M7 30V3h34v27"/><path d="M10 6h15v24M23 6h15v24"/><path d="M3 30h42"/>',
@@ -356,8 +384,39 @@ export function initUI(view) {
 
   // ---- Furniture ----
 
-  // Each type opens a menu of its designs; picking one adds that piece.
-  const furniture = adder({ id: 'design-menu', kinds: CATALOG, onPick: (type, style) => store.addItem(type, style) });
+  // Each type opens a menu of its designs; picking one adds that piece. Furniture comes in two sets,
+  // living room and bathroom, one shown at a time.
+  const rooms = [
+    { id: 'living', label: 'Living room' },
+    { id: 'bath', label: 'Bathroom' },
+  ];
+  const furnitureFor = (room) =>
+    adder({
+      id: `design-menu-${room}`,
+      kinds: Object.fromEntries(Object.entries(CATALOG).filter(([, def]) => (def.room ?? 'living') === room)),
+      onPick: (type, style) => store.addItem(type, style),
+    });
+  const sets = Object.fromEntries(rooms.map((r) => [r.id, furnitureFor(r.id)]));
+  const furniture = { close: () => Object.values(sets).forEach((set) => set.close()) };
+  let shownSet = 'living';
+  const setBlocks = Object.fromEntries(
+    rooms.map((r) => [r.id, h('div', { class: 'furniture-set' }, h('div', { class: 'add-grid' }, sets[r.id].buttons), sets[r.id].menu)]),
+  );
+  const roomTabs = segmented({
+    label: 'Which furniture',
+    options: rooms,
+    get: () => shownSet,
+    set: (id) => {
+      shownSet = id;
+      furniture.close();
+      syncRoomTabs();
+    },
+  });
+  const syncRoomTabs = () => {
+    roomTabs.sync();
+    for (const r of rooms) setBlocks[r.id].hidden = r.id !== shownSet;
+  };
+  syncRoomTabs();
   const openings = adder({
     id: 'opening-menu',
     kinds: OPENINGS,
@@ -376,7 +435,7 @@ export function initUI(view) {
     inventoryKey = key;
     count.textContent = state.items.length ? `${state.items.length} ${state.items.length === 1 ? 'piece' : 'pieces'}` : '';
     if (!state.items.length) {
-      inventory.replaceChildren(h('li', { class: 'empty' }, 'No furniture yet. Add a sofa, a table, a TV or a carpet to start arranging.'));
+      inventory.replaceChildren(h('li', { class: 'empty' }, 'No furniture yet. Add a sofa, a table, a carpet, or bathroom pieces to start arranging.'));
       return;
     }
     inventory.replaceChildren(
@@ -463,9 +522,8 @@ export function initUI(view) {
     h(
       'section',
       { class: 'section', 'aria-labelledby': 'add-heading' },
-      h('h2', { id: 'add-heading' }, 'Add furniture'),
-      h('div', { class: 'add-grid' }, furniture.buttons),
-      furniture.menu,
+      h('div', { class: 'section__head section__head--tabs' }, h('h2', { id: 'add-heading' }, 'Add furniture'), roomTabs.el),
+      Object.values(setBlocks),
     ),
     h(
       'section',
@@ -1037,7 +1095,19 @@ function buildItemInspector(root, item) {
       }),
     );
     syncers.push(...fields.map((f) => f.sync));
-    sizeFields = h('div', { class: keys.length === 3 ? 'measures' : 'measures measures--two' }, fields.map((f) => f.el));
+    sizeFields = [h('div', { class: keys.length === 3 ? 'measures' : 'measures measures--two' }, fields.map((f) => f.el))];
+    // Wall-mounted pieces (a mirror cabinet, a shower head) also have their height above the floor.
+    if (isOnWall(item)) {
+      const mount = measureField({
+        label: 'Above floor',
+        min: limit('mount', 0),
+        max: limit('mount', 1),
+        get: () => current().mount,
+        set: (v) => update({ mount: v }),
+      });
+      syncers.push(mount.sync);
+      sizeFields.push(h('div', { class: 'measures measures--gap' }, mount.el));
+    }
   }
 
   // A corner sofa's chaise can be on either side.
