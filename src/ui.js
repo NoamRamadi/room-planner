@@ -24,6 +24,15 @@ const ICONS = {
   dishwasher: '<rect x="11" y="4" width="26" height="26" rx="1"/><path d="M11 10h26M14 7h6M19 14h10M15 20h18M15 25h18"/>',
   island: '<path d="M3 11h42v3H3z"/><rect x="6" y="14" width="36" height="13"/><path d="M18 14v13M30 14v13M10 18.5h4M22 18.5h4M34 18.5h4"/>',
   stool: '<ellipse cx="24" cy="7" rx="9" ry="2.5"/><path d="M18 9l-3 21M30 9l3 21M16.5 20h15"/>',
+  bed: '<rect x="4" y="5" width="7" height="23" rx="2"/><path d="M11 19h32v6H11M11 14h32v5"/><rect x="13" y="10" width="9" height="4" rx="2"/><path d="M13 25v3M41 25v3"/>',
+  nightstand: '<rect x="14" y="6" width="20" height="18" rx="1"/><path d="M14 15h20M22 10.5h4M22 19.5h4M16 24v4M32 24v4"/>',
+  wardrobe: '<rect x="10" y="2" width="28" height="26" rx="1"/><path d="M24 2v26M21 13v5M27 13v5M12 28v2M36 28v2"/>',
+  dresser: '<rect x="14" y="3" width="20" height="24" rx="1"/><path d="M14 9h20M14 15h20M14 21h20M22 6h4M22 12h4M22 18h4M22 24h4M16 27v3M32 27v3"/>',
+  desk: '<path d="M4 10h40v3H4z"/><path d="M8 13v16M40 13v16"/><path d="M16 13v4h16v-4M22 15h4"/>',
+  chair: '<path d="M15 3h18M15 8h18M15 3v27M33 3v27M14 17h20v2H14z"/><path d="M15 25h18"/>',
+  bookcase: '<rect x="13" y="2" width="22" height="27"/><path d="M13 11h22M13 20h22"/><path d="M16 11V5M18 11V6M20 11V4M25 20v-6M27 20v-5M16 29v-6M18 29v-5M21 29v-6"/>',
+  lamp: '<path d="M17 4h14l4 10H13z"/><path d="M24 14v4"/><path d="M20 18h8c2 3 2 7-1 10h-6c-3-3-3-7-1-10z"/>',
+  crib: '<path d="M6 4v25M42 4v25M6 7h36M6 21h36"/><path d="M11 7v14M16 7v14M21 7v14M26 7v14M31 7v14M36 7v14"/><path d="M6 25h36"/>',
   rug: '<rect x="10" y="4" width="28" height="24" rx="1"/><rect x="14" y="8" width="20" height="16"/><path d="M13 4V1M18 4V1M23 4V1M28 4V1M33 4V1M13 28v3M18 28v3M23 28v3M28 28v3M33 28v3"/>',
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
@@ -115,6 +124,37 @@ Object.assign(DESIGN_ICONS, {
   'stool:wood': ICONS.stool,
   'stool:metal': '<ellipse cx="24" cy="7" rx="9" ry="2.5"/><path d="M24 9.5v19M17 30h14M19 21h10"/>',
   'stool:back': '<path d="M17 3v11M31 3v11M17 6h14"/><path d="M15 14h18v3H15z"/><path d="M17 17l-1 13M31 17l1 13M16.5 24h15"/>',
+  'bed:upholstered': ICONS.bed,
+  'bed:wooden': '<path d="M5 4v24M43 12v16M5 21h38M5 15h38"/><rect x="8" y="11" width="8" height="4" rx="2"/>',
+  'bed:platform': '<path d="M3 17h42v6H3z"/><path d="M6 23v2h36v-2"/><path d="M3 9h5v8H3z"/><path d="M8 13h34v4"/><rect x="10" y="10" width="8" height="3" rx="1.5"/>',
+  'bed:storage': '<rect x="4" y="5" width="7" height="23" rx="2"/><path d="M11 17h32v10H11M11 13h32v4"/><path d="M15 20h10v4H15zM29 20h10v4H29z"/>',
+  'bed:canopy': '<path d="M5 3v25M43 3v25M5 3h38"/><path d="M5 20h38M5 15h38"/><rect x="8" y="11" width="8" height="4" rx="2"/>',
+  'bed:bunk': '<path d="M5 2v28M39 2v28"/><path d="M5 11h34M5 8h34M5 25h34M5 22h34"/><path d="M42 8v20M46 8v20M42 13h4M42 18h4M42 23h4"/>',
+  'nightstand:drawers': ICONS.nightstand,
+  'nightstand:open': '<rect x="14" y="6" width="20" height="18"/><path d="M14 12h20M22 9h4"/><path d="M16 24v4M32 24v4"/><path d="M17 21h9v3h-9z"/>',
+  'nightstand:floating': '<rect x="12" y="10" width="24" height="8" rx="1"/><path d="M21 14h6"/><path d="M2 28h44" stroke-dasharray="2 3"/>',
+  'nightstand:round': '<ellipse cx="24" cy="8" rx="12" ry="3"/><path d="M17 10l-4 18M31 10l4 18M24 11v17"/><ellipse cx="24" cy="20" rx="8" ry="2"/>',
+  'wardrobe:hinged': ICONS.wardrobe,
+  'wardrobe:sliding': '<rect x="8" y="2" width="32" height="27" rx="1"/><path d="M8 5h32M8 26h32"/><path d="M23 5v21M25 5v21"/><path d="M11 14v4M37 14v4"/>',
+  'wardrobe:mirror': '<rect x="8" y="2" width="32" height="27" rx="1"/><path d="M24 2v27"/><path d="M12 9l5-4M12 15l9-7M28 9l5-4M28 15l9-7"/>',
+  'wardrobe:open': '<path d="M8 30V3M40 30V3M8 3h32M8 25h32M8 7h32"/><path d="M12 7v12M16 7v15M20 7v10M24 7v14M28 7v12M32 7v9"/>',
+  'dresser:chest': ICONS.dresser,
+  'dresser:wide': '<rect x="6" y="9" width="36" height="17" rx="1"/><path d="M24 9v17M6 14.7h36M6 20.3h36M13 12h4M31 12h4M13 17.5h4M31 17.5h4M13 23h4M31 23h4M8 26v3M40 26v3"/>',
+  'dresser:dressing': '<path d="M8 17h32v3H8z"/><path d="M10 20l-1 10M38 20l1 10M20 22h8"/><path d="M14 20v4h20v-4"/><ellipse cx="24" cy="9" rx="6" ry="7.5"/>',
+  'desk:writing': ICONS.desk,
+  'desk:pedestal': '<path d="M4 10h40v3H4z"/><path d="M6 13v16"/><rect x="29" y="13" width="13" height="16"/><path d="M29 18.3h13M29 23.6h13M34 15.6h3M34 21h3M34 26.3h3"/>',
+  'desk:lshape': '<path d="M5 4h38v10H16v15H5z"/><circle cx="29" cy="22" r="4"/>',
+  'chair:office': '<rect x="16" y="2" width="16" height="12" rx="3"/><path d="M14 17h20v3H14z"/><path d="M24 20v5M15 28l9-3 9 3M15 28v1M33 28v1"/>',
+  'chair:wooden': ICONS.chair,
+  'chair:armchair': '<path d="M12 4h24a2 2 0 0 1 2 2v9H10V6a2 2 0 0 1 2-2z"/><path d="M6 13a3 3 0 0 1 6 0v6h24v-6a3 3 0 0 1 6 0v11H6z"/><path d="M9 24l-1 4M39 24l1 4"/>',
+  'bookcase:open': ICONS.bookcase,
+  'bookcase:cube': '<rect x="9" y="3" width="30" height="26"/><path d="M19 3v26M29 3v26M9 11.7h30M9 20.3h30"/><path d="M11 13.5h6v5h-6zM31 5h6v5h-6zM21 22h6v5h-6z"/>',
+  'bookcase:ladder': '<path d="M36 2v28" stroke-dasharray="2 3"/><path d="M16 30L34 2"/><path d="M18.5 26H36M23 19h13M27.5 12H36M32 5h4"/>',
+  'lamp:table': ICONS.lamp,
+  'lamp:floor': '<path d="M18 2h12l3 8H15z"/><path d="M24 10v19M18 29h12"/>',
+  'lamp:arc': '<path d="M8 29h8M12 29V14a12 12 0 0 1 24 0v2"/><path d="M30 22a6 6 0 0 1 12 0z"/>',
+  'crib:cot': ICONS.crib,
+  'crib:bassinet': '<path d="M8 8h32l-3 9H11z"/><path d="M14 17l20 12M34 17L14 29"/>',
   'door:single': ICONS.door,
   'door:double': '<path d="M9 30V3h30v27M24 3v27"/><path d="M5 30h38"/><path d="M21 16v2M27 16v2"/>',
   'door:sliding': '<path d="M7 30V3h34v27"/><path d="M10 6h15v24M23 6h15v24"/><path d="M3 30h42"/>',
@@ -419,10 +459,11 @@ export function initUI(view) {
   // ---- Furniture ----
 
   // Each type opens a menu of its designs; picking one adds that piece. Furniture comes in sets by
-  // room (living room, kitchen, bathroom), one shown at a time.
+  // room (living room, kitchen, bedroom, bathroom), one shown at a time.
   const rooms = [
-    { id: 'living', label: 'Living room' },
+    { id: 'living', label: 'Living' },
     { id: 'kitchen', label: 'Kitchen' },
+    { id: 'bedroom', label: 'Bedroom' },
     { id: 'bath', label: 'Bathroom' },
   ];
   const furnitureFor = (room) =>
@@ -1157,15 +1198,15 @@ function buildItemInspector(root, item) {
     }
   }
 
-  // A corner sofa's chaise can be on either side.
+  // Some designs come either way round: a corner sofa's chaise, a corner desk's return.
   let flip = null;
-  if (item.type === 'sofa' && style.id === 'corner') {
+  if (style.flip) {
     const box = h('input', { type: 'checkbox' });
     box.addEventListener('change', () => update({ flip: box.checked }));
     syncers.push(() => {
       box.checked = current().flip;
     });
-    flip = h('label', { class: 'check' }, box, 'Chaise on the left');
+    flip = h('label', { class: 'check' }, box, style.flip);
   }
 
   // Colors

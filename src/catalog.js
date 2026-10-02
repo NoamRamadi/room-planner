@@ -135,6 +135,41 @@ const FINISHES = [
   { name: 'Cream', hex: '#ece3c8' },
 ];
 
+const PAINTED = [
+  ...WOODS,
+  { name: 'Light grey', hex: '#cfd2d3' },
+  { name: 'Sage', hex: '#9fae94' },
+  { name: 'Navy', hex: '#2f3c56' },
+];
+
+const BEDDING = [
+  { name: 'White', hex: '#f4f2ed' },
+  { name: 'Linen', hex: '#e2d9c8' },
+  { name: 'Sand', hex: '#cdbb9c' },
+  { name: 'Sage', hex: '#a9b59d' },
+  { name: 'Dusty blue', hex: '#9fb0c2' },
+  { name: 'Blush', hex: '#dcb8ae' },
+  { name: 'Terracotta', hex: '#b9714f' },
+  { name: 'Charcoal', hex: '#4a4c50' },
+];
+
+const SHADES = [
+  { name: 'Linen', hex: '#efe8da' },
+  { name: 'White', hex: '#f6f5f1' },
+  { name: 'Sand', hex: '#d9c7a5' },
+  { name: 'Sage', hex: '#a9b59d' },
+  { name: 'Terracotta', hex: '#c0714f' },
+  { name: 'Black', hex: '#2b2c2f' },
+];
+
+// Outer sizes (cm) of beds for the usual mattress widths.
+const BED_SIZES = [
+  { name: 'Single 90', w: 100, d: 210 },
+  { name: 'Double 140', w: 150, d: 210 },
+  { name: 'Queen 160', w: 170, d: 215 },
+  { name: 'King 180', w: 190, d: 215 },
+];
+
 const TV_FINISHES = [
   { name: 'Black', hex: '#1d1e21' },
   { name: 'Graphite', hex: '#4a4c50' },
@@ -163,8 +198,10 @@ const TV_SIZES = [
 // Each type comes in several designs (`styles`). A design can bring its own starting size and colors
 // (`defaults`), size limits, size presets and color choices; `name` is what a new piece of that
 // design is called. `surface`: other items can stand on it. `stackable`: rests on a surface when
-// placed over one. `room`: the furniture set it's listed under. `place`: where a new one goes
-// ('wall', 'corner', or 'island' for stools); a hanging design's `over` lists what it hangs above.
+// placed over one. `room`: the furniture set it's listed under. `place` (for a type or a design):
+// where a new one goes: 'wall', 'corner', 'bed' (beside one), 'desk' or 'island' (in front of one,
+// facing it) or 'surface' (on a bedside table, desk or chest). A hanging design's `over` lists what it
+// hangs above. `flip`: the label of a design's mirror-image option.
 export const CATALOG = {
   sofa: {
     label: 'Sofa',
@@ -189,6 +226,7 @@ export const CATALOG = {
       {
         id: 'corner',
         label: 'Corner',
+        flip: 'Chaise on the left',
         name: 'Corner sofa',
         defaults: { w: 270, d: 170, h: 85 },
         limits: { w: [180, 400], d: [130, 300] },
@@ -979,6 +1017,494 @@ export const CATALOG = {
     ],
     build: buildStool,
   },
+
+  // ---- Bedroom ----
+
+  bed: {
+    label: 'Bed',
+    room: 'bedroom',
+    place: 'wall',
+    sides: 55, // keeps this much of the wall either side clear of doors and windows, for bedside tables
+    defaults: { style: 'upholstered', w: 170, d: 215, h: 115, color: '#d6cab5', color2: '#f4f2ed' },
+    limits: { w: [80, 230], d: [180, 240], h: [40, 240] },
+    colors: [
+      { key: 'color', label: 'Headboard', palette: FABRICS },
+      { key: 'color2', label: 'Bedding', palette: BEDDING },
+    ],
+    presets: BED_SIZES,
+    styles: [
+      { id: 'upholstered', label: 'Upholstered', name: 'Bed', limits: { h: [70, 160] } },
+      {
+        id: 'wooden',
+        label: 'Wooden',
+        name: 'Wooden bed',
+        defaults: { h: 100, color: '#b88f5d' },
+        limits: { h: [70, 160] },
+        colors: [{ key: 'color', label: 'Wood', palette: WOODS }, { key: 'color2', label: 'Bedding', palette: BEDDING }],
+      },
+      {
+        id: 'platform',
+        label: 'Low platform',
+        name: 'Platform bed',
+        defaults: { h: 75, color: '#8b5b37' },
+        limits: { h: [40, 120] },
+        colors: [{ key: 'color', label: 'Wood', palette: WOODS }, { key: 'color2', label: 'Bedding', palette: BEDDING }],
+      },
+      {
+        id: 'storage',
+        label: 'Storage divan',
+        name: 'Storage bed',
+        defaults: { color: '#5d6673' },
+        limits: { h: [70, 160] },
+        colors: [{ key: 'color', label: 'Fabric', palette: FABRICS }, { key: 'color2', label: 'Bedding', palette: BEDDING }],
+      },
+      {
+        id: 'canopy',
+        label: 'Four-poster',
+        name: 'Four-poster bed',
+        defaults: { h: 200, color: '#2c2d30' },
+        limits: { h: [170, 240] },
+        colors: [{ key: 'color', label: 'Frame', palette: WOODS }, { key: 'color2', label: 'Bedding', palette: BEDDING }],
+      },
+      {
+        id: 'bunk',
+        label: 'Bunk bed',
+        name: 'Bunk bed',
+        defaults: { w: 100, d: 210, h: 165, color: '#ecebe6', color2: '#9fb0c2' },
+        limits: { w: [80, 140], h: [140, 200] },
+        colors: [{ key: 'color', label: 'Frame', palette: WOODS }, { key: 'color2', label: 'Bedding', palette: BEDDING }],
+        presets: [
+          { name: 'Single 90', w: 100, d: 210, h: 165 },
+          { name: 'Wide 120', w: 130, d: 210, h: 165 },
+        ],
+      },
+    ],
+    build: buildBed,
+  },
+  nightstand: {
+    label: 'Bedside table',
+    room: 'bedroom',
+    place: 'bed',
+    surface: true,
+    defaults: { style: 'drawers', w: 50, d: 40, h: 55, color: '#b88f5d', color2: '#26272a', mount: 45 },
+    limits: { w: [30, 80], d: [25, 55], h: [12, 75], mount: [20, 90] },
+    colors: [
+      { key: 'color', label: 'Wood', palette: PAINTED },
+      { key: 'color2', label: 'Handles and legs', palette: TRIMS },
+    ],
+    styles: [
+      {
+        id: 'drawers',
+        label: 'Two drawers',
+        name: 'Bedside table',
+        limits: { h: [35, 75] },
+        presets: [
+          { name: 'Small', w: 40, d: 35, h: 50 },
+          { name: 'Standard', w: 50, d: 40, h: 55 },
+          { name: 'Wide', w: 65, d: 42, h: 55 },
+        ],
+      },
+      {
+        id: 'open',
+        label: 'Drawer and shelf',
+        name: 'Open bedside table',
+        defaults: { color: '#ecebe6', color2: '#b8924a' },
+        limits: { h: [35, 75] },
+        presets: [
+          { name: 'Small', w: 40, d: 35, h: 50 },
+          { name: 'Standard', w: 50, d: 40, h: 55 },
+        ],
+      },
+      {
+        id: 'floating',
+        label: 'Floating',
+        name: 'Floating bedside table',
+        onWall: true, // `mount` is the height of its bottom edge
+        defaults: { w: 45, d: 32, h: 18 },
+        limits: { h: [12, 40] },
+        presets: [
+          { name: 'Small', w: 40, d: 30, h: 15 },
+          { name: 'Standard', w: 45, d: 32, h: 18 },
+        ],
+      },
+      {
+        id: 'round',
+        label: 'Round',
+        name: 'Round side table',
+        round: true,
+        defaults: { w: 45, d: 45 },
+        limits: { w: [30, 70], h: [35, 75] },
+        colors: [
+          { key: 'color', label: 'Top', palette: PAINTED },
+          { key: 'color2', label: 'Legs', palette: TRIMS },
+        ],
+        presets: [
+          { name: 'Small', w: 40, h: 50 },
+          { name: 'Standard', w: 45, h: 55 },
+        ],
+      },
+    ],
+    build: buildNightstand,
+  },
+  wardrobe: {
+    label: 'Wardrobe',
+    room: 'bedroom',
+    place: 'wall',
+    defaults: { style: 'hinged', w: 150, d: 60, h: 220, color: '#ecebe6', color2: '#a9abad' },
+    limits: { w: [50, 400], d: [35, 70], h: [100, 260] },
+    colors: [
+      { key: 'color', label: 'Doors', palette: PAINTED },
+      { key: 'color2', label: 'Handles', palette: TRIMS },
+    ],
+    styles: [
+      {
+        id: 'hinged',
+        label: 'Hinged doors',
+        name: 'Wardrobe',
+        presets: [
+          { name: '1 door', w: 50, d: 60, h: 200 },
+          { name: '2 doors', w: 100, d: 60, h: 200 },
+          { name: '3 doors', w: 150, d: 60, h: 220 },
+          { name: '4 doors', w: 200, d: 60, h: 236 },
+        ],
+      },
+      {
+        id: 'sliding',
+        label: 'Sliding doors',
+        name: 'Sliding wardrobe',
+        defaults: { w: 200, d: 65, h: 236, color: '#b88f5d', color2: '#26272a' },
+        limits: { w: [100, 400] },
+        colors: [
+          { key: 'color', label: 'Doors', palette: PAINTED },
+          { key: 'color2', label: 'Frame', palette: TRIMS },
+        ],
+        presets: [
+          { name: '160 cm', w: 160, d: 65, h: 220 },
+          { name: '200 cm', w: 200, d: 65, h: 236 },
+          { name: '250 cm', w: 250, d: 65, h: 236 },
+        ],
+      },
+      {
+        id: 'mirror',
+        label: 'Mirror doors',
+        name: 'Mirror wardrobe',
+        defaults: { w: 200, d: 65, h: 236, color: '#2c2d30' },
+        limits: { w: [100, 400] },
+        colors: [{ key: 'color', label: 'Frame', palette: PAINTED }],
+        presets: [
+          { name: '160 cm', w: 160, d: 65, h: 220 },
+          { name: '200 cm', w: 200, d: 65, h: 236 },
+          { name: '250 cm', w: 250, d: 65, h: 236 },
+        ],
+      },
+      {
+        id: 'open',
+        label: 'Clothes rail',
+        name: 'Clothes rail',
+        defaults: { w: 120, d: 45, h: 180, color: '#b88f5d', color2: '#26272a' },
+        limits: { d: [35, 60] },
+        colors: [
+          { key: 'color', label: 'Shelves', palette: WOODS },
+          { key: 'color2', label: 'Frame', palette: TRIMS },
+        ],
+        presets: [
+          { name: '80 cm', w: 80, d: 45, h: 180 },
+          { name: '120 cm', w: 120, d: 45, h: 180 },
+          { name: '160 cm', w: 160, d: 45, h: 190 },
+        ],
+      },
+    ],
+    build: buildWardrobe,
+  },
+  dresser: {
+    label: 'Chest of drawers',
+    room: 'bedroom',
+    place: 'wall',
+    surface: true,
+    defaults: { style: 'chest', w: 80, d: 45, h: 110, color: '#ecebe6', color2: '#b8924a' },
+    limits: { w: [40, 220], d: [30, 60], h: [50, 150] },
+    colors: [
+      { key: 'color', label: 'Wood', palette: PAINTED },
+      { key: 'color2', label: 'Handles', palette: TRIMS },
+    ],
+    styles: [
+      {
+        id: 'chest',
+        label: 'Tall chest',
+        name: 'Chest of drawers',
+        limits: { h: [70, 150] },
+        presets: [
+          { name: 'Narrow', w: 60, d: 45, h: 110 },
+          { name: 'Standard', w: 80, d: 45, h: 110 },
+          { name: 'Tall', w: 80, d: 45, h: 140 },
+        ],
+      },
+      {
+        id: 'wide',
+        label: 'Wide dresser',
+        name: 'Dresser',
+        defaults: { w: 140, h: 80, color: '#b88f5d', color2: '#26272a' },
+        limits: { h: [50, 110] },
+        presets: [
+          { name: '120 cm', w: 120, d: 45, h: 80 },
+          { name: '160 cm', w: 160, d: 48, h: 80 },
+        ],
+      },
+      {
+        id: 'dressing',
+        label: 'Dressing table',
+        name: 'Dressing table',
+        defaults: { w: 100, d: 42, h: 76 },
+        limits: { d: [30, 55], h: [65, 85] },
+        presets: [
+          { name: 'Small', w: 80, d: 40, h: 76 },
+          { name: 'Standard', w: 100, d: 42, h: 76 },
+          { name: 'Large', w: 120, d: 45, h: 76 },
+        ],
+      },
+    ],
+    build: buildDresser,
+  },
+  desk: {
+    label: 'Desk',
+    room: 'bedroom',
+    place: 'wall',
+    surface: true,
+    defaults: { style: 'writing', w: 120, d: 60, h: 75, color: '#b88f5d', color2: '#26272a', flip: false },
+    limits: { w: [60, 240], d: [40, 180], h: [60, 120] },
+    colors: [
+      { key: 'color', label: 'Top', palette: PAINTED },
+      { key: 'color2', label: 'Frame', palette: TRIMS },
+    ],
+    styles: [
+      {
+        id: 'writing',
+        label: 'Writing desk',
+        name: 'Desk',
+        limits: { d: [40, 90] },
+        presets: [
+          { name: '100 cm', w: 100, d: 55, h: 75 },
+          { name: '120 cm', w: 120, d: 60, h: 75 },
+          { name: '160 cm', w: 160, d: 70, h: 75 },
+        ],
+      },
+      {
+        id: 'pedestal',
+        label: 'With drawers',
+        name: 'Desk with drawers',
+        defaults: { w: 140, d: 65, color: '#ecebe6', color2: '#a9abad' },
+        limits: { w: [90, 240], d: [45, 90] },
+        colors: [
+          { key: 'color', label: 'Wood', palette: PAINTED },
+          { key: 'color2', label: 'Handles', palette: TRIMS },
+        ],
+        presets: [
+          { name: '120 cm', w: 120, d: 60, h: 75 },
+          { name: '140 cm', w: 140, d: 65, h: 75 },
+          { name: '180 cm', w: 180, d: 75, h: 75 },
+        ],
+      },
+      {
+        id: 'lshape',
+        label: 'Corner desk',
+        name: 'Corner desk',
+        place: 'corner',
+        flip: 'Return on the right',
+        defaults: { w: 160, d: 140 },
+        limits: { w: [100, 240], d: [100, 180] },
+        presets: [
+          { name: 'Medium', w: 140, d: 120, h: 75 },
+          { name: 'Large', w: 160, d: 140, h: 75 },
+          { name: 'Extra large', w: 200, d: 160, h: 75 },
+        ],
+      },
+    ],
+    build: buildDesk,
+  },
+  chair: {
+    label: 'Chair',
+    room: 'bedroom',
+    place: 'desk',
+    defaults: { style: 'office', w: 65, d: 65, h: 105, color: '#3b3e43', color2: '#26272a' },
+    limits: { w: [38, 100], d: [40, 100], h: [70, 130] },
+    colors: [
+      { key: 'color', label: 'Upholstery', palette: FABRICS },
+      { key: 'color2', label: 'Frame', palette: TRIMS },
+    ],
+    styles: [
+      {
+        id: 'office',
+        label: 'Office chair',
+        name: 'Office chair',
+        limits: { w: [50, 80], d: [50, 80], h: [85, 130] },
+        presets: [
+          { name: 'Standard', w: 65, d: 65, h: 105 },
+          { name: 'High back', w: 68, d: 68, h: 125 },
+        ],
+      },
+      {
+        id: 'wooden',
+        label: 'Wooden chair',
+        name: 'Chair',
+        defaults: { w: 45, d: 50, h: 85, color: '#d6cab5', color2: '#b88f5d' },
+        limits: { w: [38, 60], d: [40, 60], h: [70, 110] },
+        colors: [
+          { key: 'color', label: 'Seat pad', palette: FABRICS },
+          { key: 'color2', label: 'Wood', palette: WOODS },
+        ],
+        presets: [{ name: 'Standard', w: 45, d: 50, h: 85 }],
+      },
+      {
+        id: 'armchair',
+        label: 'Armchair',
+        name: 'Armchair',
+        place: 'corner',
+        defaults: { w: 80, d: 82, h: 90, color: '#6c7657', color2: '#8b5b37' },
+        limits: { w: [60, 100], d: [60, 100], h: [70, 110] },
+        colors: [
+          { key: 'color', label: 'Fabric', palette: FABRICS },
+          { key: 'color2', label: 'Legs', palette: WOODS },
+        ],
+        presets: [
+          { name: 'Compact', w: 70, d: 75, h: 85 },
+          { name: 'Standard', w: 80, d: 82, h: 90 },
+        ],
+      },
+    ],
+    build: buildChair,
+  },
+  bookcase: {
+    label: 'Bookcase',
+    room: 'bedroom',
+    place: 'wall',
+    defaults: { style: 'open', w: 80, d: 30, h: 180, color: '#b88f5d', color2: '#d6cab5' },
+    limits: { w: [40, 240], d: [20, 45], h: [60, 240] },
+    colors: [{ key: 'color', label: 'Wood', palette: PAINTED }],
+    styles: [
+      {
+        id: 'open',
+        label: 'Open shelves',
+        name: 'Bookcase',
+        presets: [
+          { name: 'Low', w: 80, d: 30, h: 100 },
+          { name: 'Tall', w: 80, d: 30, h: 200 },
+          { name: 'Wide', w: 160, d: 30, h: 200 },
+        ],
+      },
+      {
+        id: 'cube',
+        label: 'Cube storage',
+        name: 'Cube shelf',
+        defaults: { w: 147, d: 39, h: 147, color: '#ecebe6' },
+        colors: [
+          { key: 'color', label: 'Wood', palette: PAINTED },
+          { key: 'color2', label: 'Baskets', palette: FABRICS },
+        ],
+        presets: [
+          { name: '2 × 2', w: 77, d: 39, h: 77 },
+          { name: '4 × 2', w: 147, d: 39, h: 77 },
+          { name: '4 × 4', w: 147, d: 39, h: 147 },
+        ],
+      },
+      {
+        id: 'ladder',
+        label: 'Ladder shelf',
+        name: 'Ladder shelf',
+        defaults: { w: 60, d: 40, h: 180 },
+        limits: { d: [30, 45], h: [100, 220] },
+        presets: [
+          { name: 'Standard', w: 60, d: 40, h: 180 },
+          { name: 'Wide', w: 90, d: 40, h: 180 },
+        ],
+      },
+    ],
+    build: buildBookcase,
+  },
+  lamp: {
+    label: 'Lamp',
+    room: 'bedroom',
+    stackable: true,
+    defaults: { style: 'table', w: 35, d: 35, h: 55, color: '#efe8da', color2: '#b8924a' },
+    limits: { w: [15, 70], d: [15, 200], h: [25, 230] },
+    colors: [
+      { key: 'color', label: 'Shade', palette: SHADES },
+      { key: 'color2', label: 'Base', palette: TRIMS },
+    ],
+    styles: [
+      {
+        id: 'table',
+        label: 'Table lamp',
+        name: 'Table lamp',
+        place: 'surface',
+        round: true,
+        limits: { w: [15, 60], h: [25, 90] },
+        presets: [
+          { name: 'Small', w: 25, h: 40 },
+          { name: 'Medium', w: 35, h: 55 },
+          { name: 'Large', w: 45, h: 70 },
+        ],
+      },
+      {
+        id: 'floor',
+        label: 'Floor lamp',
+        name: 'Floor lamp',
+        place: 'corner',
+        stackable: false,
+        round: true,
+        defaults: { w: 45, d: 45, h: 160 },
+        limits: { w: [25, 70], h: [100, 200] },
+        presets: [
+          { name: 'Standard', w: 45, h: 160 },
+          { name: 'Tall', w: 50, h: 185 },
+        ],
+      },
+      {
+        id: 'arc',
+        label: 'Arc lamp',
+        name: 'Arc lamp',
+        place: 'corner',
+        stackable: false,
+        defaults: { w: 40, d: 150, h: 200, color: '#2b2c2f', color2: '#a9abad' },
+        limits: { w: [30, 60], d: [100, 200], h: [150, 230] },
+        presets: [
+          { name: 'Standard', w: 40, d: 150, h: 200 },
+          { name: 'Long reach', w: 40, d: 190, h: 215 },
+        ],
+      },
+    ],
+    build: buildLamp,
+  },
+  crib: {
+    label: 'Baby cot',
+    room: 'bedroom',
+    place: 'wall',
+    defaults: { style: 'cot', w: 128, d: 68, h: 90, color: '#ecebe6', color2: '#f4f2ed' },
+    limits: { w: [70, 150], d: [40, 85], h: [60, 110] },
+    colors: [
+      { key: 'color', label: 'Frame', palette: WOODS },
+      { key: 'color2', label: 'Bedding', palette: BEDDING },
+    ],
+    styles: [
+      {
+        id: 'cot',
+        label: 'Cot',
+        name: 'Baby cot',
+        presets: [
+          { name: '60 × 120', w: 128, d: 68, h: 90 },
+          { name: '70 × 140', w: 148, d: 78, h: 90 },
+        ],
+      },
+      {
+        id: 'bassinet',
+        label: 'Bassinet',
+        name: 'Bassinet',
+        defaults: { w: 85, d: 50, h: 80, color: '#b88f5d' },
+        limits: { w: [70, 100], d: [40, 60], h: [60, 90] },
+        presets: [{ name: 'Standard', w: 85, d: 50, h: 80 }],
+      },
+    ],
+    build: buildCrib,
+  },
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -990,7 +1516,7 @@ export const presetsOf = (item) => styleOf(item).presets ?? CATALOG[item.type].p
 export const colorsOf = (item) => styleOf(item).colors ?? CATALOG[item.type].colors;
 // Hangs on a wall (a wall-mounted TV) rather than standing on the floor or on furniture.
 export const isOnWall = (item) => Boolean(styleOf(item).onWall);
-export const isStackable = (item) => Boolean(CATALOG[item.type].stackable) && !isOnWall(item);
+export const isStackable = (item) => Boolean(styleOf(item).stackable ?? CATALOG[item.type].stackable) && !isOnWall(item);
 export const isFlat = (item) => Boolean(CATALOG[item.type].flat);
 
 // A new piece of the given design.
@@ -2403,5 +2929,633 @@ function buildStool({ w, d, h }, item) {
   }
   g.add(block(w - 0.08, 0.016, 0.016, frame, { y: h * 0.3, z: d / 2 - 0.04 }));
   for (const s of [-1, 1]) g.add(block(0.016, 0.016, d - 0.08, frame, { x: s * (w / 2 - 0.04), y: h * 0.3 }));
+  return g;
+}
+
+// ---- Bedroom ----
+
+const LINEN = '#f1efe9';
+const mirrorGlass = () => new THREE.MeshStandardMaterial({ color: '#d4dde1', roughness: 0.1, metalness: 0.45 });
+
+// A made bed on a mattress from z0 (head) to z1 (foot), its top at `top`: pillows, the sheet turned
+// back over the duvet, and a throw across the foot.
+function bedding(g, { w, x = 0, z0, z1, top, color, thick = 0.2, throwOn = true }) {
+  const len = z1 - z0;
+  const sheet = fabric(LINEN);
+  g.add(block(w, thick, len, sheet, { x, y: top - thick, z: (z0 + z1) / 2, r: 0.04 }));
+  const fold = z0 + Math.min(0.55, len * 0.3);
+  const drop = Math.min(0.14, thick - 0.03); // how far the duvet hangs down the sides
+  g.add(block(w + 0.04, drop + 0.06, z1 - fold + 0.02, fabric(color), { x, y: top - drop, z: (fold + z1 + 0.02) / 2, r: 0.03 }));
+  g.add(block(w + 0.05, drop + 0.07, 0.14, sheet, { x, y: top - drop, z: fold + 0.07, r: 0.03 }));
+  if (throwOn) {
+    const t = Math.min(0.4, len * 0.2);
+    g.add(block(w + 0.06, drop + 0.075, t, shade(color, 0.72), { x, y: top - drop, z: z1 - t / 2 + 0.03, r: 0.03 }));
+  }
+  const n = w > 1.15 ? 2 : 1;
+  const pw = Math.min(0.7, (w - 0.08) / n - 0.04);
+  const pillow = fabric(mix(color, '#ffffff', 0.6));
+  for (let i = 0; i < n; i++) {
+    const px = n === 1 ? 0 : (i ? 1 : -1) * (pw / 2 + 0.03);
+    g.add(block(pw, 0.13, 0.38, pillow, { x: x + px, y: top - 0.01, z: z0 + 0.24, r: 0.06 }));
+  }
+}
+
+function buildBed({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const style = item.style;
+  const head = -d / 2;
+  if (style === 'bunk') return bunkBed(g, { w, d, h }, item);
+
+  if (style === 'wooden' || style === 'canopy') {
+    // Corner posts, side rails, a headboard between the head posts and a low footboard; a
+    // four-poster's posts carry rails all round the top.
+    const frame = wood(item.color);
+    const p = style === 'canopy' ? 0.05 : 0.07;
+    for (const [sx, sz] of CORNERS) {
+      const tall = style === 'canopy' || sz < 0 ? h : 0.6;
+      g.add(block(p, tall, p, frame, { x: sx * (w / 2 - p / 2), z: sz * (d / 2 - p / 2) }));
+    }
+    for (const s of [-1, 1]) g.add(block(0.03, 0.16, d - 2 * p, frame, { x: s * (w / 2 - p / 2), y: 0.22 }));
+    const headTop = style === 'canopy' ? Math.min(h - 0.1, 1.1) : h - 0.04;
+    g.add(block(w - 2 * p, headTop - 0.3, 0.03, frame, { y: 0.3, z: head + p / 2 }));
+    g.add(block(w - 2 * p, 0.25, 0.03, frame, { y: 0.3, z: d / 2 - p / 2 }));
+    if (style === 'canopy') {
+      for (const s of [-1, 1]) {
+        g.add(block(p, 0.04, d, frame, { x: s * (w / 2 - p / 2), y: h - 0.04 }));
+        g.add(block(w, 0.04, p, frame, { y: h - 0.04, z: s * (d / 2 - p / 2) }));
+      }
+    } else {
+      g.add(block(w, 0.04, p + 0.01, frame, { y: h - 0.04, z: head + p / 2 }));
+    }
+    bedding(g, { w: w - 2 * p - 0.01, z0: head + p, z1: d / 2 - p, top: 0.58, color: item.color2 });
+    return g;
+  }
+
+  if (style === 'platform') {
+    // A low wooden base on a recessed plinth, wider than the mattress, and a low headboard.
+    const frame = wood(item.color);
+    g.add(block(w - 0.16, 0.08, d - 0.16, shade(item.color, 0.4), { z: 0.04 }));
+    g.add(block(w, 0.17, d - 0.06, frame, { y: 0.08, z: 0.03, r: 0.01 }));
+    g.add(block(w, h, 0.06, frame, { z: head + 0.03, r: 0.01 }));
+    bedding(g, { w: w - 0.2, z0: head + 0.08, z1: d / 2 - 0.12, top: 0.45, color: item.color2 });
+    return g;
+  }
+
+  // Upholstered or storage divan: a padded base and a padded headboard with stitched channels.
+  const pad = fabric(item.color);
+  const headT = 0.09;
+  const top = 0.58;
+  const baseW = w - 0.04;
+  if (style === 'storage') {
+    // Two drawers in each side.
+    g.add(block(baseW - 0.04, 0.04, d - headT - 0.04, shade(item.color, 0.4), { z: headT / 2 }));
+    g.add(block(baseW, 0.34, d - headT, pad, { y: 0.04, z: headT / 2, r: 0.02 }));
+    const len = (d - headT - 0.3) / 2;
+    for (const s of [-1, 1]) {
+      for (const k of [0, 1]) {
+        const z = head + headT + 0.15 + len * (k + 0.5);
+        g.add(block(0.004, 0.22, len - 0.04, shade(item.color, 0.8), { x: s * (baseW / 2 + 0.001), y: 0.1, z }));
+        g.add(block(0.016, 0.014, 0.14, trim('#a9abad'), { x: s * (baseW / 2 + 0.008), y: 0.27, z }));
+      }
+    }
+  } else {
+    for (const [sx, sz] of CORNERS) g.add(leg(0.02, 0.016, 0.08, wood('#5d4030'), sx * (baseW / 2 - 0.08), sz * (d / 2 - 0.1)));
+    g.add(block(baseW, 0.3, d - headT, pad, { y: 0.08, z: headT / 2, r: 0.03 }));
+  }
+  g.add(block(w, h, headT, pad, { z: head + headT / 2, r: 0.04 }));
+  if (h - top > 0.2) {
+    const line = shade(item.color, 0.72);
+    const channels = Math.max(3, Math.round(w / 0.22));
+    for (let i = 1; i < channels; i++) g.add(block(0.01, h - top - 0.1, 0.004, line, { x: -w / 2 + (w * i) / channels, y: top + 0.02, z: head + headT + 0.002 }));
+  }
+  bedding(g, { w: baseW - 0.04, z0: head + headT, z1: d / 2 - 0.02, top, color: item.color2 });
+  return g;
+}
+
+// Two beds one above the other between four tall posts, with guard rails and a ladder up the side.
+function bunkBed(g, { w, d, h }, item) {
+  const frame = wood(item.color);
+  const p = 0.06;
+  for (const [sx, sz] of CORNERS) g.add(block(p, h, p, frame, { x: sx * (w / 2 - p / 2), z: sz * (d / 2 - p / 2) }));
+  const upper = h - 0.5;
+  for (const y of [0.16, upper]) {
+    for (const s of [-1, 1]) {
+      g.add(block(0.03, 0.14, d - 2 * p, frame, { x: s * (w / 2 - p / 2), y }));
+      g.add(block(w - 2 * p, 0.3, 0.03, frame, { y: y + 0.04, z: s * (d / 2 - p / 2) }));
+    }
+    bedding(g, { w: w - 2 * p - 0.01, z0: -d / 2 + p, z1: d / 2 - p, top: y + 0.26, color: item.color2, thick: 0.16, throwOn: false });
+  }
+  // Guard rails round the top bunk, open at the ladder.
+  const ladderZ = [d / 2 - 0.12, d / 2 - 0.5];
+  g.add(block(0.03, 0.1, d - 2 * p, frame, { x: -(w / 2 - p / 2), y: h - 0.14 }));
+  const railLen = ladderZ[1] - 0.03 - (-d / 2 + p);
+  g.add(block(0.03, 0.1, railLen, frame, { x: w / 2 - p / 2, y: h - 0.14, z: -d / 2 + p + railLen / 2 }));
+  const lx = w / 2 - p / 2 + 0.03;
+  for (const z of ladderZ) g.add(block(0.03, upper + 0.3, 0.04, frame, { x: lx, z }));
+  for (let y = 0.4; y < upper; y += 0.28) {
+    g.add(block(0.03, 0.03, ladderZ[0] - ladderZ[1], frame, { x: lx, y, z: (ladderZ[0] + ladderZ[1]) / 2 }));
+  }
+  return g;
+}
+
+function buildNightstand({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const body = wood(item.color);
+  const line = shade(item.color, 0.45);
+  const metalPart = trim(item.color2);
+  const style = item.style;
+  const handle = (y, z = d / 2) => g.add(block(Math.min(0.12, w * 0.35), 0.012, 0.015, metalPart, { y, z: z + 0.0075 }));
+
+  if (style === 'round') {
+    // A round top and a lower shelf on three splayed legs.
+    const r = w / 2;
+    g.add(post(r, r, 0.025, body, 0, 0, h - 0.025, 40));
+    g.add(post(r * 0.72, r * 0.72, 0.018, body, 0, 0, h * 0.3, 32));
+    for (let k = 0; k < 3; k++) {
+      const a = (k * 2 * Math.PI) / 3;
+      g.add(rod([Math.sin(a) * r * 0.55, h - 0.025, Math.cos(a) * r * 0.55], [Math.sin(a) * r * 0.78, 0, Math.cos(a) * r * 0.78], 0.012, metalPart));
+    }
+    return g;
+  }
+  if (style === 'floating') {
+    // One drawer box on the wall.
+    g.add(block(w, h, d, body, { r: 0.004 }));
+    g.add(block(w - 0.02, 0.006, 0.004, line, { y: h - 0.025, z: d / 2 }));
+    handle(h * 0.45);
+    return g;
+  }
+
+  const legH = 0.12;
+  for (const [sx, sz] of CORNERS) g.add(leg(0.013, 0.009, legH, metalPart, sx * (w / 2 - 0.035), sz * (d / 2 - 0.035)));
+  const bodyH = h - legH;
+  if (style === 'open') {
+    // A drawer under the top and an open shelf below.
+    const t = 0.018;
+    g.add(block(w, t, d, body, { y: h - t }));
+    g.add(block(w, t, d, body, { y: legH }));
+    for (const s of [-1, 1]) g.add(block(t, bodyH, d, body, { x: s * (w / 2 - t / 2), y: legH }));
+    g.add(block(w - 2 * t, bodyH, 0.008, shade(item.color, 0.85), { y: legH, z: -d / 2 + 0.004 }));
+    g.add(block(w - 2 * t, 0.14, d - 0.02, body, { y: h - t - 0.14, z: 0.01 }));
+    g.add(block(w - 2 * t, 0.006, 0.004, line, { y: h - t - 0.143, z: d / 2 }));
+    handle(h - t - 0.07);
+    g.add(block(Math.min(0.2, w * 0.5), 0.03, Math.min(0.15, d * 0.5), fabric('#9b5c48'), { y: legH + t, z: 0.02 }));
+    return g;
+  }
+  g.add(block(w, bodyH, d, body, { y: legH, r: 0.006 }));
+  grooves(g, line, { w, y0: legH, bodyH, z: d / 2, cols: 1, rows: 2 });
+  for (const j of [0, 1]) handle(legH + (bodyH * (j + 0.6)) / 2);
+  return g;
+}
+
+function buildWardrobe({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const style = item.style;
+  if (style === 'open') return clothesRail(g, { w, d, h }, item);
+  const body = wood(item.color);
+  const line = shade(item.color, 0.45);
+  const plinth = 0.06;
+  g.add(block(w - 0.04, plinth, d - 0.04, shade(item.color, 0.5), {}));
+
+  if (style === 'hinged') {
+    // Doors about 50 cm wide, handles where each pair meets, and top boxes on a tall one.
+    g.add(block(w, h - plinth, d, body, { y: plinth, r: 0.004 }));
+    const doors = Math.max(1, Math.round(w / 0.5));
+    const dw = w / doors;
+    grooves(g, line, { w, y0: plinth, bodyH: h - plinth, z: d / 2, cols: doors });
+    if (h > 2.05) g.add(block(w - 0.02, 0.006, 0.004, line, { y: h - 0.4, z: d / 2 }));
+    const handles = trim(item.color2);
+    const length = Math.min(0.35, h * 0.16);
+    for (let i = 0; i < doors; i++) {
+      const left = -w / 2 + dw * i;
+      const x = i % 2 === 0 && i < doors - 1 ? left + dw - 0.04 : left + 0.04;
+      barHandle(g, handles, { x, y: plinth + (h - plinth) * 0.5, z: d / 2, length, upright: true });
+    }
+    return g;
+  }
+
+  // Sliding: panels on two tracks in front of the carcass, plain (with a pull) or mirrored.
+  g.add(block(w, h - plinth, d - 0.06, body, { y: plinth, z: -0.03 }));
+  const track = style === 'mirror' ? body : trim(item.color2);
+  g.add(block(w, 0.035, 0.06, track, { y: h - 0.035, z: d / 2 - 0.03 }));
+  g.add(block(w, 0.02, 0.06, track, { y: plinth, z: d / 2 - 0.03 }));
+  const n = w > 2.1 ? 3 : 2;
+  const pw = w / n + 0.02;
+  const ph = h - plinth - 0.06;
+  for (let i = 0; i < n; i++) {
+    const x = Math.min(w / 2 - pw / 2, Math.max(-w / 2 + pw / 2, -w / 2 + (w / n) * (i + 0.5)));
+    const z = d / 2 - (i % 2 ? 0.018 : 0.042);
+    if (style === 'mirror') {
+      g.add(block(pw, ph, 0.02, body, { x, y: plinth + 0.02, z }));
+      g.add(block(pw - 0.06, ph - 0.06, 0.004, mirrorGlass(), { x, y: plinth + 0.05, z: z + 0.011 }));
+    } else {
+      g.add(block(pw, ph, 0.02, body, { x, y: plinth + 0.02, z }));
+      const edge = i < n / 2 ? x + pw / 2 - 0.04 : x - pw / 2 + 0.04;
+      g.add(block(0.012, 0.45, 0.006, trim(item.color2), { x: edge, y: plinth + ph * 0.42, z: z + 0.012 }));
+    }
+  }
+  return g;
+}
+
+// An open clothes rail: a steel frame, a shelf on top, a shoe shelf, and clothes on hangers.
+function clothesRail(g, { w, d, h }, item) {
+  const shelf = wood(item.color);
+  const frame = trim(item.color2);
+  const t = 0.025;
+  for (const [sx, sz] of CORNERS) g.add(block(0.025, h, 0.025, frame, { x: sx * (w / 2 - 0.0125), z: sz * (d / 2 - 0.0125) }));
+  g.add(block(w, t, d, shelf, { y: h - t }));
+  g.add(block(w - 0.05, t, d - 0.02, shelf, { y: 0.12 }));
+  const railY = h - 0.12;
+  const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, w - 0.05, 12), frame);
+  rail.rotation.z = Math.PI / 2;
+  rail.position.set(0, railY, 0);
+  g.add(rail);
+
+  const rnd = seeded(Math.round(w * 1000 + h * 10));
+  const CLOTHES = ['#2f3c56', '#d6cab5', '#f1efe9', '#6c7657', '#a4573a', '#3b3e43', '#9fb0c2', '#c69a33', '#dcb8ae'];
+  const mats = {};
+  const cloth = (c) => (mats[c] ??= fabric(c));
+  for (let x = -w / 2 + 0.08; x < w / 2 - 0.08; x += 0.05 + rnd() * 0.05) {
+    const len = Math.min(railY - 0.35, 0.55 + rnd() * 0.5);
+    g.add(block(0.03 + rnd() * 0.02, len, Math.min(0.46, d - 0.06), cloth(CLOTHES[Math.floor(rnd() * CLOTHES.length)]), { x, y: railY - 0.03 - len, z: 0, r: 0.012 }));
+  }
+  // Shoes on the bottom shelf, boxes on top.
+  for (let x = -w / 2 + 0.1; x < w / 2 - 0.12; x += 0.22) {
+    const shoe = cloth(CLOTHES[Math.floor(rnd() * CLOTHES.length)]);
+    for (const s of [-1, 1]) g.add(block(0.08, 0.08, 0.26, shoe, { x: x + s * 0.045, y: 0.12 + t, z: 0.02, r: 0.03 }));
+  }
+  g.add(block(Math.min(0.4, w * 0.3), 0.2, d - 0.08, cloth('#d6cab5'), { x: -w / 4, y: h, r: 0.01 }));
+  return g;
+}
+
+function buildDresser({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const body = wood(item.color);
+  const line = shade(item.color, 0.45);
+  const handle = trim(item.color2);
+  const style = item.style;
+
+  if (style === 'dressing') {
+    // A slim table with a drawer, on tapered legs, and an oval mirror standing at the back.
+    const t = 0.03;
+    g.add(block(w, t, d, body, { y: h - t, r: 0.004 }));
+    g.add(block(w - 0.06, 0.12, d - 0.06, body, { y: h - t - 0.12 }));
+    g.add(block(0.1, 0.012, 0.015, handle, { y: h - t - 0.065, z: d / 2 - 0.03 + 0.0075 }));
+    for (const [sx, sz] of CORNERS) g.add(leg(0.018, 0.012, h - t, body, sx * (w / 2 - 0.05), sz * (d / 2 - 0.05)));
+    const mw = Math.min(0.55, w * 0.55);
+    const mh = Math.min(0.75, mw * 1.35);
+    const oval2d = (rw, rh, depth, material, z) => {
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 48), material);
+      mesh.rotation.x = Math.PI / 2;
+      mesh.scale.set(rw, depth, rh);
+      mesh.position.set(0, h + 0.03 + mh / 2, z);
+      return mesh;
+    };
+    g.add(block(0.12, 0.03, 0.08, body, { y: h, z: -d / 2 + 0.06 }));
+    g.add(oval2d(mw, mh, 0.025, body, -d / 2 + 0.06));
+    g.add(oval2d(mw - 0.05, mh - 0.05, 0.006, mirrorGlass(), -d / 2 + 0.075));
+    return g;
+  }
+
+  // Chests and dressers: rows of drawers on short legs.
+  const legH = 0.08;
+  for (const [sx, sz] of CORNERS) g.add(leg(0.02, 0.014, legH, body, sx * (w / 2 - 0.05), sz * (d / 2 - 0.05)));
+  const bodyH = h - legH;
+  g.add(block(w, bodyH, d, body, { y: legH, r: 0.006 }));
+  const cols = style === 'wide' ? (w > 1.6 ? 3 : 2) : 1;
+  const rows = style === 'wide' ? 3 : Math.max(3, Math.min(6, Math.round(bodyH / 0.2)));
+  grooves(g, line, { w, y0: legH, bodyH, z: d / 2, cols, rows });
+  const cw = w / cols;
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < rows; j++) {
+      g.add(block(Math.min(0.14, cw * 0.35), 0.012, 0.016, handle, { x: -w / 2 + cw * (i + 0.5), y: legH + (bodyH * (j + 0.55)) / rows, z: d / 2 + 0.008 }));
+    }
+  }
+  return g;
+}
+
+function buildDesk({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const top = wood(item.color);
+  const frame = trim(item.color2);
+  const t = 0.03;
+  const style = item.style;
+
+  if (style === 'lshape') {
+    // A main top along the back and a return down one side, on steel legs.
+    const sx = item.flip ? 1 : -1;
+    const md = Math.min(0.7, d * 0.5);
+    const rw = Math.min(0.6, w * 0.45);
+    g.add(block(w, t, md, top, { y: h - t, z: -d / 2 + md / 2 }));
+    g.add(block(rw, t, d - md, top, { x: sx * (w / 2 - rw / 2), y: h - t, z: md / 2 }));
+    const legs = [
+      [-w / 2, -d / 2],
+      [w / 2, -d / 2],
+      [-sx * w / 2, -d / 2 + md],
+      [sx * w / 2, d / 2],
+      [sx * (w / 2 - rw), d / 2],
+    ];
+    for (const [x, z] of legs) g.add(block(0.04, h - t, 0.04, frame, { x: x - Math.sign(x) * 0.03, z: z - Math.sign(z) * 0.03 }));
+    return g;
+  }
+
+  g.add(block(w, t, d, top, { y: h - t, r: 0.003 }));
+  if (style === 'pedestal') {
+    // Drawers on the right, a panel leg on the left and a modesty panel at the back.
+    const pw = Math.min(0.42, w * 0.35);
+    const px = w / 2 - pw / 2 - 0.01;
+    const front = d / 2 - 0.03;
+    g.add(block(pw, h - t, d - 0.04, top, { x: px, z: -0.01 }));
+    grooves(g, shade(item.color, 0.45), { w: pw, x0: px - pw / 2, y0: 0, bodyH: h - t, z: front, cols: 1, rows: 3 });
+    for (let j = 0; j < 3; j++) g.add(block(Math.min(0.12, pw * 0.4), 0.012, 0.016, frame, { x: px, y: ((h - t) * (j + 0.6)) / 3, z: front + 0.008 }));
+    g.add(block(0.03, h - t, d - 0.06, top, { x: -w / 2 + 0.025 }));
+    const gap = px - pw / 2 - (-w / 2 + 0.04);
+    g.add(block(gap, 0.35, 0.018, top, { x: -w / 2 + 0.04 + gap / 2, y: h - t - 0.35, z: -d / 2 + 0.04 }));
+    return g;
+  }
+  // Writing desk: a slim drawer under the top, on four slender legs.
+  for (const [sx, sz] of CORNERS) g.add(block(0.035, h - t, 0.035, frame, { x: sx * (w / 2 - 0.04), z: sz * (d / 2 - 0.04) }));
+  g.add(block(w - 0.08, 0.08, d - 0.08, top, { y: h - t - 0.08 }));
+  g.add(block(Math.min(0.12, w * 0.2), 0.012, 0.016, frame, { y: h - t - 0.045, z: d / 2 - 0.04 + 0.008 }));
+  return g;
+}
+
+function buildChair({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const style = item.style;
+  const soft = fabric(item.color);
+
+  if (style === 'office') {
+    // A five-star base on castors, a gas lift, a padded seat and back, and armrests.
+    const frame = trim(item.color2);
+    const seatY = 0.48;
+    const r = Math.min(w, d) / 2 - 0.03;
+    const castor = new THREE.MeshStandardMaterial({ color: '#1d1e20', roughness: 0.4 });
+    for (let k = 0; k < 5; k++) {
+      const a = (k * 2 * Math.PI) / 5;
+      const arm = block(0.035, 0.03, r, frame, { x: (Math.sin(a) * r) / 2, y: 0.05, z: (Math.cos(a) * r) / 2 });
+      arm.rotation.y = a;
+      g.add(arm);
+      const wheel = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 8), castor);
+      wheel.position.set(Math.sin(a) * r, 0.025, Math.cos(a) * r);
+      g.add(wheel);
+    }
+    g.add(post(0.025, 0.025, seatY - 0.13, metal('#8f9397'), 0, 0, 0.07, 16));
+    g.add(block(w * 0.82, 0.08, d * 0.78, soft, { y: seatY - 0.06, z: 0.03, r: 0.035 }));
+    const back = block(w * 0.76, h - seatY - 0.1, 0.07, soft, { y: seatY + 0.1, z: -d / 2 + 0.1, r: 0.035 });
+    back.rotation.x = -0.12;
+    g.add(back);
+    g.add(block(0.05, 0.16, 0.03, frame, { y: seatY - 0.02, z: -d / 2 + 0.07 }));
+    for (const s of [-1, 1]) {
+      g.add(block(0.025, 0.18, 0.025, frame, { x: s * w * 0.42, y: seatY, z: 0.02 }));
+      g.add(block(0.06, 0.025, 0.24, frame, { x: s * w * 0.42, y: seatY + 0.18, z: 0.02, r: 0.01 }));
+    }
+    return g;
+  }
+
+  const frame = wood(item.color2);
+  if (style === 'wooden') {
+    // Four legs, the back ones running up into the back rails, and a seat pad.
+    const seatY = 0.45;
+    const lw = 0.035;
+    const lx = w / 2 - lw / 2 - 0.01;
+    const lz = d / 2 - lw / 2 - 0.01;
+    for (const [sx, sz] of CORNERS) g.add(block(lw, sz < 0 ? h : seatY, lw, frame, { x: sx * lx, z: sz * lz }));
+    g.add(block(w - 0.02, 0.03, d - 0.02, frame, { y: seatY - 0.03 }));
+    g.add(block(w - 0.08, 0.035, d - 0.1, soft, { y: seatY, z: 0.02, r: 0.012 }));
+    g.add(block(w - 0.03, 0.08, 0.025, frame, { y: h - 0.09, z: -lz }));
+    g.add(block(w - 0.03, 0.05, 0.02, frame, { y: seatY + 0.15, z: -lz }));
+    for (const s of [-1, 1]) g.add(block(0.02, 0.02, d - 0.06, frame, { x: s * lx, y: 0.15 }));
+    return g;
+  }
+
+  // Armchair: a padded base, seat cushion, tall back and arms on short tapered legs.
+  const legH = 0.14;
+  const base = 0.16;
+  const seatTop = 0.44;
+  const armW = Math.min(0.14, w * 0.17);
+  for (const [sx, sz] of CORNERS) g.add(leg(0.018, 0.012, legH, frame, sx * (w / 2 - 0.07), sz * (d / 2 - 0.07)));
+  g.add(block(w, base, d, soft, { y: legH, r: 0.03 }));
+  g.add(block(w - 2 * armW, seatTop - legH - base, d - 0.2, soft, { y: legH + base, z: 0.08, r: 0.04 }));
+  g.add(block(w, h - legH - base, 0.18, soft, { y: legH + base, z: -d / 2 + 0.09, r: 0.05 }));
+  for (const s of [-1, 1]) g.add(block(armW, 0.62 - legH - base, d - 0.18, soft, { x: s * (w / 2 - armW / 2), y: legH + base, z: 0.09, r: 0.04 }));
+  return g;
+}
+
+const BOOKS = ['#2f3c56', '#a4573a', '#6c7657', '#d6cab5', '#3b3e43', '#c69a33', '#8b5b37', '#9fb0c2', '#ece6d8', '#7a4630'];
+
+// Books standing on a shelf between x0 and x1 at height y, at most `room` tall, with a gap here and there.
+function books(g, rnd, mats, { x0, x1, y, z = 0, depth, room }) {
+  if (room < 0.15) return;
+  let x = x0;
+  while (x < x1 - 0.03) {
+    if (rnd() < 0.12) {
+      x += 0.06 + rnd() * 0.1;
+      continue;
+    }
+    const t = 0.02 + rnd() * 0.035;
+    if (x + t > x1) break;
+    const c = BOOKS[Math.floor(rnd() * BOOKS.length)];
+    const material = (mats[c] ??= new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 }));
+    g.add(block(t, Math.min(room - 0.03, 0.17 + rnd() * 0.12), depth * (0.75 + rnd() * 0.2), material, { x: x + t / 2, y, z }));
+    x += t + 0.002;
+  }
+}
+
+// A small potted plant standing at (x, y, z).
+function plant(g, { x, y, z, size = 0.1 }) {
+  g.add(post(size * 0.6, size * 0.45, size, ceramic('#c0714f'), x, z, y, 18));
+  const leaves = new THREE.Mesh(new THREE.SphereGeometry(size * 0.9, 14, 10), new THREE.MeshStandardMaterial({ color: '#5f7a4a', roughness: 0.8 }));
+  leaves.scale.y = 0.8;
+  leaves.position.set(x, y + size + size * 0.6, z);
+  g.add(leaves);
+}
+
+function buildBookcase({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const body = wood(item.color);
+  const rnd = seeded(Math.round(w * 1000 + h * 100 + d * 10));
+  const mats = {};
+  const t = 0.022;
+  const style = item.style;
+
+  if (style === 'ladder') {
+    // Two rails leaning on the wall, and shelves getting shallower towards the top.
+    for (const s of [-1, 1]) g.add(rod([s * (w / 2 - 0.02), 0, d / 2 - 0.02], [s * (w / 2 - 0.02), h, -d / 2 + 0.02], 0.016, body));
+    const n = Math.max(3, Math.round(h / 0.38));
+    const step = (h - 0.35) / (n - 1);
+    for (let k = 0; k < n; k++) {
+      const y = 0.06 + step * k;
+      const front = d / 2 - 0.02 - (d - 0.04) * ((y + t) / h);
+      const depth = front - (-d / 2 + 0.01);
+      g.add(block(w - 0.05, t, depth, body, { y, z: -d / 2 + 0.01 + depth / 2 }));
+      if (k < n - 1 && depth > 0.12 && k % 2 === 0) books(g, rnd, mats, { x0: -w / 2 + 0.05, x1: 0.05, y: y + t, z: -d / 2 + 0.01 + depth / 2, depth: depth - 0.04, room: step - t });
+      if (k === n - 1) plant(g, { x: 0, y: y + t, z: -d / 2 + 0.01 + depth / 2, size: Math.min(0.08, depth / 2) });
+    }
+    return g;
+  }
+
+  // The case: sides, top, a deeper bottom board and a back panel.
+  for (const s of [-1, 1]) g.add(block(t, h, d, body, { x: s * (w / 2 - t / 2) }));
+  g.add(block(w - 2 * t, t, d, body, { y: h - t }));
+  g.add(block(w - 2 * t, h, 0.008, shade(item.color, 0.85), { z: -d / 2 + 0.004 }));
+  const x0 = -w / 2 + t;
+  const inner = w - 2 * t;
+
+  if (style === 'cube') {
+    // A grid of cubes, some with fabric baskets, some with books.
+    g.add(block(inner, t, d, body, {}));
+    const cols = Math.max(1, Math.round(w / 0.37));
+    const rows = Math.max(1, Math.round(h / 0.37));
+    const cw = inner / cols;
+    const ch = (h - 2 * t) / rows;
+    for (let i = 1; i < cols; i++) g.add(block(t, h - 2 * t, d, body, { x: x0 + cw * i, y: t }));
+    for (let j = 1; j < rows; j++) g.add(block(inner, t, d, body, { y: t + ch * j - t / 2 }));
+    const basket = fabric(item.color2);
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const cx = x0 + cw * (i + 0.5);
+        const y = t + ch * j + (j ? t / 2 : 0);
+        const room = ch - (j ? t : t / 2);
+        const pick = rnd();
+        if (pick < 0.45) {
+          g.add(block(cw - t - 0.03, room - 0.03, d - 0.04, basket, { x: cx, y, z: 0.01, r: 0.01 }));
+          g.add(block(0.08, 0.025, 0.004, shade(item.color2, 0.4), { x: cx, y: y + room - 0.09, z: d / 2 - 0.01 }));
+        } else if (pick < 0.85) {
+          books(g, rnd, mats, { x0: cx - cw / 2 + t, x1: cx + cw / 2 - t, y, depth: d - 0.06, room });
+        } else if (j === rows - 1) {
+          plant(g, { x: cx, y, z: 0, size: Math.min(0.1, room / 3) });
+        }
+      }
+    }
+    return g;
+  }
+
+  // Open shelves about 34 cm apart, filled with books.
+  g.add(block(inner, 0.05, d, body, {}));
+  const n = Math.max(1, Math.round((h - 0.05) / 0.34));
+  const gap = (h - 0.05 - t) / n;
+  for (let k = 1; k < n; k++) g.add(block(inner, t, d - 0.01, body, { y: 0.05 + gap * k, z: 0.005 }));
+  for (let k = 0; k < n; k++) {
+    const y = 0.05 + gap * k + (k ? t : 0);
+    const end = x0 + 0.01 + (inner - 0.02) * (0.45 + rnd() * 0.55);
+    books(g, rnd, mats, { x0: x0 + 0.01, x1: end, y, z: -0.02, depth: d - 0.06, room: gap - t });
+    if (k === n - 1 && end < x0 + inner - 0.2) plant(g, { x: (end + x0 + inner) / 2, y, z: 0, size: Math.min(0.09, (gap - t) / 3) });
+  }
+  return g;
+}
+
+// A lamp shade that glows a little, as if the lamp were on.
+const lampShade = (hex) => new THREE.MeshStandardMaterial({ color: hex, emissive: hex, emissiveIntensity: 0.25, roughness: 0.9, side: THREE.DoubleSide });
+const bulbGlow = () => new THREE.MeshStandardMaterial({ color: '#fff6e0', emissive: '#ffe9b8', emissiveIntensity: 1.2 });
+
+function buildLamp({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const base = trim(item.color2);
+  const shadeMat = lampShade(item.color);
+  const style = item.style;
+
+  if (style === 'arc') {
+    // A heavy base at the back, a pole and an arc over to a dome hanging at the front.
+    const r = Math.min(0.2, w / 2);
+    const zb = -d / 2 + Math.min(0.15, w / 2);
+    const zf = d / 2 - r;
+    const R = (zf - zb) / 2;
+    const yp = h - R;
+    g.add(block(Math.min(0.3, w), 0.05, Math.min(0.3, w), stone('#e2e0da'), { z: zb }));
+    g.add(post(0.013, 0.013, yp - 0.05, base, 0, zb, 0.05, 12));
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(R, 0.011, 8, 48, Math.PI), base);
+    arc.rotation.y = Math.PI / 2;
+    arc.position.set(0, yp, (zb + zf) / 2);
+    g.add(arc);
+    g.add(post(0.008, 0.008, 0.08, base, 0, zf, yp - 0.08, 8));
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), shadeMat);
+    dome.scale.y = 0.6;
+    dome.position.set(0, yp - 0.08 - r * 0.6, zf);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 8), bulbGlow());
+    bulb.position.set(0, yp - 0.08 - r * 0.6, zf);
+    g.add(dome, bulb);
+    return g;
+  }
+
+  const r = w / 2;
+  if (style === 'floor') {
+    // A round base, a slim pole and a drum shade.
+    const shadeH = Math.min(0.32, h * 0.2);
+    g.add(post(Math.min(0.15, r * 0.7), Math.min(0.16, r * 0.75), 0.025, base, 0, 0, 0, 32));
+    g.add(post(0.012, 0.012, h - shadeH * 0.7, base, 0, 0, 0.025, 12));
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.85, r, shadeH, 40, 1, true), shadeMat);
+    drum.position.y = h - shadeH / 2;
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 8), bulbGlow());
+    bulb.position.y = h - shadeH * 0.55;
+    g.add(drum, bulb);
+    return g;
+  }
+
+  // Table lamp: a turned vase-shaped base and a tapered drum shade.
+  const shadeH = h * 0.42;
+  const baseH = h - shadeH * 0.85;
+  const rb = r * 0.45;
+  const profile = [
+    [0, 0],
+    [rb * 0.6, 0],
+    [rb, baseH * 0.35],
+    [rb * 0.8, baseH * 0.7],
+    [rb * 0.3, baseH * 0.9],
+    [rb * 0.3, baseH],
+    [0, baseH],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  g.add(new THREE.Mesh(new THREE.LatheGeometry(profile, 32), base));
+  g.add(post(0.008, 0.008, shadeH * 0.5, base, 0, 0, baseH, 8));
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.75, r, shadeH, 40, 1, true), shadeMat);
+  drum.position.y = h - shadeH / 2;
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(Math.min(0.03, r * 0.3), 12, 8), bulbGlow());
+  bulb.position.y = h - shadeH * 0.55;
+  g.add(drum, bulb);
+  return g;
+}
+
+function buildCrib({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const frame = wood(item.color);
+  const linen = fabric(item.color2);
+
+  if (item.style === 'bassinet') {
+    // A lined oval basket on a crossed stand.
+    const bh = 0.25;
+    const lining = new THREE.MeshStandardMaterial({ color: item.color2, roughness: 0.9, side: THREE.DoubleSide });
+    const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, bh, 40, 1, true), lining);
+    basket.scale.set(w, 1, d);
+    basket.position.y = h - bh / 2;
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.016, 8, 48), frame);
+    rim.rotation.x = Math.PI / 2;
+    rim.scale.set(w, d, 1);
+    rim.position.y = h;
+    g.add(basket, rim, oval(w * 0.84, 0.03, d * 0.84, lining, { y: h - bh }), oval(w * 0.8, 0.05, d * 0.8, fabric(LINEN), { y: h - bh + 0.03 }));
+    for (const sx of [-1, 1]) {
+      const x = sx * (w / 2 - 0.12);
+      g.add(rod([x, 0, -d / 2 + 0.03], [x, h - bh, d / 2 - 0.08], 0.014, frame));
+      g.add(rod([x, 0, d / 2 - 0.03], [x, h - bh, -d / 2 + 0.08], 0.014, frame));
+    }
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, w - 0.24, 10), frame);
+    bar.rotation.z = Math.PI / 2;
+    bar.position.y = (h - bh) / 2;
+    g.add(bar);
+    return g;
+  }
+
+  // Cot: corner posts, slatted long sides, solid ends, and the mattress raised off the floor.
+  const p = 0.045;
+  const base = 0.3;
+  for (const [sx, sz] of CORNERS) g.add(block(p, h, p, frame, { x: sx * (w / 2 - p / 2), z: sz * (d / 2 - p / 2) }));
+  const n = Math.round((w - 2 * p) / 0.075);
+  for (const sz of [-1, 1]) {
+    const z = sz * (d / 2 - p / 2);
+    g.add(block(w - 2 * p, 0.04, 0.03, frame, { y: h - 0.04, z }));
+    g.add(block(w - 2 * p, 0.05, 0.03, frame, { y: base - 0.05, z }));
+    for (let i = 1; i < n; i++) g.add(block(0.022, h - base - 0.04, 0.022, frame, { x: -w / 2 + p + ((w - 2 * p) * i) / n, y: base, z }));
+  }
+  for (const sx of [-1, 1]) g.add(block(0.02, h - base + 0.01, d - 2 * p, frame, { x: sx * (w / 2 - p / 2), y: base - 0.05 }));
+  g.add(block(w - 2 * p - 0.01, 0.1, d - 2 * p - 0.01, linen, { y: base, r: 0.02 }));
+  g.add(block((w - 2 * p) * 0.35, 0.03, d - 2 * p - 0.05, shade(item.color2, 0.85), { x: w * 0.2, y: base + 0.1, r: 0.012 }));
   return g;
 }
