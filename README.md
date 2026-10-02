@@ -80,7 +80,7 @@ Furniture can't pass through walls (it slides along them) but fits under beams.
 
 ## Doors and windows
 
-Under **Walls → Doors and windows**, click **Door** or **Window** and pick a design. It goes in the selected wall, or in a wall with room for it. Drag it along its wall or onto another wall; while it's selected, the view shows its size and its distance from each end of the wall. In its panel you can set the width, height, how high a window starts above the floor, its distance from the corner, which side a door's hinges are on and which way it opens, and the colors. Doors show their swing on the floor. Doors and windows go in straight walls that stand on the floor (not curved walls or beams), and they move, turn, copy and disappear with their wall.
+Under **Add furniture → Doors & windows**, click **Door** or **Window** and pick a design. It goes in the selected wall, or in a wall with room for it. Drag it along its wall or onto another wall; while it's selected, the view shows its size and its distance from each end of the wall. In its panel you can set the width, height, how high a window starts above the floor, its distance from the corner, which side a door's hinges are on and which way it opens, and the colors. Doors show their swing on the floor. Doors and windows go in straight walls that stand on the floor (not curved walls or beams), and they move, turn, copy and disappear with their wall.
 
 ## Lock
 

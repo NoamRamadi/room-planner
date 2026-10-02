@@ -459,12 +459,14 @@ export function initUI(view) {
   // ---- Furniture ----
 
   // Each type opens a menu of its designs; picking one adds that piece. Furniture comes in sets by
-  // room (living room, kitchen, bedroom, bathroom), one shown at a time.
+  // room (living room, kitchen, bedroom, bathroom), with doors and windows as a set of their own; one
+  // set is shown at a time.
   const rooms = [
     { id: 'living', label: 'Living' },
     { id: 'kitchen', label: 'Kitchen' },
     { id: 'bedroom', label: 'Bedroom' },
     { id: 'bath', label: 'Bathroom' },
+    { id: 'openings', label: 'Doors & windows' },
   ];
   const furnitureFor = (room) =>
     adder({
@@ -472,11 +474,27 @@ export function initUI(view) {
       kinds: Object.fromEntries(Object.entries(CATALOG).filter(([, def]) => (def.room ?? 'living') === room)),
       onPick: (type, style) => store.addItem(type, style),
     });
-  const sets = Object.fromEntries(rooms.map((r) => [r.id, furnitureFor(r.id)]));
+  const openings = adder({
+    id: 'opening-menu',
+    kinds: OPENINGS,
+    onPick: (kind, style) => {
+      if (store.addOpening(kind, style) === false) say(`No wall has room for a ${noun(OPENINGS[kind].label)}. Make a wall longer, or move a door or window.`);
+    },
+  });
+  const sets = Object.fromEntries(rooms.map((r) => [r.id, r.id === 'openings' ? openings : furnitureFor(r.id)]));
   const furniture = { close: () => Object.values(sets).forEach((set) => set.close()) };
   let shownSet = 'living';
   const setBlocks = Object.fromEntries(
-    rooms.map((r) => [r.id, h('div', { class: 'furniture-set' }, h('div', { class: 'add-grid' }, sets[r.id].buttons), sets[r.id].menu)]),
+    rooms.map((r) => [
+      r.id,
+      h(
+        'div',
+        { class: 'furniture-set' },
+        h('div', { class: 'add-grid' }, sets[r.id].buttons),
+        sets[r.id].menu,
+        r.id === 'openings' && h('p', { class: 'help' }, 'They go in the selected wall, or in a wall with room. Drag one along its wall, or onto another wall.'),
+      ),
+    ]),
   );
   const roomTabs = segmented({
     label: 'Which furniture',
@@ -493,13 +511,6 @@ export function initUI(view) {
     for (const r of rooms) setBlocks[r.id].hidden = r.id !== shownSet;
   };
   syncRoomTabs();
-  const openings = adder({
-    id: 'opening-menu',
-    kinds: OPENINGS,
-    onPick: (kind, style) => {
-      if (store.addOpening(kind, style) === false) say(`No wall has room for a ${noun(OPENINGS[kind].label)}. Make a wall longer, or move a door or window.`);
-    },
-  });
 
   const inventory = h('ol', { class: 'inventory', 'data-always': '' });
   const count = h('span', { class: 'section__meta' });
@@ -511,7 +522,7 @@ export function initUI(view) {
     inventoryKey = key;
     count.textContent = state.items.length ? `${state.items.length} ${state.items.length === 1 ? 'piece' : 'pieces'}` : '';
     if (!state.items.length) {
-      inventory.replaceChildren(h('li', { class: 'empty' }, 'No furniture yet. Add a sofa, a table, a carpet, or bathroom pieces to start arranging.'));
+      inventory.replaceChildren(h('li', { class: 'empty' }, 'No furniture yet. Pick a room under Add furniture and add a piece to start arranging.'));
       return;
     }
     inventory.replaceChildren(
@@ -579,10 +590,6 @@ export function initUI(view) {
         roomDepth.el,
         h('button', { type: 'button', class: 'btn', onclick: () => store.addRoom(next.width, next.depth) }, 'Add room'),
       ),
-      h('div', { class: 'section__head section__head--list' }, h('h3', { class: 'list-title' }, 'Doors and windows')),
-      h('div', { class: 'add-grid' }, openings.buttons),
-      openings.menu,
-      h('p', { class: 'help' }, 'They go in the selected wall, or in a wall with room. Drag one along its wall, or onto another wall.'),
       h('div', { class: 'section__head section__head--list' }, h('h3', { class: 'list-title' }, 'Walls and groups'), several),
       wallList,
     ),
@@ -643,7 +650,6 @@ export function initUI(view) {
     title: 'Lock the design so nothing moves or changes by accident',
     onclick: () => {
       furniture.close();
-      openings.close();
       store.setLocked(!store.getUI().locked);
     },
   });
@@ -836,7 +842,7 @@ function buildHelp(root) {
         h('li', {}, 'Shift-click several walls and group them to move them as one. Click a grouped wall again to edit just that wall.'),
         h('li', {}, 'The quickest way to lay out a room or a whole apartment is Draw walls: click its corners on a floor plan.'),
         h('li', {}, 'The floor fills in wherever walls enclose a space.'),
-        h('li', {}, 'Add doors and windows from the Walls panel, then drag them along a wall or onto another one.'),
+        h('li', {}, 'Add doors and windows under Add furniture → Doors & windows, then drag them along a wall or onto another one.'),
         h('li', {}, 'Lock, above the view, keeps everything in place while you look around and check measurements.'),
       ),
       h(
@@ -931,7 +937,7 @@ function wallOpenings(w) {
           list.map((o) => h('button', { type: 'button', class: 'preset', 'data-always': '', onclick: () => store.selectOpening(o.id) }, `${o.name}, ${o.width} cm`)),
         )
       : null,
-    h('p', { class: 'help help--first' }, list.length ? 'Pick one to change it.' : 'None yet. While this wall is selected, Door or Window in the Walls panel adds one here.'),
+    h('p', { class: 'help help--first' }, list.length ? 'Pick one to change it.' : 'None yet. While this wall is selected, Door or Window under Add furniture → Doors & windows adds one here.'),
   ];
 }
 
