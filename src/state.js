@@ -71,6 +71,7 @@ let state = loadSaved() ?? fresh();
 // locked: nothing can be moved or changed, only looked at and selected.
 // Both are view settings, remembered separately from the design.
 // drawing: the wall drawing tool is open (the rest of the app waits until it closes).
+// measuring: the measuring tool is on (clicks in the view measure instead of selecting).
 // leftOpen, rightOpen: the side panels are showing (also remembered).
 const view = loadView();
 let ui = {
@@ -79,6 +80,7 @@ let ui = {
   cutaway: view.cutaway ?? true,
   locked: view.locked ?? false,
   drawing: false,
+  measuring: false,
   leftOpen: view.leftOpen ?? true,
   rightOpen: view.rightOpen ?? true,
 };
@@ -195,7 +197,13 @@ export function setPanel(side, open) {
 }
 
 export function setDrawing(on) {
-  ui = { ...ui, drawing: on, several: false, sel: on ? null : ui.sel };
+  ui = { ...ui, drawing: on, several: false, sel: on ? null : ui.sel, measuring: on ? false : ui.measuring };
+  emit();
+}
+
+// Measuring changes nothing, so it works while locked too.
+export function setMeasuring(on) {
+  ui = { ...ui, measuring: on, several: false };
   emit();
 }
 

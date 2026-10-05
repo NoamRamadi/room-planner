@@ -483,6 +483,40 @@ export function rayDistance(outlines, ox, oz, dx, dz) {
   return best;
 }
 
+// The open gaps at the free ends of walls: from the end of a wall straight on to the face of the next
+// wall it points at (an opening left between walls, like a doorway without a door). Beams don't
+// count, as you can walk under them. Each gap is listed once, as { a, b, length } in cm.
+export function gapsOf(chosen, walls, max = 1500) {
+  const joins = jointsFor(walls);
+  const outline = new Map(walls.map((w) => [w.id, footprintOf(w, joins)]));
+  const gaps = [];
+  for (const w of chosen) {
+    const len = lengthOf(w);
+    if (!len || w.gap || Math.abs(w.curve || 0) >= 0.5) continue;
+    const u = { x: (w.x2 - w.x1) / len, z: (w.z2 - w.z1) / len };
+    const nl = left(u);
+    const others = walls.filter((v) => v.id !== w.id && !v.gap).map((v) => outline.get(v.id));
+    for (const end of [0, 1]) {
+      if (joins.get(w.id)?.[end].some((j) => !j.wall.gap)) continue; // a corner (a beam on it leaves the way open)
+      const p = endsOf(w)[end];
+      // An end butting into another wall has no gap.
+      if (walls.some((v) => v.id !== w.id && !v.gap && pointToSegment(p, { x: v.x1, z: v.z1 }, { x: v.x2, z: v.z2 }).d <= v.thickness / 2 + 0.5)) continue;
+      const dir = end ? u : { x: -u.x, z: -u.z };
+      // Straight on from the middle of the end and from both its corners: the nearest wall in front.
+      let best = Infinity;
+      for (const s of [0, 1, -1]) {
+        const o = { x: p.x + nl.x * s * (w.thickness / 2 - 0.5), z: p.z + nl.z * s * (w.thickness / 2 - 0.5) };
+        best = Math.min(best, rayDistance(others, o.x, o.z, dir.x, dir.z));
+      }
+      if (!Number.isFinite(best) || best < 1 || best > max) continue;
+      const b = { x: p.x + dir.x * best, z: p.z + dir.z * best };
+      if (gaps.some((g) => dist(g.a, b) < 5 && dist(g.b, p) < 5)) continue; // the same gap, seen from the other side
+      gaps.push({ a: p, b, length: best });
+    }
+  }
+  return gaps;
+}
+
 export function boundsOf(walls) {
   if (!walls.length) return { minX: -200, maxX: 200, minZ: -250, maxZ: 250, width: 400, length: 500, cx: 0, cz: 0 };
   const pts = walls.flatMap(pathOf);

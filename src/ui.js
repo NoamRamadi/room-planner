@@ -52,6 +52,7 @@ const ICONS = {
   door: '<path d="M15 30V3h18v27"/><path d="M10 30h28"/><path d="M29 16v2"/>',
   window: '<rect x="8" y="4" width="32" height="22"/><path d="M24 4v22"/><path d="M5 28h38"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  measure: '<path d="M3 15.5L15.5 3l5.5 5.5L8.5 21z"/><path d="M7 11.5l2 2M10 8.5l2 2M13 5.5l2 2"/>',
   unlock: '<rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>',
 };
 
@@ -697,6 +698,26 @@ export function initUI(view) {
     lock.innerHTML = `${icon(locked ? 'lock' : 'unlock')}<span>${locked ? 'Locked' : 'Lock'}</span>`;
   });
 
+  // Measure: click two points in the view to see the distance between them. It changes nothing, so it
+  // works while locked too.
+  const measure = h('button', {
+    type: 'button',
+    class: 'tool',
+    'data-always': '',
+    title: 'Measure the distance between two points (M)',
+    html: `${icon('measure')}<span>Measure</span>`,
+    onclick: () => {
+      furniture.close();
+      store.setMeasuring(!store.getUI().measuring);
+    },
+  });
+  const clearMeasures = h('button', { type: 'button', class: 'tool', 'data-always': '', onclick: () => view.clearMeasures() }, 'Clear');
+  syncers.push(() => {
+    const { measuring } = store.getUI();
+    measure.setAttribute('aria-pressed', String(measuring));
+    clearMeasures.hidden = !measuring;
+  });
+
   // Undo and redo: every change to the design, one drag or one run of typing at a time.
   const mac = /Mac|iPhone|iPad/.test(navigator.platform);
   const undoBtn = h('button', { type: 'button', 'aria-label': 'Undo', title: `Undo (${mac ? '⌘Z' : 'Ctrl+Z'})`, html: icon('undo'), onclick: () => store.undo() });
@@ -717,6 +738,8 @@ export function initUI(view) {
     ),
     seeThrough,
     lock,
+    measure,
+    clearMeasures,
     h(
       'button',
       {
@@ -732,9 +755,12 @@ export function initUI(view) {
   );
   const hint = document.querySelector('.hint');
   syncers.push(() => {
-    hint.textContent = store.getUI().locked
-      ? 'Locked: look around and click things to see their measurements. Nothing can be moved or changed.'
-      : 'Drag walls, doors, windows and furniture to move them. Drag empty space to look around. Scroll or pinch to zoom.';
+    const { locked, measuring } = store.getUI();
+    hint.textContent = measuring
+      ? 'Measuring: click two points to see the distance between them. Points snap to the corners and faces of walls, doors, windows and furniture; hold Shift for a straight line. Backspace removes the last one, Esc stops.'
+      : locked
+        ? 'Locked: look around and click things to see their measurements. Nothing can be moved or changed.'
+        : 'Drag walls, doors, windows and furniture to move them. Drag empty space to look around. Scroll or pinch to zoom.';
   });
   const lockNote = h('p', { class: 'lock-note' }, 'Locked. Unlock to make changes.');
 
@@ -793,7 +819,7 @@ export function initUI(view) {
     document.querySelector('.app').classList.toggle('is-drawing', ui.drawing);
   });
 
-  bindShortcuts();
+  bindShortcuts(view);
 }
 
 // The inspector is rebuilt only when what it shows changes; values in between update in place.
@@ -884,6 +910,7 @@ function buildHelp(root) {
         h('li', {}, 'The floor fills in wherever walls enclose a space.'),
         h('li', {}, 'Add doors and windows under Add furniture → Doors & windows, then drag them along a wall or onto another one.'),
         h('li', {}, 'Lock, above the view, keeps everything in place while you look around and check measurements.'),
+        h('li', {}, 'Select a wall to see the gap from each of its free ends to the next wall. Measure, above the view, measures between any two points.'),
       ),
       h(
         'dl',
@@ -1377,10 +1404,10 @@ function buildItemInspector(root, item) {
   return syncers;
 }
 
-function bindShortcuts() {
+function bindShortcuts(view) {
   window.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
-    const { sel, several, drawing, leftOpen, rightOpen } = store.getUI();
+    const { sel, several, drawing, measuring, leftOpen, rightOpen } = store.getUI();
     if ((e.key === '[' || e.key === ']') && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       if (e.key === '[') store.setPanel('left', !leftOpen);
@@ -1388,6 +1415,20 @@ function bindShortcuts() {
       return;
     }
     if (drawing) return; // the drawing tool has its own keys
+    const plainKey = !e.metaKey && !e.ctrlKey && !e.altKey;
+    if ((e.key === 'm' || e.key === 'M') && plainKey) {
+      store.setMeasuring(!measuring);
+      return;
+    }
+    if (measuring) {
+      if (e.key === 'Escape') {
+        if (!view.cancelMeasure()) store.setMeasuring(false);
+      } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        view.undoMeasure();
+      } else return;
+      e.preventDefault();
+      return;
+    }
     const undoKey = (e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z');
     if ((undoKey && e.shiftKey) || (e.ctrlKey && (e.key === 'y' || e.key === 'Y'))) {
       e.preventDefault();

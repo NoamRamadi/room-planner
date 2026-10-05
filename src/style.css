@@ -753,7 +753,8 @@ h3 {
 
 /* ---- Lock button in the view bar ---- */
 
-.lock {
+.lock,
+.tool {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -767,11 +768,13 @@ h3 {
   cursor: pointer;
 }
 
-.lock:hover {
+.lock:hover,
+.tool:hover {
   background: var(--plaster-deep);
 }
 
-.lock svg {
+.lock svg,
+.tool svg {
   width: 16px;
   height: 16px;
   fill: none;
@@ -781,13 +784,15 @@ h3 {
   stroke-linejoin: round;
 }
 
-.lock[aria-pressed='true'] {
+.lock[aria-pressed='true'],
+.tool[aria-pressed='true'] {
   border-color: var(--graphite);
   background: var(--graphite);
   color: var(--plaster);
 }
 
-.lock[aria-pressed='true'] svg {
+.lock[aria-pressed='true'] svg,
+.tool[aria-pressed='true'] svg {
   color: var(--tape);
 }
 
@@ -1542,4 +1547,25 @@ h3 {
   .viewbar .btn {
     padding: 6px 10px;
   }
+}
+
+/* ---- Measuring ---- */
+
+.stage.is-measuring canvas {
+  cursor: crosshair;
+}
+
+.tool[hidden] {
+  display: none;
+}
+
+.measure-dot {
+  z-index: 4;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 2px solid var(--graphite);
+  border-radius: 50%;
+  background: var(--tape);
+  pointer-events: none;
 }

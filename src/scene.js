@@ -12,9 +12,11 @@ import { PATTERN_SIZE, floorTexture } from './textures.js';
 import {
   boundsOf,
   contains,
+  dist,
   facesOf,
   floorsOf,
   footprintOf,
+  gapsOf,
   jointsOf,
   lengthOf,
   midpointOf,
@@ -36,6 +38,12 @@ const UP = new THREE.Vector3(0, 1, 0);
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const fmt = (cm) => `${Math.round(cm)} cm`;
+const CORNERS_2D = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 // Selection and clearance lines draw on top of everything so they stay readable behind furniture.
@@ -590,6 +598,7 @@ export function createScene(container) {
   const wallBars = [];
   const wallLength = new Dim('sel');
   wallSel.add(wallLength);
+  const wallGaps = []; // the open gap at each free end of the selected walls
 
   function handle(className) {
     const el = document.createElement('button');
@@ -637,6 +646,23 @@ export function createScene(container) {
       else bar.visible = false;
     });
 
+    // The gaps between the selected walls' free ends and the walls they point at, along the floor.
+    const gapList = gapsOf(chosen, state.walls);
+    while (wallGaps.length < gapList.length) {
+      const dim = new Dim('sel');
+      wallGaps.push(dim);
+      wallSel.add(dim);
+    }
+    wallGaps.forEach((dim, k) => {
+      const g = gapList[k];
+      if (!g) {
+        dim.visible = false;
+        return;
+      }
+      const across = v3(-(g.b.z - g.a.z) / g.length, 0, (g.b.x - g.a.x) / g.length);
+      dim.measure(v3(g.a.x * CM, 0.03, g.a.z * CM), v3(g.b.x * CM, 0.03, g.b.z * CM), `Gap ${fmt(g.length)}`, across);
+    });
+
     // One wall: its length alongside it, and a handle on each end for stretching and turning it.
     const one = chosen.length === 1 ? chosen[0] : null;
     wallLength.visible = Boolean(one);
@@ -661,6 +687,132 @@ export function createScene(container) {
       el.dataset.end = end;
       el.setAttribute('aria-label', `Drag the ${end ? 'end' : 'start'} of ${one.name}`);
     });
+  }
+
+  // ---- Measuring: click two points to see the distance between them ----
+
+  const measureGroup = new THREE.Group();
+  scene.add(measureGroup);
+  const measures = []; // finished ones: { a, b } on the floor plan, in cm
+  let measureStart = null; // the first point of the one being measured
+  let measureHover = null; // the point under the pointer
+  const measureDims = [];
+  const measureDots = [];
+
+  function drawMeasures() {
+    const on = store.getUI().measuring;
+    measureGroup.visible = on;
+    if (!on) return;
+    const lines = [...measures, ...(measureStart && measureHover ? [{ a: measureStart, b: measureHover }] : [])];
+    while (measureDims.length < lines.length) {
+      const dim = new Dim('sel');
+      measureDims.push(dim);
+      measureGroup.add(dim);
+    }
+    measureDims.forEach((dim, k) => {
+      const m = lines[k];
+      if (!m) {
+        dim.visible = false;
+        return;
+      }
+      const len = dist(m.a, m.b);
+      const across = len ? v3(-(m.b.z - m.a.z) / len, 0, (m.b.x - m.a.x) / len) : v3(1, 0, 0);
+      dim.measure(v3(m.a.x * CM, 0.03, m.a.z * CM), v3(m.b.x * CM, 0.03, m.b.z * CM), fmt(len), across);
+    });
+    // A dot at each end, and where the next point would go.
+    const points = [...lines.flatMap((m) => [m.a, m.b]), ...(measureStart ? [measureStart] : measureHover ? [measureHover] : [])];
+    while (measureDots.length < points.length) {
+      const dot = handle('measure-dot');
+      dot.element.tabIndex = -1;
+      dot.element.setAttribute('aria-hidden', 'true');
+      measureDots.push(dot);
+      measureGroup.add(dot);
+    }
+    measureDots.forEach((dot, k) => {
+      const p = points[k];
+      dot.visible = Boolean(p);
+      if (p) dot.position.set(p.x * CM, 0.03, p.z * CM);
+    });
+  }
+
+  // A piece of furniture's footprint corners on the floor plan.
+  function itemCorners(item) {
+    const { w, d } = dimsOf(item);
+    const a = THREE.MathUtils.degToRad(item.rotation);
+    return CORNERS_2D.map(([sx, sz]) => {
+      const [lx, lz] = [(sx * w) / 2, (sz * d) / 2];
+      return { x: item.x + Math.cos(a) * lx + Math.sin(a) * lz, z: item.z - Math.sin(a) * lx + Math.cos(a) * lz };
+    });
+  }
+
+  // The point to measure from under the pointer, on the floor plan. It snaps to a corner nearby (of a
+  // wall, a door or window opening, or furniture), else onto a wall face or furniture edge. Shift keeps
+  // the line straight across or down the plan.
+  function measurePoint(e) {
+    const hit = pick(e);
+    const raw = hit ? { x: hit.point.x / CM, z: hit.point.z / CM } : planePoint(e, floorPlane);
+    if (!raw) return null;
+    const { walls, items, openings } = store.getState();
+    const reach = (camera.position.distanceTo(v3(raw.x * CM, 0, raw.z * CM)) / CM) * 0.015; // about a dozen pixels
+    const outlines = [...walls.map((w) => footprints.get(w.id)).filter(Boolean), ...items.filter((i) => !isFlat(i)).map(itemCorners)];
+    const jambs = openings.flatMap((o) => {
+      const w = walls.find((x) => x.id === o.wall);
+      if (!w || !takesOpenings(w)) return [];
+      const { u, nl } = facesOf(w, walls);
+      const span = openingSpan(o, w);
+      return [span.a, span.b].flatMap((s) => [1, -1].map((side) => ({ x: w.x1 + u.x * s + nl.x * side * (w.thickness / 2), z: w.z1 + u.z * s + nl.z * side * (w.thickness / 2) })));
+    });
+    let p = null;
+    let best = reach;
+    for (const c of [...outlines.flat(), ...jambs]) {
+      const d = dist(c, raw);
+      if (d < best) [p, best] = [{ x: c.x, z: c.z }, d];
+    }
+    if (!p) {
+      best = reach * 0.7;
+      for (const poly of outlines) {
+        poly.forEach((a, k) => {
+          const on = pointToSegment(raw, a, poly[(k + 1) % poly.length]);
+          if (on.d < best) [p, best] = [{ x: on.x, z: on.z }, on.d];
+        });
+      }
+    }
+    p ??= raw;
+    if (e.shiftKey && measureStart) {
+      if (Math.abs(p.x - measureStart.x) > Math.abs(p.z - measureStart.z)) p = { x: p.x, z: measureStart.z };
+      else p = { x: measureStart.x, z: p.z };
+    }
+    return p;
+  }
+
+  function measureClick(e) {
+    const p = measurePoint(e);
+    if (!p) return;
+    if (!measureStart) measureStart = p;
+    else {
+      measures.push({ a: measureStart, b: p });
+      measureStart = null;
+    }
+    measureHover = p;
+    drawMeasures();
+  }
+
+  // Esc first drops a measurement just started; Backspace removes the last one.
+  function cancelMeasure() {
+    if (!measureStart) return false;
+    measureStart = null;
+    drawMeasures();
+    return true;
+  }
+  function undoMeasure() {
+    if (measureStart) measureStart = null;
+    else measures.pop();
+    drawMeasures();
+  }
+  function clearMeasures() {
+    measures.length = 0;
+    measureStart = null;
+    drawMeasures();
   }
 
   // ---- Pointer: dragging furniture, walls and wall corners ----
@@ -718,6 +870,11 @@ export function createScene(container) {
     (e) => {
       if (store.getUI().drawing || e.button !== 0 || !e.isPrimary) return; // the drawing tool handles its own
       tween = null;
+      // Measuring: a click places a point; a drag still turns the camera.
+      if (store.getUI().measuring) {
+        press = { x: e.clientX, y: e.clientY, additive: false };
+        return;
+      }
       const end = e.target.closest?.('[data-end]');
       if (end) {
         e.stopPropagation();
@@ -774,6 +931,13 @@ export function createScene(container) {
 
   container.addEventListener('pointermove', (e) => {
     if (store.getUI().drawing) return;
+    if (store.getUI().measuring) {
+      if (e.buttons === 0) {
+        measureHover = measurePoint(e);
+        drawMeasures();
+      }
+      return;
+    }
     if (cornerDrag && e.pointerId === cornerDrag.pointerId) {
       const p = planePoint(e, floorPlane);
       if (p) showSnap(store.dragCorner(cornerDrag.corner, cornerDrag.anchor, p.x, p.z));
@@ -833,6 +997,11 @@ export function createScene(container) {
     }
     if ([itemDrag, openingDrag, sinkDrag].some((drag) => drag && e.pointerId === drag.pointerId)) {
       endDrags();
+      return;
+    }
+    if (store.getUI().measuring) {
+      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) measureClick(e);
+      press = null;
       return;
     }
     // A click (not an orbit): while locked it selects what's under the pointer; on empty space it
@@ -926,7 +1095,7 @@ export function createScene(container) {
 
   // PNG of the current view without measurements or handles.
   function savePhoto() {
-    const overlays = [selection, gaps, roomDims, wallSel, openingSel, snapMark];
+    const overlays = [selection, gaps, roomDims, wallSel, openingSel, snapMark, measureGroup];
     const shown = overlays.map((o) => o.visible);
     overlays.forEach((o) => (o.visible = false));
     renderer.render(scene, camera);
@@ -960,6 +1129,9 @@ export function createScene(container) {
     updateWallSelection(state, ui);
     updateOpeningSelection(state, ui);
     container.classList.toggle('is-locked', ui.locked);
+    container.classList.toggle('is-measuring', ui.measuring);
+    if (!ui.measuring && (measures.length || measureStart)) clearMeasures(); // leaving the tool clears them
+    else drawMeasures();
   });
   new ResizeObserver(resize).observe(container);
   resize();
@@ -973,5 +1145,5 @@ export function createScene(container) {
     labelRenderer.render(scene, camera);
   });
 
-  return { setView, savePhoto, focus };
+  return { setView, savePhoto, focus, cancelMeasure, undoMeasure, clearMeasures };
 }

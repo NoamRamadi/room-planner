@@ -22,6 +22,7 @@ Plan a room of your apartment in 3D, right in the browser.
 - Switch between 3D view, top view (floor plan) and eye level, and save a photo of the view
 - Turn **See-through walls** on to cut away walls that stand between you and the room, or off to keep every wall standing
 - **Lock** the design when you're done, so you can look around and check measurements without moving anything by accident
+- **Measure** anything: select a wall to see the gap at its free ends, or use the Measure tool to measure between any two points
 - **Undo and redo** any change: the arrows at the start of the bar above the view, or Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z
 
 Your design is saved automatically in the browser. Use **Save design file** / **Open design file** to move it to another computer or share it.
@@ -93,6 +94,12 @@ Under **Add furniture → Doors & windows**, click **Door** or **Window** and pi
 
 **Lock**, above the view, freezes the design: you can still turn the view, switch views, select things to see their measurements, and save a photo or the design file, but nothing can be moved, added, removed or changed until you click **Locked** again. The lock is remembered the next time you open the app.
 
+## Measuring
+
+**Gaps between walls:** select a wall (or a whole group) and every free end shows a yellow **Gap** label: the clear distance from the end of the wall straight on to the face of the next wall, such as the opening left between two walls. Beams don't close a gap, as you can walk under them.
+
+**Measure tool:** click **Measure** above the view (or press M), then click two points to see the distance between them, on the floor plan. Points snap to the corners and faces of walls, the edges of door and window openings, and the corners and edges of furniture; hold Shift for a line straight across or down the plan. Click again to start another measurement. Backspace removes the last one, **Clear** removes them all, and Esc (or Measure again) stops measuring. Measuring changes nothing, so it also works while the design is locked. Measurements aren't saved with the design.
+
 ## Furniture designs
 
 Under **Add furniture**, pick **Living**, **Kitchen**, **Bedroom**, **Bathroom** or **Any room**, click a type and pick a design from the menu. To change a piece's design later, select it and pick another under **Design**; its size is kept wherever the new design allows. Each design has its own size presets. A round table has a single size, its diameter. A wall-mounted TV has a height above the floor. A corner sofa can have its chaise on the left, and a corner desk its return on the right.
@@ -119,6 +126,7 @@ Carpets lie flat on the floor: furniture can stand on them, and carpets and furn
 | Deselect | Esc, or click empty space |
 | Select several walls | Shift-click (or Select several), then group with Ctrl/Cmd+G; ungroup with Ctrl/Cmd+Shift+G |
 | Undo / redo | The arrows above the view, Ctrl/Cmd+Z, and Shift+Ctrl/Cmd+Z (or Ctrl+Y). A whole drag, or a run of typing in one field, is one step; the last 100 steps are kept while the page is open |
+| Measure | Measure above the view, or M; then click two points (Shift: straight line, Backspace: remove the last, Esc: stop) |
 | Hide or show the side panels | The tabs on the left and right edges of the view, or `[` and `]` (on phones the panels stay below the view) |
 
 ## Code
