@@ -37,6 +37,8 @@ const ICONS = {
   curtain:
     '<path d="M4 4h40"/><circle cx="4" cy="4" r="1.5"/><circle cx="44" cy="4" r="1.5"/><path d="M7 4c-1 8 1 16-1 26M12 4c1 8-1 16 1 26M6 30h7M36 4c-1 8 1 16-1 26M41 4c1 8-1 16 1 26M35 30h7"/><rect x="17" y="8" width="14" height="15" stroke-dasharray="2 2"/>',
   socket: '<rect x="15" y="7" width="18" height="18" rx="2"/><circle cx="24" cy="16" r="6"/><path d="M21.5 14.5h.01M26.5 14.5h.01M24 18.5h.01"/>',
+  counter:
+    '<path d="M3 10h14l2 3h10l2-3h14v3H3z"/><path d="M5 13v15h38V13M17 13v15M29 13v15M5 18h12M5 23h12M9 15.5h4M9 20.5h4M9 25.5h4M26 18v4M32 18v4"/><path d="M24 10V5a3 3 0 0 1 6 0v1"/>',
   rug: '<rect x="10" y="4" width="28" height="24" rx="1"/><rect x="14" y="8" width="20" height="16"/><path d="M13 4V1M18 4V1M23 4V1M28 4V1M33 4V1M13 28v3M18 28v3M23 28v3M28 28v3M33 28v3"/>',
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
@@ -176,6 +178,10 @@ Object.assign(DESIGN_ICONS, {
   'socket:usb': '<rect x="8" y="8" width="32" height="16" rx="2"/><circle cx="17" cy="16" r="5"/><path d="M15 14.8h.01M19 14.8h.01M17 18h.01"/><path d="M29 11.5h6v3h-6zM29 17.5h6v3h-6z"/>',
   'socket:waterproof': '<rect x="14" y="4" width="20" height="24" rx="2"/><path d="M14 9h20"/><rect x="16.5" y="11" width="15" height="14" rx="1" stroke-dasharray="2 2"/><circle cx="24" cy="18" r="4"/>',
   'socket:data': '<rect x="15" y="7" width="18" height="18" rx="2"/><path d="M18 12h5v5h-5zM25 12h5v5h-5zM20 21h8"/>',
+  'counter:single': ICONS.counter,
+  'counter:double':
+    '<path d="M3 10h8l2 3h8l2-3h2l2 3h8l2-3h8v3H3z"/><path d="M5 13v15h38V13M17 13v15M29 13v15M5 18h12M5 23h12M9 15.5h4M9 20.5h4M9 25.5h4M26 18v4M32 18v4"/><path d="M24 10V5a3 3 0 0 1 6 0v1"/>',
+  'counter:none': '<path d="M3 10h42v3H3z"/><path d="M5 13v15h38V13M17 13v15M29 13v15M5 18h12M5 23h12M9 15.5h4M9 20.5h4M9 25.5h4M26 18v4M32 18v4"/>',
   'door:single': ICONS.door,
   'door:double': '<path d="M9 30V3h30v27M24 3v27"/><path d="M5 30h38"/><path d="M21 16v2M27 16v2"/>',
   'door:sliding': '<path d="M7 30V3h34v27"/><path d="M10 6h15v24M23 6h15v24"/><path d="M3 30h42"/>',
@@ -1281,6 +1287,36 @@ function buildItemInspector(root, item) {
     flip = h('label', { class: 'check' }, box, style.flip);
   }
 
+  // Layout: how many drawers and cupboards (each a row of choices), and where the sink sits.
+  const layoutRows = (def.options ?? []).map((opt) => {
+    const choice = segmented({
+      label: opt.label,
+      options: opt.values.map((v) => ({ id: v, label: v === 0 ? 'None' : String(v) })),
+      get: () => current()[opt.key],
+      set: (v) => update({ [opt.key]: v }),
+    });
+    const row = h('div', { class: 'field-row field-row--choice' }, h('span', { class: 'field-row__label' }, opt.label), choice.el);
+    syncers.push(choice.sync, () => {
+      row.hidden = opt.when ? !opt.when(current()) : false;
+    });
+    return row;
+  });
+  let sinkField = null;
+  if (style.sink) {
+    const half = style.sink / 2;
+    const field = measureField({
+      label: 'Sink position',
+      min: half + 3,
+      max: () => current().w - half - 3,
+      get: () => current().sink,
+      set: (v) => update({ sink: v }),
+    });
+    syncers.push(field.sync);
+    sinkField = [h('div', { class: 'measures measures--gap' }, field.el), h('p', { class: 'help' }, 'From the left end of the counter, as you face it, to the middle of the sink. You can also drag the sink along the counter.')];
+  }
+  const layout = layoutRows.length ? h('div', { class: 'inspector__group' }, h('h3', {}, 'Layout'), layoutRows, flip, sinkField) : null;
+  if (layout) flip = null; // shown with the layout instead of under the size
+
   // Colors
   const colorPickers = colorsOf(item).map((slot) => {
     const picker = swatches({
@@ -1308,6 +1344,7 @@ function buildItemInspector(root, item) {
     panelHead(name, null, () => store.clearSelection()),
     h('div', { class: 'inspector__group' }, h('h3', {}, 'Design'), designs),
     h('div', { class: 'inspector__group' }, h('h3', {}, 'Size'), h('div', { class: 'presets' }, presetButtons), sizeFields, flip),
+    layout,
     h('div', { class: 'inspector__group' }, colorPickers),
     h(
       'div',

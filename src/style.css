@@ -1321,6 +1321,20 @@ h3 {
   line-height: 1.4;
 }
 
+.field-row--choice {
+  margin-top: 10px;
+}
+
+.field-row--choice .segmented button {
+  min-width: 34px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+}
+
+.stage.is-hovering-slide canvas {
+  cursor: ew-resize;
+}
+
 .field-row--stack {
   flex-direction: column;
   align-items: stretch;

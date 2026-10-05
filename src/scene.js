@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { CATALOG, buildItem, dimsOf, isFlat } from './catalog.js';
+import { CATALOG, buildItem, dimsOf, isFlat, styleOf } from './catalog.js';
 import { buildOpening, buildSwing } from './openings.js';
 import { elevationOf, halfExtents } from './layout.js';
 import * as store from './state.js';
@@ -462,7 +462,9 @@ export function createScene(container) {
     const alive = new Set();
     for (const item of items) {
       alive.add(item.id);
-      const key = [item.type, item.style, item.flip, item.w, item.d, item.h, item.inches, item.color, item.color2, item.color3].join('|');
+      // Rebuilt whenever anything but its place, turn or name changes.
+      const { x, z, rotation, name, id, ...look } = item;
+      const key = JSON.stringify(look);
       let model = models.get(item.id);
       if (model?.key !== key) {
         if (model) removeModel(model);
@@ -493,6 +495,8 @@ export function createScene(container) {
   const gaps = new THREE.Group();
   const gapDims = [0, 1, 2, 3].map(() => new Dim('gap'));
   gaps.add(...gapDims);
+  const sinkDims = [new Dim('gap'), new Dim('gap')];
+  selection.add(...sinkDims);
   scene.add(selection, gaps);
 
   function updateItemSelection(state, ui) {
@@ -516,6 +520,17 @@ export function createScene(container) {
     sizeDims[1].visible = item.type !== 'tv'; // a TV's depth is just its foot
     sizeDims[2].measure(v3(hw + off, 0, hd + off), v3(hw + off, h * CM, hd + off), fmt(h), v3(1, 0, 0));
     if (isFlat(item)) sizeDims[2].visible = false; // a carpet's thickness isn't worth a label
+
+    // A counter's sink: its distance from each end of the counter, along the front of the top.
+    const sinkW = styleOf(item).sink;
+    sinkDims.forEach((dim) => (dim.visible = Boolean(sinkW)));
+    if (sinkW) {
+      const [a, b] = [item.sink - sinkW / 2, item.sink + sinkW / 2];
+      const top = h * CM + 0.01;
+      const front = hd - 0.04;
+      sinkDims[0].measure(v3(-hw, top, front), v3(-hw + a * CM, top, front), fmt(a), v3(0, 0, 1));
+      sinkDims[1].measure(v3(-hw + b * CM, top, front), v3(hw, top, front), fmt(w - b), v3(0, 0, 1));
+    }
 
     // Clearance from each side of the footprint straight out to the nearest wall standing on the floor.
     const solid = state.walls.filter((wall) => !wall.gap).map((wall) => footprints.get(wall.id));
@@ -659,7 +674,14 @@ export function createScene(container) {
   let openingDrag = null;
   let wallDrag = null;
   let cornerDrag = null;
+  let sinkDrag = null;
   let press = null; // a press on empty space: a click if it doesn't move
+
+  // How far along a piece of furniture (cm from its left end, as seen from the front) a floor point is.
+  function alongItem(item, p) {
+    const a = THREE.MathUtils.degToRad(item.rotation);
+    return Math.cos(a) * (p.x - item.x) - Math.sin(a) * (p.z - item.z) + dimsOf(item).w / 2;
+  }
 
   function aim(e) {
     const r = renderer.domElement.getBoundingClientRect();
@@ -673,8 +695,12 @@ export function createScene(container) {
     for (const hit of raycaster.intersectObjects([itemsGroup, openingGroup, wallGroup], true)) {
       if (!isShown(hit.object)) continue;
       let o = hit.object;
-      while (o && !o.userData.itemId && !o.userData.wallId && !o.userData.openingId) o = o.parent;
-      if (o?.userData.itemId) return { kind: 'item', id: o.userData.itemId, point: hit.point };
+      let part = null;
+      while (o && !o.userData.itemId && !o.userData.wallId && !o.userData.openingId) {
+        part ??= o.userData.part ?? null;
+        o = o.parent;
+      }
+      if (o?.userData.itemId) return { kind: 'item', id: o.userData.itemId, point: hit.point, part };
       if (o?.userData.openingId) return { kind: 'opening', id: o.userData.openingId, point: hit.point };
       if (o?.userData.wallId) return { kind: 'wall', id: o.userData.wallId, point: hit.point };
     }
@@ -721,7 +747,12 @@ export function createScene(container) {
       dragPlane.set(UP, -hit.point.y);
       const start = { x: hit.point.x / CM, z: hit.point.z / CM, sx: e.clientX, sy: e.clientY };
       store.beginGesture(); // the whole drag is one step to undo
-      if (hit.kind === 'item') {
+      if (hit.kind === 'item' && hit.part === 'sink') {
+        // Dragging a counter's sink slides it along the counter.
+        store.select(hit.id);
+        const item = store.getSelected();
+        sinkDrag = { id: hit.id, pointerId: e.pointerId, grab: alongItem(item, start) - item.sink };
+      } else if (hit.kind === 'item') {
         store.select(hit.id);
         const item = store.getSelected();
         itemDrag = { id: hit.id, pointerId: e.pointerId, dx: item.x - start.x, dz: item.z - start.z };
@@ -762,16 +793,26 @@ export function createScene(container) {
       if (p) store.moveItem(itemDrag.id, p.x + itemDrag.dx, p.z + itemDrag.dz);
       return;
     }
+    if (sinkDrag && e.pointerId === sinkDrag.pointerId) {
+      const p = planePoint(e, dragPlane);
+      const item = store.getState().items.find((i) => i.id === sinkDrag.id);
+      if (p && item) store.updateItem(item.id, { sink: Math.round(alongItem(item, p) - sinkDrag.grab) });
+      return;
+    }
     if (openingDrag && e.pointerId === openingDrag.pointerId) {
       const p = planePoint(e, dragPlane);
       if (p) store.moveOpening(openingDrag.id, p.x + openingDrag.dx, p.z + openingDrag.dz);
       return;
     }
-    if (e.pointerType === 'mouse' && e.buttons === 0) container.classList.toggle('is-hovering', Boolean(pick(e)));
+    if (e.pointerType === 'mouse' && e.buttons === 0) {
+      const hit = pick(e);
+      container.classList.toggle('is-hovering', Boolean(hit));
+      container.classList.toggle('is-hovering-slide', hit?.part === 'sink' && !store.getUI().locked);
+    }
   });
 
   function endDrags() {
-    itemDrag = openingDrag = wallDrag = cornerDrag = null;
+    itemDrag = openingDrag = wallDrag = cornerDrag = sinkDrag = null;
     store.endGesture();
     showSnap(null);
     container.classList.remove('is-dragging');
@@ -790,7 +831,7 @@ export function createScene(container) {
       endDrags();
       return;
     }
-    if ((itemDrag && e.pointerId === itemDrag.pointerId) || (openingDrag && e.pointerId === openingDrag.pointerId)) {
+    if ([itemDrag, openingDrag, sinkDrag].some((drag) => drag && e.pointerId === drag.pointerId)) {
       endDrags();
       return;
     }

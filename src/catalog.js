@@ -784,7 +784,7 @@ export const CATALOG = {
         label: 'Wall cabinet',
         name: 'Wall cabinet',
         onWall: true, // `mount` is the height of its bottom edge
-        over: ['kitchen', 'sinkunit', 'dishwasher'], // hung above a base unit with nothing above it yet
+        over: ['kitchen', 'sinkunit', 'dishwasher', 'counter'], // hung above a base unit with nothing above it yet
         defaults: { w: 60, d: 35, h: 70 },
         limits: { d: [25, 40], h: [30, 100] },
         colors: [{ key: 'color', label: 'Fronts', palette: FRONTS }],
@@ -822,6 +822,43 @@ export const CATALOG = {
       },
     ],
     build: buildKitchenCabinet,
+  },
+  counter: {
+    label: 'Kitchen counter',
+    room: 'kitchen',
+    place: 'wall',
+    // A run of base units under one countertop: columns of drawers on one side, cupboards on the
+    // other, and a sink anywhere along the top (`sink`: cm from the left end to the sink's middle).
+    defaults: { style: 'single', w: 240, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9', drawers: 1, rows: 3, cupboards: 2, sink: 150, flip: false },
+    limits: { w: [60, 480], d: [50, 70], h: [80, 100], drawers: [0, 2], rows: [2, 4], cupboards: [0, 3], sink: [0, 480] },
+    colors: [
+      { key: 'color', label: 'Fronts', palette: FRONTS },
+      { key: 'color2', label: 'Countertop', palette: WORKTOPS },
+    ],
+    // Set in the panel as a row of choices each.
+    options: [
+      { key: 'drawers', label: 'Drawer columns', values: [0, 1, 2] },
+      { key: 'rows', label: 'Drawers in a column', values: [2, 3, 4], when: (item) => item.drawers > 0 },
+      { key: 'cupboards', label: 'Cupboards', values: [0, 1, 2, 3] },
+    ],
+    presets: [
+      { name: '180 cm', w: 180, d: 60, h: 90 },
+      { name: '240 cm', w: 240, d: 60, h: 90 },
+      { name: '300 cm', w: 300, d: 60, h: 90 },
+    ],
+    styles: [
+      { id: 'single', label: 'Single sink', name: 'Sink counter', sink: 50, flip: 'Drawers on the right' },
+      { id: 'double', label: 'Double sink', name: 'Double sink counter', sink: 86, flip: 'Drawers on the right', defaults: { w: 300, cupboards: 3, sink: 190 } },
+      { id: 'none', label: 'No sink', name: 'Kitchen counter', flip: 'Drawers on the right' },
+    ],
+    // At least one drawer column or cupboard, and the sink (`sink` is its width) on the counter.
+    fit(item) {
+      for (const key of ['drawers', 'rows', 'cupboards']) item[key] = Math.round(item[key]);
+      if (item.drawers + item.cupboards < 1) item.cupboards = 1;
+      const half = (styleOf(item).sink ?? 0) / 2;
+      if (half) item.sink = Math.round(clamp(item.sink, half + 3, item.w - half - 3));
+    },
+    build: buildCounter,
   },
   sinkunit: {
     label: 'Sink unit',
@@ -1723,6 +1760,7 @@ export function normalizeItem(item) {
     if (typeof next[key] === 'number') next[key] = clamp(next[key], lo, hi);
   }
   if (styleOf(next).round) next.d = next.w;
+  CATALOG[next.type].fit?.(next);
   return next;
 }
 
@@ -2799,9 +2837,9 @@ function buildKitchenCabinet({ w, d, h }, item) {
   }
 
   if (style === 'wall') {
-    // A box on the wall with doors, the handles along their bottom edge.
+    // A box on the wall with doors about 45 cm wide, the handles along their bottom edge.
     g.add(block(w, h, d, body, { r: 0.004 }));
-    const cols = w > 0.65 ? 2 : 1;
+    const cols = Math.max(1, Math.round(w / 0.45));
     grooves(g, line, { w, y0: 0, bodyH: h, z: d / 2, cols });
     for (let i = 0; i < cols; i++) barHandle(g, handle, { x: -w / 2 + (w / cols) * (i + 0.5), y: 0.04, z: d / 2, length: Math.min(0.14, (w / cols) * 0.5) });
     return g;
@@ -3958,6 +3996,54 @@ function buildSocket({ w, d, h }, item) {
     } else {
       outlet(g, item.color, { x, y: cy, z: face, r: Math.min(0.022, step * 0.32, h * 0.32) });
     }
+  }
+  return g;
+}
+
+// A kitchen counter: drawer columns on one side and cupboards on the other, all the same width,
+// under one countertop, with the sink (if any) wherever it's been put along the top.
+function buildCounter({ w, d, h }, item) {
+  const g = new THREE.Group();
+  baseCabinet(g, { w, d, h }, { fronts: item.color, top: item.color2, layout: 'plain' });
+  const line = shade(item.color, 0.45);
+  const handle = steel();
+  const bodyH = h - PLINTH - WORKTOP;
+  const z = d / 2 - 0.01;
+  const { drawers, rows, cupboards } = item;
+  const n = drawers + cupboards;
+  const mw = w / n;
+  for (let i = 0; i < n; i++) {
+    const x0 = -w / 2 + mw * i;
+    const cx = x0 + mw / 2;
+    const isDrawers = item.flip ? i >= cupboards : i < drawers;
+    if (i > 0) g.add(block(0.006, bodyH - 0.01, 0.004, line, { x: x0, y: PLINTH + 0.005, z }));
+    if (isDrawers) {
+      for (let j = 1; j < rows; j++) g.add(block(mw - 0.02, 0.006, 0.004, line, { x: cx, y: PLINTH + (bodyH * j) / rows, z }));
+      for (let j = 0; j < rows; j++) barHandle(g, handle, { x: cx, y: PLINTH + (bodyH * (j + 1)) / rows - 0.05, z, length: Math.min(0.3, mw * 0.5) });
+    } else {
+      // A cupboard: one door, or a pair when it's wide; handles where the doors open.
+      const pair = mw > 0.7;
+      if (pair) g.add(block(0.006, bodyH - 0.01, 0.004, line, { x: cx, y: PLINTH + 0.005, z }));
+      const xs = pair ? [cx - 0.05, cx + 0.05] : [x0 + mw - 0.06];
+      for (const x of xs) barHandle(g, handle, { x, y: PLINTH + bodyH - 0.1, z, length: Math.min(0.14, mw * 0.3), upright: true });
+    }
+  }
+
+  const sinkW = styleOf(item).sink;
+  if (sinkW) {
+    // The sink and its tap, in a group of their own so they can be dragged along the counter.
+    const sink = new THREE.Group();
+    sink.userData.part = 'sink';
+    sink.position.x = -w / 2 + item.sink / 100;
+    const bd = Math.min(0.42, d - 0.16);
+    if (item.style === 'double') {
+      const bw = (sinkW / 100 - 0.09) / 2;
+      for (const s of [-1, 1]) sinkBowl(sink, { bw, bd, x: s * (bw / 2 + 0.03), y: h, z: 0.02 });
+    } else {
+      sinkBowl(sink, { bw: sinkW / 100 - 0.03, bd, y: h, z: 0.02 });
+    }
+    gooseneck(sink, steel(), { y: h, z: -d / 2 + 0.06 });
+    g.add(sink);
   }
   return g;
 }
