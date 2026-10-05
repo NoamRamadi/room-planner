@@ -115,7 +115,8 @@ function awayFrom(w, end) {
   return end === 0 ? unit(p[1].x - p[0].x, p[1].z - p[0].z) : unit(p[p.length - 2].x - p.at(-1).x, p[p.length - 2].z - p.at(-1).z);
 }
 
-function intersectLines(p, u, q, v) {
+// Where the line through p along u meets the line through q along v (null if they're parallel).
+export function intersectLines(p, u, q, v) {
   const den = u.x * v.z - u.z * v.x;
   if (Math.abs(den) < 1e-6) return null;
   const t = ((q.x - p.x) * v.z - (q.z - p.z) * v.x) / den;
@@ -161,6 +162,72 @@ export function footprintOf(w, joins) {
     if (end) [R[n - 1], L[n - 1]] = end;
   }
   return [...L, ...R.reverse()];
+}
+
+// ---- Inside measurements ----
+
+// People measure a room from the inside, wall face to wall face. A straight wall's two faces run
+// between the faces of the walls it meets: to the mitre where it turns a corner, or to the face of a
+// wall it butts into at a T.
+
+const jointCache = new WeakMap();
+const jointsFor = (walls) => {
+  let joins = jointCache.get(walls);
+  if (!joins) jointCache.set(walls, (joins = jointsOf(walls)));
+  return joins;
+};
+
+// The wall's faces as stretches along it, in cm from its start (x1, z1): `left` and `right` (of the
+// direction from start to end) as [from, to]. `side` is +1 if only the left face has a room against
+// it, -1 if only the right one, 0 if both or neither (a wall between two rooms, or standing alone).
+// `inside` is the face to measure, { from, to, length }: the room's, else the shorter one. `u` runs
+// along the wall and `nl` points to its left.
+export function facesOf(w, walls) {
+  const len = lengthOf(w) || 1;
+  const u = { x: (w.x2 - w.x1) / len, z: (w.z2 - w.z1) / len };
+  const nl = left(u);
+  if (Math.abs(w.curve || 0) >= 0.5) {
+    const all = [0, len];
+    return { side: 0, left: all, right: all, inside: { from: 0, to: len, length: pathLength(w) }, u, nl };
+  }
+  const joins = jointsFor(walls);
+  const [L0, L1, R1, R0] = footprintOf(w, joins.has(w.id) ? joins : null);
+  const along = (p) => (p.x - w.x1) * u.x + (p.z - w.z1) * u.z;
+  const faces = { left: [along(L0), along(L1)], right: [along(R0), along(R1)] };
+  // An end butting into the side of another wall stops at that wall's face.
+  for (const end of [0, 1]) {
+    if (joins.get(w.id)?.[end].length) continue;
+    const p = endsOf(w)[end];
+    const host = walls.find((v) => v.id !== w.id && !v.curve && pointToSegment(p, { x: v.x1, z: v.z1 }, { x: v.x2, z: v.z2 }).d <= JOIN + 0.5);
+    if (!host) continue;
+    const hl = lengthOf(host) || 1;
+    const sin = Math.abs(u.x * (host.z2 - host.z1) - u.z * (host.x2 - host.x1)) / hl;
+    if (sin < 0.2) continue;
+    const cut = host.thickness / 2 / sin;
+    for (const f of [faces.left, faces.right]) f[end] += end ? -cut : cut;
+  }
+  const floors = floorsOf(walls);
+  const mid = { x: (w.x1 + w.x2) / 2, z: (w.z1 + w.z2) / 2 };
+  const reach = w.thickness / 2 + 10;
+  const room = (s) => floors.some((f) => contains(f, mid.x + nl.x * s * reach, mid.z + nl.z * s * reach));
+  const [onLeft, onRight] = [room(1), room(-1)];
+  const side = onLeft && !onRight ? 1 : onRight && !onLeft ? -1 : 0;
+  const size = ([a, b]) => b - a;
+  const face = side === 1 ? faces.left : side === -1 ? faces.right : size(faces.left) <= size(faces.right) ? faces.left : faces.right;
+  return { side, ...faces, inside: { from: face[0], to: face[1], length: size(face) }, u, nl };
+}
+
+export const insideLengthOf = (w, walls) => facesOf(w, walls).inside.length;
+
+// The overall outside size of what's built: the bounds of the walls' outlines.
+export function outsideBoundsOf(walls) {
+  const joins = jointsFor(walls);
+  const pts = walls.flatMap((w) => footprintOf(w, joins));
+  if (!pts.length) return boundsOf(walls);
+  const xs = pts.map((p) => p.x);
+  const zs = pts.map((p) => p.z);
+  const b = { minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs) };
+  return { ...b, width: b.maxX - b.minX, length: b.maxZ - b.minZ, cx: (b.minX + b.maxX) / 2, cz: (b.minZ + b.maxZ) / 2 };
 }
 
 // ---- Floor ----

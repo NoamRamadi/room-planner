@@ -55,11 +55,17 @@ git push
 
 `npm run build` also creates a `dist/` folder of plain static files that works on any other static host.
 
+## Measuring from the inside
+
+Every length you type or see is measured the way you'd measure a room with a tape: on the inside, from wall face to wall face. A room added as 350 × 400 has exactly 350 × 400 of clear floor, whatever the walls' thickness; the walls are built around it. A wall's **Length** is its inside face, corner to corner, and its panel also shows the outside face. A wall between two rooms (or standing on its own) is measured along its shorter face.
+
+Changing a wall's thickness keeps the face on the room side where it is, so the room never shrinks; the walls joined to it are trimmed or extended to meet it. For a wall between two rooms you choose which face stays put (**Top**, **Middle** or **Bottom**, or **Left** / **Right**, as seen from above). The overall size shown around the plan is the outside size. Designs made before this keep their walls where they were and show their true inside sizes; to fix a room, type the inside length into each wall.
+
 ## Drawing walls
 
 Click **Draw walls** at the top of the Walls panel to swap the 3D view for a floor plan seen from above, on a grid of squares (the corner of the plan says how big a square is; it gets finer as you zoom in). Your existing walls show in grey, with gaps for doors and windows.
 
-- **Draw:** click to start a wall, then click at each corner; every click ends one wall and starts the next.
+- **Draw:** click to start a wall, then click at each corner; every click ends one wall and starts the next. Draw along the inside of the room: the walls go outside your lines, so the room keeps the size you draw.
 - **End a line:** click its last corner again (a double-click), press Enter or Esc, or use **Finish line**. Clicking where the line started closes the room.
 - **Snapping:** corners snap to the ends of other walls, onto other walls (at whole centimetres), and to a 10 cm grid; walls snap to straight and 45° directions, with a guide line. Hold Alt to place a corner freely.
 - **Exact lengths:** while drawing a wall, type its length (for example `350`) and press Enter.
@@ -69,10 +75,10 @@ Click **Draw walls** at the top of the Walls panel to swap the 3D view for a flo
 
 ## Building walls
 
-- **Add wall:** set the length and click **Add wall**. With a wall selected, the new wall starts at that wall's end, turned 90°, so four walls in a row make a closed room. With nothing selected, it appears in the middle of the view.
-- **Add room:** set a width and length and click **Add room** for four walls at once, already grouped.
+- **Add wall:** set the inside length and click **Add wall**. With a wall selected, the new wall continues from that wall's end, turned 90°, so four walls in a row make a closed room with exactly the inside sizes you typed. With nothing selected, it appears in the middle of the view.
+- **Add room:** set the inside width and length and click **Add room** for four walls at once, already grouped.
 - **Connect walls:** drag a wall. When one of its ends comes within 20 cm of another wall's end (or the middle of a straight wall), it snaps on and a yellow ring shows the connection.
-- **Stretch or turn a wall:** select it and drag the round handle at either end. Every wall joined at that corner moves with it. You can also type the length and angle in the panel.
+- **Stretch or turn a wall:** select it and drag the round handle at either end. Every wall joined at that corner moves with it. You can also type the length and angle in the panel; a new length moves the next wall along with the end, so a rectangular room stays rectangular.
 - **One wall's details:** thickness, height, **gap below** (for a beam over an opening), **bulge** (a curved wall), and color.
 - **Group walls:** Shift-click walls (or turn on **Select several**), then **Group these walls** or press Ctrl/Cmd+G. Clicking a grouped wall selects the whole group; click it again to edit just that wall. Groups can be renamed, turned, duplicated, ungrouped or removed.
 - **Floor:** filled automatically wherever walls enclose a space. A room with one open side gets its floor from the outline of its walls.
@@ -81,7 +87,7 @@ Furniture can't pass through walls (it slides along them) but fits under beams.
 
 ## Doors and windows
 
-Under **Add furniture → Doors & windows**, click **Door** or **Window** and pick a design. It goes in the selected wall, or in a wall with room for it. Drag it along its wall or onto another wall; while it's selected, the view shows its size and its distance from each end of the wall. In its panel you can set the width, height, how high a window starts above the floor, its distance from the corner, which side a door's hinges are on and which way it opens, and the colors. Doors show their swing on the floor. Doors and windows go in straight walls that stand on the floor (not curved walls or beams), and they move, turn, copy and disappear with their wall.
+Under **Add furniture → Doors & windows**, click **Door** or **Window** and pick a design. It goes in the selected wall, or in a wall with room for it. Drag it along its wall or onto another wall; while it's selected, the view shows its size and its distance from each inside corner of the wall. In its panel you can set the width, height, how high a window starts above the floor, its distance from the inside corner, which side a door's hinges are on and which way it opens, and the colors. Doors show their swing on the floor. Doors and windows go in straight walls that stand on the floor (not curved walls or beams), and they move, turn, copy and disappear with their wall.
 
 ## Lock
 

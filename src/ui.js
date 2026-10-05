@@ -4,7 +4,7 @@ import { OPENINGS, openingLimitsOf, openingStyleOf } from './openings.js';
 import { h, measureField } from './dom.js';
 import { createDrawMode } from './draw.js';
 import * as store from './state.js';
-import { LIMITS, angleOf, lengthOf, maxCurve, openingSpan, takesOpenings } from './walls.js';
+import { LIMITS, angleOf, facesOf, insideLengthOf, maxCurve, openingSpan, takesOpenings } from './walls.js';
 
 const ICONS = {
   sofa: '<path d="M9 15V9a2 2 0 0 1 2-2h26a2 2 0 0 1 2 2v6"/><path d="M5 16a2.5 2.5 0 0 1 5 0v4h28v-4a2.5 2.5 0 0 1 5 0v8H5z"/><path d="M8 24v3M40 24v3"/>',
@@ -266,7 +266,8 @@ const sizeText = (item) => {
   return `${w} × ${d} × ${h}`;
 };
 
-const wallText = (w) => `${Math.round(lengthOf(w))} cm`;
+// Walls are measured on the inside, wall face to wall face, the way you'd measure a room with a tape.
+const wallText = (w, walls = store.getState().walls) => `${Math.round(insideLengthOf(w, walls))} cm`;
 
 function download(url, filename) {
   const a = h('a', { href: url, download: filename });
@@ -385,8 +386,8 @@ export function initUI(view) {
     const from = sel?.type === 'wall' ? store.wallById(sel.id) : null;
     const free = from && store.hasFreeEnd(from.id);
     addWallHelp.textContent = from
-      ? `The new wall starts at ${free ? 'the free end' : 'the end'} of ${from.name}, turned 90°.`
-      : 'Select a wall first to continue from its free end. Four walls in a row make a room.';
+      ? `The new wall continues from ${free ? 'the free end' : 'the end'} of ${from.name}, turned 90°. Lengths are inside lengths, wall face to wall face.`
+      : 'Lengths are inside lengths, wall face to wall face. Select a wall first to continue from its free end; four walls in a row make a room.';
   });
 
   const several = h(
@@ -400,7 +401,7 @@ export function initUI(view) {
   const wallCount = h('span', { class: 'section__meta' });
   let wallListKey = '';
   function renderWallList(state, ui) {
-    const key = JSON.stringify([ui.sel, state.groups, state.walls.map((w) => [w.id, w.name, w.group, Math.round(lengthOf(w))])]);
+    const key = JSON.stringify([ui.sel, state.groups, state.walls.map((w) => [w.id, w.name, w.group, wallText(w, state.walls)])]);
     if (key === wallListKey) return;
     wallListKey = key;
     const selected = new Set(store.selectedWallIds(ui.sel));
@@ -601,7 +602,7 @@ export function initUI(view) {
         'div',
         { class: 'draw-entry' },
         h('button', { type: 'button', class: 'btn btn--tape', onclick: () => draw.open() }, 'Draw walls'),
-        h('p', { class: 'help help--first' }, 'Draw walls corner by corner on a floor plan.'),
+        h('p', { class: 'help help--first' }, 'Draw the inside of a room corner by corner on a floor plan.'),
       ),
       h('div', { class: 'adder' }, nextLength.el, h('button', { type: 'button', class: 'btn', onclick: () => store.addWall(next.length, view.focus()) }, 'Add wall')),
       addWallHelp,
@@ -612,6 +613,7 @@ export function initUI(view) {
         roomDepth.el,
         h('button', { type: 'button', class: 'btn', onclick: () => store.addRoom(next.width, next.depth) }, 'Add room'),
       ),
+      h('p', { class: 'help' }, 'Width and length are the room’s inside size, as you’d measure it with a tape; the walls go around it.'),
       h('div', { class: 'section__head section__head--list' }, h('h3', { class: 'list-title' }, 'Walls and groups'), several),
       wallList,
     ),
@@ -829,6 +831,7 @@ function buildDrawHelp(root) {
         h('li', {}, 'To end a line, click its last corner again, press Enter, or use Finish line. Clicking where the line started closes the room.'),
         h('li', {}, 'Corners snap to the ends of other walls, to points along them, and to the 10 cm grid. Walls snap to straight and 45° directions. Hold Alt to place freely.'),
         h('li', {}, 'While drawing a wall, type its length and press Enter.'),
+        h('li', {}, 'Draw along the inside of the room. The walls go outside your lines, so the room keeps the size you draw.'),
         h('li', {}, 'Set the thickness and height above the plan before drawing; they apply to the walls you draw next.'),
         h('li', {}, 'Done adds the new walls and selects them, ready to group. Cancel throws them away.'),
       ),
@@ -859,6 +862,7 @@ function buildHelp(root) {
         'ul',
         { class: 'tips' },
         h('li', {}, 'Add wall makes a wall of the length you set. With a wall selected, the next one starts at its free end, so four walls in a row make a room.'),
+        h('li', {}, 'Lengths and room sizes are measured on the inside, wall face to wall face, the way you’d measure with a tape. Walls get thicker away from the room.'),
         h('li', {}, 'Drag a wall to move it. Its ends connect to nearby walls.'),
         h('li', {}, 'Select a wall and drag the round handles at its ends to stretch or turn it. Walls joined there move with it.'),
         h('li', {}, 'Shift-click several walls and group them to move them as one. Click a grouped wall again to edit just that wall.'),
@@ -897,7 +901,7 @@ function buildWallInspector(root, id) {
   const update = (patch) => store.updateWall(id, patch);
 
   const fields = [
-    measureField({ label: 'Length', min: LIMITS.length[0], max: LIMITS.length[1], live: false, get: () => lengthOf(wall()), set: (v) => store.setWallLength(id, v) }),
+    measureField({ label: 'Length', min: LIMITS.length[0], max: LIMITS.length[1], live: false, get: () => insideLengthOf(wall(), store.getState().walls), set: (v) => store.setWallLength(id, v) }),
     measureField({ label: 'Thickness', min: LIMITS.thickness[0], max: LIMITS.thickness[1], get: () => wall().thickness, set: (v) => update({ thickness: v }) }),
     measureField({ label: 'Angle', unit: '°', min: 0, max: 359, live: false, get: () => angleOf(wall()), set: (v) => store.setWallAngle(id, v) }),
     measureField({ label: 'Height', min: () => wall().gap + 20, max: LIMITS.height[1], get: () => wall().height, set: (v) => update({ height: v }) }),
@@ -906,6 +910,43 @@ function buildWallInspector(root, id) {
   ];
   const color = swatches({ label: 'Color', palette: WALL_PAINTS, get: () => wall().color, set: (v) => update({ color: v }) });
   syncers.push(...fields.map((f) => f.sync), color.sync);
+
+  // Which face the length is measured on, and the other face's length.
+  const measuredOn = h('p', { class: 'readout readout--wall' });
+  // A wall with no room on one side (between two rooms, or on its own): which face stays put when
+  // its thickness changes, named as the faces look in the top view.
+  const keepLabels = () => {
+    const { nl } = facesOf(wall(), store.getState().walls);
+    const across = Math.abs(nl.x) > Math.abs(nl.z);
+    const [leftName, rightName] = across ? (nl.x < 0 ? ['Left', 'Right'] : ['Right', 'Left']) : nl.z < 0 ? ['Top', 'Bottom'] : ['Bottom', 'Top'];
+    return { left: leftName, right: rightName };
+  };
+  const keepOptions = () => {
+    const names = keepLabels();
+    const options = [
+      { id: 'left', label: names.left },
+      { id: 'middle', label: 'Middle' },
+      { id: 'right', label: names.right },
+    ];
+    return names.left === 'Right' || names.left === 'Bottom' ? options.reverse() : options;
+  };
+  const keep = segmented({
+    label: 'Keep in place when the thickness changes',
+    options: keepOptions(),
+    get: () => wall().keep ?? 'middle',
+    set: (v) => update({ keep: v === 'middle' ? undefined : v }),
+  });
+  const keepRow = h('div', { class: 'field-row field-row--stack' }, h('span', { class: 'field-row__label' }, 'When the thickness changes, keep this face in place'), keep.el);
+  syncers.push(keep.sync, () => {
+    const walls = store.getState().walls;
+    const w = wall();
+    const f = facesOf(w, walls);
+    const other = Math.round(f.side ? (f.side === 1 ? f.right : f.left).reduce((a, b) => b - a) : Math.max(f.left[1] - f.left[0], f.right[1] - f.right[0]));
+    if (w.curve) measuredOn.textContent = 'Measured along the curve.';
+    else if (f.side) measuredOn.textContent = `Measured inside the room, wall face to wall face. Outside face: ${other} cm.`;
+    else measuredOn.textContent = `Measured along its shorter face; the other face is ${other} cm.`;
+    keepRow.hidden = Boolean(f.side || w.curve);
+  });
 
   root.append(panelHead(h('h2', { class: 'inspector__title' }, w0.name), group ? `Part of ${group.name}` : 'Not in a group', () => store.clearSelection()));
   if (group) {
@@ -927,11 +968,13 @@ function buildWallInspector(root, id) {
       'div',
       { class: 'inspector__group' },
       h('div', { class: 'measures' }, fields.slice(0, 3).map((f) => f.el)),
+      measuredOn,
+      keepRow,
       h('div', { class: 'measures measures--gap' }, fields.slice(3).map((f) => f.el)),
       h(
         'p',
         { class: 'help' },
-        'Length and angle move the wall’s end, along with any walls joined there. A gap below turns the wall into a beam over an opening. Bulge curves the wall; a negative number curves it the other way.',
+        'Length moves the wall’s end; a wall joined there moves along with it, so a room stays square. Thickness grows away from the room. Angle turns the wall about its start. A gap below turns the wall into a beam over an opening. Bulge curves the wall; a negative number curves it the other way.',
       ),
     ),
     h('div', { class: 'inspector__group' }, color.el),
@@ -993,14 +1036,15 @@ function buildOpeningInspector(root, id) {
   if (o0.kind === 'window') {
     size.push(measureField({ label: 'Above floor', min: limit('sill', 0), max: limit('sill', 1), get: () => current().sill, set: (v) => update({ sill: v }) }));
   }
-  // Position: from the wall's start corner to the near edge of the opening.
+  // Position: from the inside corner at the wall's start to the near edge of the opening.
+  const face = () => facesOf(wall(), store.getState().walls).inside;
   const fromCorner = measureField({
     label: 'From corner',
     min: 0,
-    max: () => Math.round(lengthOf(wall()) - openingSpan(current(), wall()).width),
+    max: () => Math.max(0, Math.round(face().length - openingSpan(current(), wall()).width)),
     live: false,
-    get: () => openingSpan(current(), wall()).a,
-    set: (v) => store.slideOpening(id, v + openingSpan(current(), wall()).width / 2),
+    get: () => openingSpan(current(), wall()).a - face().from,
+    set: (v) => store.slideOpening(id, v + face().from + openingSpan(current(), wall()).width / 2),
   });
   syncers.push(...size.map((f) => f.sync), fromCorner.sync);
 

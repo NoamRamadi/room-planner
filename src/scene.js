@@ -12,12 +12,14 @@ import { PATTERN_SIZE, floorTexture } from './textures.js';
 import {
   boundsOf,
   contains,
+  facesOf,
   floorsOf,
   footprintOf,
   jointsOf,
   lengthOf,
   midpointOf,
   openingSpan,
+  outsideBoundsOf,
   pointToSegment,
   rayDistance,
   signedArea,
@@ -341,7 +343,8 @@ export function createScene(container) {
     return plan;
   }
 
-  // Overall size of what's been built, on the sides nearest the camera; hidden once the camera is inside.
+  // Overall outside size of what's been built, on the sides nearest the camera; hidden once the camera
+  // is inside.
   const roomDims = new THREE.Group();
   const [widthDim, lengthDim, heightDim] = [new Dim('room'), new Dim('room'), new Dim('room')];
   roomDims.add(widthDim, lengthDim, heightDim);
@@ -354,21 +357,21 @@ export function createScene(container) {
       roomDims.visible = false;
       return;
     }
-    const b = boundsOf(state.walls);
+    const b = outsideBoundsOf(state.walls);
     const p = camera.position;
     const top = Math.max(...state.walls.map((w) => w.height)) * CM;
     const inside = p.y < top && floorsOf(state.walls).some((f) => contains(f, p.x / CM, p.z / CM));
     roomDims.visible = !inside;
     const sx = p.x >= b.cx * CM ? 1 : -1;
     const sz = p.z >= b.cz * CM ? 1 : -1;
-    const side = `${sx},${sz},${top}`;
+    const side = `${sx},${sz},${top},${b.width},${b.length}`;
     if (side !== roomDimsSide) {
       roomDimsSide = side;
       const [x0, x1, z0, z1] = [b.minX * CM, b.maxX * CM, b.minZ * CM, b.maxZ * CM];
       const ox = sx > 0 ? x1 + 0.4 : x0 - 0.4;
       const oz = sz > 0 ? z1 + 0.4 : z0 - 0.4;
-      widthDim.measure(v3(x0, 0.01, oz), v3(x1, 0.01, oz), fmt(b.width), v3(0, 0, 1));
-      lengthDim.measure(v3(ox, 0.01, z0), v3(ox, 0.01, z1), fmt(b.length), v3(1, 0, 0));
+      widthDim.measure(v3(x0, 0.01, oz), v3(x1, 0.01, oz), `${fmt(b.width)} outside`, v3(0, 0, 1));
+      lengthDim.measure(v3(ox, 0.01, z0), v3(ox, 0.01, z1), `${fmt(b.length)} outside`, v3(1, 0, 0));
       const hx = sx > 0 ? x0 - 0.1 : x1 + 0.1;
       const hz = sz > 0 ? z1 + 0.3 : z0 - 0.3;
       heightDim.measure(v3(hx, 0, hz), v3(hx, top, hz), fmt(top / CM), v3(1, 0, 0));
@@ -552,7 +555,8 @@ export function createScene(container) {
     const { span, turn } = openingFrame(o, w);
     openingSel.position.set(w.x1 * CM, 0, w.z1 * CM);
     openingSel.rotation.y = turn;
-    const [a, b, y0, y1, len] = [span.a * CM, span.b * CM, span.bottom * CM, span.top * CM, lengthOf(w) * CM];
+    const face = facesOf(w, state.walls).inside; // distances are to the inside corners
+    const [a, b, y0, y1, from, to] = [span.a * CM, span.b * CM, span.bottom * CM, span.top * CM, face.from * CM, face.to * CM];
     const c = [v3(a, y0, 0), v3(b, y0, 0), v3(b, y1, 0), v3(a, y1, 0)];
     openingBars.forEach((bar, i) => bar.span(c[i], c[(i + 1) % 4]));
     const up = v3(0, 1, 0);
@@ -560,8 +564,8 @@ export function createScene(container) {
     openingWidth.measure(v3(a, y1 + 0.12, 0), v3(b, y1 + 0.12, 0), fmt(span.width), up);
     openingHeight.measure(v3(b + 0.12, y0, 0), v3(b + 0.12, y1, 0), fmt(span.top - span.bottom), along);
     openingSill.measure(v3(b + 0.12, 0, 0), v3(b + 0.12, y0, 0), fmt(span.bottom), along);
-    openingBefore.measure(v3(0, 0.02, 0), v3(a, 0.02, 0), fmt(span.a), up);
-    openingAfter.measure(v3(b, 0.02, 0), v3(len, 0.02, 0), fmt(lengthOf(w) - span.b), up);
+    openingBefore.measure(v3(from, 0.02, 0), v3(a, 0.02, 0), fmt(span.a - face.from), up);
+    openingAfter.measure(v3(b, 0.02, 0), v3(to, 0.02, 0), fmt(face.to - span.b), up);
   }
 
   // ---- Selected walls: outlines, length, handles at the ends ----
@@ -623,16 +627,15 @@ export function createScene(container) {
     wallLength.visible = Boolean(one);
     endHandles.forEach((h) => (h.visible = Boolean(one) && !ui.locked)); // nothing to drag while locked
     if (!one) return;
-    const len = lengthOf(one);
-    const n = { x: -(one.z2 - one.z1) / len, z: (one.x2 - one.x1) / len };
+    // Its inside length, along the face it's measured on, just into the room.
+    const faces = facesOf(one, state.walls);
+    const { u, inside } = faces;
+    const s = faces.side || (inside.from === faces.left[0] && inside.to === faces.left[1] ? 1 : -1);
+    const n = { x: faces.nl.x * s, z: faces.nl.z * s };
     const off = one.thickness / 2 + 30;
     const y = one.height * CM + 0.02;
-    wallLength.measure(
-      v3((one.x1 + n.x * off) * CM, y, (one.z1 + n.z * off) * CM),
-      v3((one.x2 + n.x * off) * CM, y, (one.z2 + n.z * off) * CM),
-      fmt(len),
-      v3(n.x, 0, n.z),
-    );
+    const at = (t) => v3((one.x1 + u.x * t + n.x * off) * CM, y, (one.z1 + u.z * t + n.z * off) * CM);
+    wallLength.measure(at(inside.from), at(inside.to), fmt(inside.length), v3(n.x, 0, n.z));
     [
       [one.x1, one.z1],
       [one.x2, one.z2],

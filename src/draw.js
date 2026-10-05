@@ -69,7 +69,7 @@ export function createDrawMode(stage, { onClose }) {
     h(
       'p',
       { class: 'draw__hint' },
-      'Click to start a wall, then click at each corner. Click the last corner again (or press Enter) to end the line. Type a number for an exact length. Drag to move around, scroll to zoom. Hold Alt to place freely.',
+      'Draw along the inside of the room: click to start, then click at each corner. Click the last corner again (or press Enter) to end the line. Type a number for an exact length. Drag to move around, scroll to zoom. Hold Alt to place freely.',
     ),
     legend,
   );

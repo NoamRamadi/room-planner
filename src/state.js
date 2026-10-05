@@ -10,6 +10,9 @@ import {
   dist,
   endsAt,
   endsOf,
+  facesOf,
+  insideLengthOf,
+  intersectLines,
   jointsOf,
   lengthOf,
   midpointOf,
@@ -50,11 +53,13 @@ function newWall(ends, look, extra = {}) {
 function fresh() {
   const room = { ...DEFAULT_LOOK };
   const group = { id: newId(), name: 'Room 1' };
-  const walls = rectangleWalls(400, 500).map((ends, i) => newWall(ends, room, { name: `Wall ${i + 1}`, group: group.id }));
-  // A window in the back wall and a door near the front of the left wall.
+  // 400 × 500 inside: the walls' centre lines run half a thickness further out.
+  const t = WALL_THICKNESS;
+  const walls = rectangleWalls(400 + t, 500 + t).map((ends, i) => newWall(ends, room, { name: `Wall ${i + 1}`, group: group.id }));
+  // A window in the middle of the back wall and a door near the front of the left wall.
   const openings = [
-    { ...newOpeningOf('window', 'standard'), id: newId(), wall: walls[0].id, offset: 200 },
-    { ...newOpeningOf('door', 'single'), id: newId(), wall: walls[3].id, offset: 90 },
+    { ...newOpeningOf('window', 'standard'), id: newId(), wall: walls[0].id, offset: (400 + t) / 2 },
+    { ...newOpeningOf('door', 'single'), id: newId(), wall: walls[3].id, offset: 90 + t / 2 },
   ];
   return { room, walls, groups: [group], items: [], openings };
 }
@@ -314,9 +319,58 @@ export function updateRoom(patch) {
 
 // ---- Walls ----
 
-function commitWalls(walls, { live = false } = {}) {
-  state = { ...state, walls, items: live ? state.items : state.items.map((i) => settle(i, walls, state.items)) };
+// `keepOpenings`: where a wall's start corner moved along the wall, its doors and windows stay where
+// they are in the room rather than moving with the corner.
+function commitWalls(walls, { live = false, keepOpenings = false } = {}) {
+  const openings = keepOpenings ? openingsKept(state.walls, walls) : state.openings;
+  state = { ...state, walls, openings, items: live ? state.items : state.items.map((i) => settle(i, walls, state.items)) };
   emit();
+}
+
+function openingsKept(before, after) {
+  const old = new Map(before.map((w) => [w.id, w]));
+  const now = new Map(after.map((w) => [w.id, w]));
+  return state.openings.map((o) => {
+    const a = old.get(o.wall);
+    const b = now.get(o.wall);
+    if (!a || !b || (a.x1 === b.x1 && a.z1 === b.z1)) return o;
+    const ua = unitOf(a);
+    const ub = unitOf(b);
+    const centre = { x: a.x1 + ua.x * o.offset, z: a.z1 + ua.z * o.offset };
+    return { ...o, offset: round((centre.x - b.x1) * ub.x + (centre.z - b.z1) * ub.z) };
+  });
+}
+
+const unitOf = (w) => {
+  const l = lengthOf(w) || 1;
+  return { x: (w.x2 - w.x1) / l, z: (w.z2 - w.z1) / l };
+};
+
+// Move the listed wall ends ({ id, end }) by `shift`.
+function moveEnds(walls, ends, shift) {
+  const moving = new Set(ends.map((e) => `${e.id}:${e.end}`));
+  return walls.map((w) => {
+    let next = w;
+    for (const end of [0, 1]) {
+      if (!moving.has(`${w.id}:${end}`)) continue;
+      const [x, z] = end ? ['x2', 'z2'] : ['x1', 'z1'];
+      next = { ...next, [x]: round(next[x] + shift.x), [z]: round(next[z] + shift.z) };
+    }
+    return next;
+  });
+}
+
+// Ends of other walls that butt into the side of wall w (T-junctions), as { id, end }.
+function buttingInto(walls, w) {
+  const a = { x: w.x1, z: w.z1 };
+  const b = { x: w.x2, z: w.z2 };
+  return walls.flatMap((o) =>
+    o.id === w.id
+      ? []
+      : endsOf(o)
+          .map((p, end) => ({ id: o.id, end, hit: pointToSegment(p, a, b) }))
+          .filter(({ hit }) => hit.d <= JOIN + 0.5 && hit.t > 0.001 && hit.t < 0.999),
+  );
 }
 
 // Tidy up after a drag: furniture a wall now runs through moves out of the way.
@@ -329,29 +383,61 @@ export function hasFreeEnd(id) {
   return jointsOf(state.walls).get(id)?.some((ends) => ends.length === 0) ?? false;
 }
 
-// A new wall of the given length. With one wall selected it starts at that wall's free end, turned 90°
-// (so adding four walls in a row closes a room); otherwise it's centred on `focus`.
+// A new wall whose inside face is `length` long. With one wall selected it continues from that wall's
+// free end, turned a quarter clockwise with the room inside the turn. The two meet in a mitred corner
+// half the new wall's thickness past the old end, so the old wall keeps its inside length; four walls
+// in a row close a room with exactly the inside sizes typed. Otherwise it's centred on `focus`.
 export function addWall(length, focus = { x: 0, z: 0 }) {
   if (ui.locked) return null;
   const from = ui.sel?.type === 'wall' ? wallById(ui.sel.id) : null;
-  let ends;
-  let group = null;
+  const t = WALL_THICKNESS;
+  let walls = state.walls;
+  let wall;
   if (from) {
-    const joins = jointsOf(state.walls).get(from.id);
+    const joins = jointsOf(walls).get(from.id);
     const end = joins[1].length === 0 ? 1 : joins[0].length === 0 ? 0 : 1;
+    const free = joins[end].length === 0;
     const [a, b] = endsOf(from);
-    const start = end === 1 ? b : a;
-    const away = end === 1 ? { x: b.x - a.x, z: b.z - a.z } : { x: a.x - b.x, z: a.z - b.z };
-    const l = Math.hypot(away.x, away.z) || 1;
-    const dir = { x: -away.z / l, z: away.x / l }; // a quarter turn clockwise in the top view
-    ends = { x1: start.x, z1: start.z, x2: round(start.x + dir.x * length), z2: round(start.z + dir.z * length) };
-    group = from.group;
+    const tip = end === 1 ? b : a;
+    const l = lengthOf(from) || 1;
+    const away = end === 1 ? { x: (b.x - a.x) / l, z: (b.z - a.z) / l } : { x: (a.x - b.x) / l, z: (a.z - b.z) / l };
+    const dir = { x: -away.z, z: away.x }; // a quarter turn clockwise in the top view
+    const corner = free ? { x: round(tip.x + (away.x * t) / 2), z: round(tip.z + (away.z * t) / 2) } : tip;
+    if (free) walls = moveEnds(walls, [{ id: from.id, end }], { x: corner.x - tip.x, z: corner.z - tip.z });
+    // Its inside face starts at the old wall's inside face, half that wall's thickness along.
+    const reach = length + (free ? from.thickness / 2 : 0);
+    const ends = { x1: corner.x, z1: corner.z, x2: round(corner.x + dir.x * reach), z2: round(corner.z + dir.z * reach) };
+    wall = newWall(ends, state.room, { name: nextName(walls, 'Wall'), group: from.group });
+    walls = closeCorner([...walls, wall], wall);
   } else {
-    ends = { x1: round(focus.x - length / 2), z1: round(focus.z), x2: round(focus.x + length / 2), z2: round(focus.z) };
+    const ends = { x1: round(focus.x - length / 2), z1: round(focus.z), x2: round(focus.x + length / 2), z2: round(focus.z) };
+    wall = newWall(ends, state.room, { name: nextName(walls, 'Wall') });
+    walls = [...walls, wall];
   }
-  const wall = newWall(ends, state.room, { name: nextName(state.walls, 'Wall'), group });
   ui = { ...ui, sel: { type: 'wall', id: wall.id } };
-  commitWalls([...state.walls, wall]);
+  commitWalls(walls, { keepOpenings: true });
+}
+
+// When a new wall's free end has come round to another wall's free end (closing a room built wall by
+// wall), the two join in a corner where their centre lines meet.
+function closeCorner(walls, wall) {
+  const tip = { x: wall.x2, z: wall.z2 };
+  const joins = jointsOf(walls);
+  let best = null;
+  for (const o of walls) {
+    if (o.id === wall.id || o.curve) continue;
+    endsOf(o).forEach((p, end) => {
+      const d = dist(p, tip);
+      if (!joins.get(o.id)[end].length && d <= Math.max(wall.thickness, o.thickness) + 1 && (!best || d < best.d)) best = { o, end, p, d };
+    });
+  }
+  if (!best) return walls;
+  const hit = intersectLines(tip, unitOf(wall), best.p, unitOf(best.o));
+  const p = hit && dist(hit, tip) <= 2 * Math.max(wall.thickness, best.o.thickness) + 1 ? hit : best.p;
+  return moveEnds(moveEnds(walls, [{ id: wall.id, end: 1 }], { x: p.x - tip.x, z: p.z - tip.z }), [{ id: best.o.id, end: best.end }], {
+    x: p.x - best.p.x,
+    z: p.z - best.p.z,
+  });
 }
 
 // Walls drawn with the drawing tool ({ x1, z1, x2, z2, thickness, height } each), added in one go and
@@ -366,13 +452,63 @@ export function addDrawnWalls(segments) {
     walls = [...walls, wall];
     ids.push(wall.id);
   }
+  walls = drawnInside(walls, ids, state.walls);
   ui = { ...ui, drawing: false, sel: ids.length > 1 ? { type: 'walls', ids } : ids.length ? { type: 'wall', id: ids[0] } : null };
   commitWalls(walls);
 }
 
-// Four walls around a width × length room, grouped. Placed beside anything already built.
+// The drawing tool draws the inside faces of walls. Once the drawn walls are in, each one with a room
+// on one side moves out by half its thickness, away from the room, and the corners between them are
+// re-cut, so the room keeps the size that was drawn. Walls meeting walls built before stay as drawn.
+function drawnInside(walls, ids, existing) {
+  const drawn = walls.filter((w) => ids.includes(w.id));
+  const key = (p) => `${Math.round(p.x * 10)},${Math.round(p.z * 10)}`;
+  const onWall = (o, p) => pointToSegment(p, { x: o.x1, z: o.z1 }, { x: o.x2, z: o.z2 }).d <= JOIN + 0.5;
+  const corners = new Map();
+  for (const w of drawn) endsOf(w).forEach((p, end) => corners.set(key(p), [...(corners.get(key(p)) ?? []), { w, end, p }]));
+  const pinned = new Set([...corners].filter(([, list]) => list.length > 2 || existing.some((o) => onWall(o, list[0].p))).map(([k]) => k));
+  const shift = new Map();
+  for (const w of drawn) {
+    if (endsOf(w).some((p) => pinned.has(key(p)))) continue;
+    const { side, nl } = facesOf(w, walls);
+    if (side) shift.set(w.id, { x: (-side * nl.x * w.thickness) / 2, z: (-side * nl.z * w.thickness) / 2 });
+  }
+  const none = { x: 0, z: 0 };
+  const lineOf = (w) => {
+    const s = shift.get(w.id) ?? none;
+    return [{ x: w.x1 + s.x, z: w.z1 + s.z }, unitOf(w)];
+  };
+  const moved = new Map();
+  for (const [k, list] of corners) {
+    if (pinned.has(k)) continue;
+    const { p, w } = list[0];
+    // The walls meeting here: a corner, or a drawn wall this end butts into.
+    const host = list.length === 1 ? drawn.find((o) => o.id !== w.id && !endsOf(o).some((q) => dist(q, p) <= JOIN) && onWall(o, p)) : null;
+    const meeting = [...list.map((e) => e.w), ...(host ? [host] : [])];
+    if (meeting.length === 2) {
+      const [[p1, u1], [p2, u2]] = meeting.map(lineOf);
+      const hit = intersectLines(p1, u1, p2, u2);
+      if (hit && dist(hit, p) <= 2 * Math.max(...meeting.map((m) => m.thickness)) + 1) {
+        moved.set(k, hit);
+        continue;
+      }
+    }
+    const s = shift.get(w.id) ?? none;
+    moved.set(k, { x: p.x + s.x, z: p.z + s.z });
+  }
+  return walls.map((w) => {
+    if (!ids.includes(w.id)) return w;
+    const [a, b] = endsOf(w).map((p) => moved.get(key(p)) ?? p);
+    return { ...w, x1: round(a.x), z1: round(a.z), x2: round(b.x), z2: round(b.z) };
+  });
+}
+
+// Four walls around a room `width` × `length` inside (wall face to wall face), grouped. Their centre
+// lines run half a thickness further out. Placed beside anything already built.
 export function addRoom(width, length) {
   if (ui.locked) return null;
+  width += WALL_THICKNESS;
+  length += WALL_THICKNESS;
   let cx = 0;
   let cz = 0;
   if (state.walls.length) {
@@ -393,14 +529,49 @@ export function addRoom(width, length) {
 export function updateWall(id, patch) {
   if (ui.locked) return null;
   nextKey = `wall:${id}:${Object.keys(patch).sort()}`;
-  commitWalls(state.walls.map((w) => (w.id === id ? { ...w, ...patch } : w)));
+  const before = wallById(id);
+  let walls = state.walls.map((w) => (w.id === id ? { ...w, ...patch } : w));
+  if ('thickness' in patch && patch.thickness !== before.thickness) walls = thickened(walls, before, patch.thickness);
+  commitWalls(walls, { keepOpenings: true });
+}
+
+// Which face of a wall stays put when its thickness changes: +1 its left, -1 its right, 0 its middle.
+// The face with the room against it; for a wall between two rooms or on its own, the one in `keep`.
+export function fixedFaceOf(w, walls = state.walls) {
+  return facesOf(w, walls).side || (w.keep === 'left' ? 1 : w.keep === 'right' ? -1 : 0);
+}
+
+// A wall changing thickness keeps its fixed face where it is and grows or shrinks on the other side,
+// so the room it faces keeps its size. Walls joined to it, or butting into its side, are trimmed or
+// extended to meet it again.
+function thickened(walls, before, thickness) {
+  const fixed = before.curve ? 0 : fixedFaceOf(before);
+  if (!fixed) return walls;
+  const { nl, u } = facesOf(before, state.walls);
+  const s = (-fixed * (thickness - before.thickness)) / 2;
+  const shift = { x: nl.x * s, z: nl.z * s };
+  const a = { x: before.x1, z: before.z1 };
+  const b = { x: before.x2, z: before.z2 };
+  const start = { x: a.x + shift.x, z: a.z + shift.z };
+  return walls.map((w) => {
+    if (w.id === before.id) return { ...w, x1: round(start.x), z1: round(start.z), x2: round(b.x + shift.x), z2: round(b.z + shift.z) };
+    let next = w;
+    endsOf(w).forEach((e, end) => {
+      if (dist(e, a) > JOIN && dist(e, b) > JOIN && pointToSegment(e, a, b).d > JOIN + 0.5) return;
+      const hit = w.curve ? null : intersectLines(e, unitOf(w), start, u);
+      const q = hit && dist(hit, e) <= Math.abs(s) * 4 + 1 ? hit : { x: e.x + shift.x, z: e.z + shift.z };
+      const [x, z] = end ? ['x2', 'z2'] : ['x1', 'z1'];
+      next = { ...next, [x]: round(q.x), [z]: round(q.z) };
+    });
+    return next;
+  });
 }
 
 // Move a set of wall ends (a corner) to (x, z).
-function withEndsAt(ends, x, z) {
+function withEndsAt(ends, x, z, walls = state.walls) {
   const byId = new Map();
   for (const e of ends) byId.set(e.id, [...(byId.get(e.id) ?? []), e.end]);
-  return state.walls.map((w) => {
+  return walls.map((w) => {
     const list = byId.get(w.id);
     if (!list) return w;
     const next = { ...w };
@@ -437,12 +608,35 @@ export function dragCorner(corner, anchor, x, z) {
   return target;
 }
 
-// Length and angle keep the wall's start where it is and move its end, with any walls joined there.
+// Length is the wall's inside length (wall face to wall face). Its start stays put and its end moves.
+// A wall joined at the end at an angle moves along with it, keeping its own length and direction,
+// together with the walls at its far corner and any butting into it, so a rectangular room stays
+// rectangular. Angle turns the wall about its start, with any walls joined at its end.
 export function setWallLength(id, length) {
   if (ui.locked) return null;
-  const w = wallById(id);
-  const u = { x: (w.x2 - w.x1) / lengthOf(w), z: (w.z2 - w.z1) / lengthOf(w) };
-  commitWalls(withEndsAt(cornerAt(id, 1), w.x1 + u.x * length, w.z1 + u.z * length));
+  let walls = state.walls;
+  for (let k = 0; k < 4; k++) {
+    const w = walls.find((x) => x.id === id);
+    const delta = length - insideLengthOf(w, walls);
+    if (Math.abs(delta) < 0.05) break;
+    walls = pushEnd(walls, w, delta);
+  }
+  commitWalls(walls, { keepOpenings: true });
+}
+
+function pushEnd(walls, w, delta) {
+  const u = unitOf(w);
+  let moving = endsAt(walls, { x: w.x2, z: w.z2 });
+  const others = moving.filter((e) => e.id !== w.id);
+  if (others.length === 1) {
+    const next = walls.find((x) => x.id === others[0].id);
+    const v = unitOf(next);
+    if (!next.curve && Math.abs(u.x * v.z - u.z * v.x) > 0.5) {
+      const far = endsAt(walls, endsOf(next)[1 - others[0].end]);
+      if (!far.some((e) => e.id === w.id)) moving = [...moving, ...far, ...buttingInto(walls, next)];
+    }
+  }
+  return moveEnds(walls, moving, { x: u.x * delta, z: u.z * delta });
 }
 
 export function setWallAngle(id, degrees) {
@@ -855,6 +1049,7 @@ function sanitize(raw) {
           curve: num(w.curve, [-5000, 5000], 0),
           color: hex(w.color, room.wallColor),
           group: groupIds.has(w.group) ? w.group : null,
+          ...(w.keep === 'left' || w.keep === 'right' ? { keep: w.keep } : {}),
         };
       });
     groups = groups.filter((g) => walls.some((w) => w.group === g.id));
