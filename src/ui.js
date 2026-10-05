@@ -49,6 +49,7 @@ const ICONS = {
   redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h4"/>',
   chevronLeft: '<path d="M15 5l-7 7 7 7"/>',
   chevronRight: '<path d="M9 5l7 7-7 7"/>',
+  chevronDown: '<path d="M5 9l7 7 7-7"/>',
   door: '<path d="M15 30V3h18v27"/><path d="M10 30h28"/><path d="M29 16v2"/>',
   window: '<rect x="8" y="4" width="32" height="22"/><path d="M24 4v22"/><path d="M5 28h38"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
@@ -414,9 +415,33 @@ export function initUI(view) {
 
   const wallList = h('ul', { class: 'wall-list', 'data-always': '' });
   const wallCount = h('span', { class: 'section__meta' });
+  // Groups folded down to their own row, remembered in this browser.
+  const FOLDED_KEY = 'room-planner:folded';
+  const folded = new Set();
+  try {
+    for (const id of JSON.parse(localStorage.getItem(FOLDED_KEY)) ?? []) folded.add(id);
+  } catch {
+    // nothing remembered yet
+  }
+  const rememberFolded = () => {
+    try {
+      localStorage.setItem(FOLDED_KEY, JSON.stringify([...folded]));
+    } catch {
+      // private browsing: just don't remember it
+    }
+  };
+  const setFolded = (id, on) => {
+    if (on) folded.add(id);
+    else folded.delete(id);
+    rememberFolded();
+    renderWallList(store.getState(), store.getUI());
+  };
   let wallListKey = '';
   function renderWallList(state, ui) {
-    const key = JSON.stringify([ui.sel, state.groups, state.walls.map((w) => [w.id, w.name, w.group, wallText(w, state.walls)])]);
+    // A wall picked on its own (in the view, say) unfolds its group so it shows in the list.
+    const picked = ui.sel?.type === 'wall' ? state.walls.find((w) => w.id === ui.sel.id) : null;
+    if (picked?.group && folded.delete(picked.group)) rememberFolded();
+    const key = JSON.stringify([ui.sel, state.groups, [...folded], state.walls.map((w) => [w.id, w.name, w.group, wallText(w, state.walls)])]);
     if (key === wallListKey) return;
     wallListKey = key;
     const selected = new Set(store.selectedWallIds(ui.sel));
@@ -440,10 +465,20 @@ export function initUI(view) {
     const rows = [];
     for (const g of state.groups) {
       const members = state.walls.filter((w) => w.group === g.id);
+      const open = !folded.has(g.id);
       rows.push(
         h(
           'li',
-          {},
+          { class: 'wall-list__group' },
+          h('button', {
+            type: 'button',
+            class: 'wall-list__fold',
+            'aria-expanded': String(open),
+            'aria-label': `${open ? 'Collapse' : 'Expand'} ${g.name}`,
+            title: open ? 'Collapse' : 'Expand',
+            html: icon(open ? 'chevronDown' : 'chevronRight'),
+            onclick: () => setFolded(g.id, open),
+          }),
           h(
             'button',
             {
@@ -456,7 +491,7 @@ export function initUI(view) {
             h('span', { class: 'wall-list__size' }, `${members.length} walls`),
           ),
         ),
-        members.map((w) => wallRow(w, true)),
+        open ? members.map((w) => wallRow(w, true)) : [],
       );
     }
     rows.push(state.walls.filter((w) => !w.group).map((w) => wallRow(w, false)));

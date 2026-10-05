@@ -81,7 +81,7 @@ Click **Draw walls** at the top of the Walls panel to swap the 3D view for a flo
 - **Connect walls:** drag a wall. When one of its ends comes within 20 cm of another wall's end (or the middle of a straight wall), it snaps on and a yellow ring shows the connection.
 - **Stretch or turn a wall:** select it and drag the round handle at either end. Every wall joined at that corner moves with it. You can also type the length and angle in the panel; a new length moves the next wall along with the end, so a rectangular room stays rectangular.
 - **One wall's details:** thickness, height, **gap below** (for a beam over an opening), **bulge** (a curved wall), and color.
-- **Group walls:** Shift-click walls (or turn on **Select several**), then **Group these walls** or press Ctrl/Cmd+G. Clicking a grouped wall selects the whole group; click it again to edit just that wall. Groups can be renamed, turned, duplicated, ungrouped or removed.
+- **Group walls:** Shift-click walls (or turn on **Select several**), then **Group these walls** or press Ctrl/Cmd+G. Clicking a grouped wall selects the whole group; click it again to edit just that wall. Groups can be renamed, turned, duplicated, ungrouped or removed. In the **Walls and groups** list, the arrow beside a group folds it down to a single row (click it again to unfold); folded groups are remembered, and a group unfolds by itself when you pick one of its walls in the view.
 - **Floor:** filled automatically wherever walls enclose a space. A room with one open side gets its floor from the outline of its walls.
 
 Furniture can't pass through walls (it slides along them) but fits under beams.

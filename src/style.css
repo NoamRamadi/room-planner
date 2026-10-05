@@ -344,8 +344,42 @@ h3 {
 }
 
 .wall-list .is-nested {
-  padding-left: 20px;
+  padding-left: 40px;
   border-bottom-style: dashed;
+}
+
+/* A group's row: a fold button, then the group itself. */
+.wall-list__group {
+  display: flex;
+}
+
+.wall-list .wall-list__fold {
+  flex: none;
+  justify-content: center;
+  align-items: center;
+  width: 28px;
+  padding: 0;
+  color: var(--pencil);
+}
+
+.wall-list__fold svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wall-list .wall-list__fold:hover {
+  color: var(--graphite);
+}
+
+.wall-list__group .is-group {
+  flex: 1;
+  min-width: 0;
+  padding-left: 0;
 }
 
 .wall-list__name {
