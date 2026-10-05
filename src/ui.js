@@ -39,6 +39,8 @@ const ICONS = {
   socket: '<rect x="15" y="7" width="18" height="18" rx="2"/><circle cx="24" cy="16" r="6"/><path d="M21.5 14.5h.01M26.5 14.5h.01M24 18.5h.01"/>',
   counter:
     '<path d="M3 10h14l2 3h10l2-3h14v3H3z"/><path d="M5 13v15h38V13M17 13v15M29 13v15M5 18h12M5 23h12M9 15.5h4M9 20.5h4M9 25.5h4M26 18v4M32 18v4"/><path d="M24 10V5a3 3 0 0 1 6 0v1"/>',
+  microwave: '<rect x="5" y="6" width="38" height="20" rx="2"/><rect x="9" y="10" width="22" height="12" rx="1"/><path d="M35 10h4M35 14h4"/><circle cx="37" cy="19" r="1.6"/><path d="M8 26v2M40 26v2"/>',
+  dispenser: '<rect x="16" y="3" width="16" height="26" rx="3"/><path d="M19 7h10"/><rect x="19" y="11" width="10" height="11" rx="1"/><path d="M24 11v3M19 25h10"/>',
   rug: '<rect x="10" y="4" width="28" height="24" rx="1"/><rect x="14" y="8" width="20" height="16"/><path d="M13 4V1M18 4V1M23 4V1M28 4V1M33 4V1M13 28v3M18 28v3M23 28v3M28 28v3M33 28v3"/>',
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
@@ -182,6 +184,12 @@ Object.assign(DESIGN_ICONS, {
   'counter:double':
     '<path d="M3 10h8l2 3h8l2-3h2l2 3h8l2-3h8v3H3z"/><path d="M5 13v15h38V13M17 13v15M29 13v15M5 18h12M5 23h12M9 15.5h4M9 20.5h4M9 25.5h4M26 18v4M32 18v4"/><path d="M24 10V5a3 3 0 0 1 6 0v1"/>',
   'counter:none': '<path d="M3 10h42v3H3z"/><path d="M5 13v15h38V13M17 13v15M29 13v15M5 18h12M5 23h12M9 15.5h4M9 20.5h4M9 25.5h4M26 18v4M32 18v4"/>',
+  'microwave:countertop': ICONS.microwave,
+  'microwave:retro': '<rect x="5" y="6" width="38" height="21" rx="6"/><rect x="10" y="10" width="20" height="12" rx="3"/><circle cx="36" cy="12.5" r="2"/><circle cx="36" cy="19.5" r="2"/><path d="M9 27v2M39 27v2"/>',
+  'microwave:otr': '<path d="M3 3h42" stroke-dasharray="2 3"/><rect x="6" y="6" width="36" height="14" rx="1"/><rect x="9" y="9" width="22" height="8"/><path d="M34 9h5M34 12h5"/><path d="M8 27h32M12 29.5h8M28 29.5h8"/>',
+  'dispenser:bar': ICONS.dispenser,
+  'dispenser:bottle': '<path d="M18 3h12v9a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3z"/><path d="M22 15h4v2h-4z"/><rect x="14" y="17" width="20" height="12" rx="2"/><path d="M19 21h3M26 21h3M18 26h12"/>',
+  'dispenser:urn': '<path d="M15 7h18v20H15z"/><path d="M18 4h12v3H18zM24 2v2"/><path d="M15 11h-3v6h3M33 11h3v6h-3"/><path d="M14 29h20M24 22v3h3"/>',
   'door:single': ICONS.door,
   'door:double': '<path d="M9 30V3h30v27M24 3v27"/><path d="M5 30h38"/><path d="M21 16v2M27 16v2"/>',
   'door:sliding': '<path d="M7 30V3h34v27"/><path d="M10 6h15v24M23 6h15v24"/><path d="M3 30h42"/>',

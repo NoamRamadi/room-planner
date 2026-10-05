@@ -1,5 +1,5 @@
 // The design (walls, groups of walls, furniture, colors) and what's selected. Every change is saved to localStorage.
-import { CATALOG, FLOOR_PATTERNS, limitsOf, newItemOf, normalizeItem } from './catalog.js';
+import { CATALOG, FLOOR_PATTERNS, isSurface, limitsOf, newItemOf, normalizeItem } from './catalog.js';
 import { carryStacked, findSpot, moveWithin, normAngle, preferredSpot, settle } from './layout.js';
 import { OPENINGS, newOpeningOf, normalizeOpening, openingLimitsOf } from './openings.js';
 import {
@@ -928,7 +928,7 @@ export function addItem(type, style) {
 
 function replaceItem(before, after) {
   let items = state.items.map((i) => (i.id === before.id ? after : i));
-  if (CATALOG[before.type].surface) items = carryStacked(items, before, after);
+  if (isSurface(before)) items = carryStacked(items, before, after);
   state = { ...state, items };
   emit();
 }

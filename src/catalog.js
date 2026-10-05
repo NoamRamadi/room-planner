@@ -230,8 +230,8 @@ const TV_SIZES = [
 // design is called. `surface`: other items can stand on it. `stackable`: rests on a surface when
 // placed over one. `room`: the furniture set it's listed under. `place` (for a type or a design):
 // where a new one goes: 'wall', 'corner', 'bed' (beside one), 'desk' or 'island' (in front of one,
-// facing it), 'surface' (on a bedside table, desk or chest), 'window' (over one, sized to it) or
-// 'ceiling'. A hanging design's `over` lists what it hangs above. `flip`: the label of a design's
+// facing it), 'surface' (on a bedside table, desk or chest), 'counter' (on a kitchen worktop, next
+// to the sink if `nearSink`), 'window' (over one, sized to it) or 'ceiling'. A hanging design's `over` lists what it hangs above. `flip`: the label of a design's
 // mirror-image option. `behind`: hangs flat against the wall, so furniture can stand in front of it.
 export const CATALOG = {
   sofa: {
@@ -749,6 +749,7 @@ export const CATALOG = {
     label: 'Kitchen cabinet',
     room: 'kitchen',
     place: 'wall',
+    surface: true, // the worktop of a base cabinet
     defaults: { style: 'base', w: 60, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9', mount: 145 },
     limits: { w: [30, 300], d: [15, 70], h: [20, 240], mount: [40, 220] },
     colors: [
@@ -782,6 +783,7 @@ export const CATALOG = {
       {
         id: 'wall',
         label: 'Wall cabinet',
+        surface: false,
         name: 'Wall cabinet',
         onWall: true, // `mount` is the height of its bottom edge
         over: ['kitchen', 'sinkunit', 'dishwasher', 'counter'], // hung above a base unit with nothing above it yet
@@ -797,6 +799,7 @@ export const CATALOG = {
       {
         id: 'tall',
         label: 'Tall pantry',
+        surface: false,
         name: 'Pantry',
         defaults: { h: 210 },
         limits: { d: [45, 70], h: [150, 240] },
@@ -809,6 +812,7 @@ export const CATALOG = {
       {
         id: 'shelf',
         label: 'Open shelf',
+        surface: false,
         name: 'Kitchen shelf',
         onWall: true,
         defaults: { w: 80, d: 25, h: 40, mount: 150, color: '#b88f5d' },
@@ -827,6 +831,7 @@ export const CATALOG = {
     label: 'Kitchen counter',
     room: 'kitchen',
     place: 'wall',
+    surface: true,
     // A run of base units under one countertop: columns of drawers on one side, cupboards on the
     // other, and a sink anywhere along the top (`sink`: cm from the left end to the sink's middle).
     defaults: { style: 'single', w: 240, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9', drawers: 1, rows: 3, cupboards: 2, sink: 150, flip: false },
@@ -864,6 +869,7 @@ export const CATALOG = {
     label: 'Sink unit',
     room: 'kitchen',
     place: 'wall',
+    surface: true,
     defaults: { style: 'single', w: 80, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9' },
     limits: { w: [50, 200], d: [50, 70], h: [80, 100] },
     colors: [
@@ -994,6 +1000,7 @@ export const CATALOG = {
     label: 'Dishwasher',
     room: 'kitchen',
     place: 'wall',
+    surface: true,
     defaults: { style: 'integrated', w: 60, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9' },
     limits: { w: [45, 60], d: [55, 65], h: [80, 90] },
     colors: [
@@ -1023,6 +1030,92 @@ export const CATALOG = {
       },
     ],
     build: buildDishwasher,
+  },
+  microwave: {
+    label: 'Microwave',
+    room: 'kitchen',
+    place: 'counter',
+    stackable: true,
+    defaults: { style: 'countertop', w: 50, d: 38, h: 30, color: '#1e1f22', mount: 150 },
+    limits: { w: [35, 80], d: [28, 45], h: [22, 45], mount: [120, 200] },
+    colors: [{ key: 'color', label: 'Finish', palette: FINISHES }],
+    styles: [
+      {
+        id: 'countertop',
+        label: 'Countertop',
+        name: 'Microwave',
+        presets: [
+          { name: '20 L', w: 45, d: 34, h: 26 },
+          { name: '25 L', w: 50, d: 38, h: 30 },
+          { name: '32 L', w: 55, d: 44, h: 32 },
+        ],
+      },
+      {
+        id: 'retro',
+        label: 'Retro',
+        name: 'Retro microwave',
+        defaults: { color: '#ece3c8' },
+        presets: [
+          { name: '20 L', w: 45, d: 34, h: 27 },
+          { name: '25 L', w: 50, d: 38, h: 30 },
+        ],
+      },
+      {
+        id: 'otr',
+        label: 'Over the cooker',
+        name: 'Over-the-cooker microwave',
+        place: 'wall',
+        onWall: true, // `mount` is the height of its bottom edge
+        over: ['cooking'], // hung above the cooker, like a hood
+        defaults: { w: 76, d: 40, h: 42, color: '#c3c6c9' },
+        limits: { w: [60, 80], d: [35, 45], h: [38, 45] },
+        presets: [{ name: '76 cm', w: 76, d: 40, h: 42 }],
+      },
+    ],
+    build: buildMicrowave,
+  },
+  dispenser: {
+    label: 'Water dispenser',
+    room: 'kitchen',
+    place: 'counter',
+    nearSink: true,
+    stackable: true,
+    defaults: { style: 'bar', w: 25, d: 42, h: 45, color: '#f2f2ef' },
+    limits: { w: [18, 45], d: [18, 50], h: [25, 80] },
+    colors: [{ key: 'color', label: 'Finish', palette: FINISHES }],
+    styles: [
+      {
+        id: 'bar',
+        label: 'Water bar',
+        name: 'Water bar',
+        presets: [
+          { name: 'Compact', w: 22, d: 38, h: 42 },
+          { name: 'Standard', w: 25, d: 42, h: 45 },
+        ],
+      },
+      {
+        id: 'bottle',
+        label: 'With bottle',
+        name: 'Bottle water dispenser',
+        defaults: { w: 30, d: 32, h: 72 },
+        presets: [
+          { name: '11 L bottle', w: 28, d: 30, h: 62 },
+          { name: '19 L bottle', w: 30, d: 32, h: 72 },
+        ],
+      },
+      {
+        id: 'urn',
+        label: 'Hot water urn',
+        name: 'Hot water urn',
+        round: true,
+        defaults: { w: 28, d: 28, h: 45, color: '#c3c6c9' },
+        presets: [
+          { name: '5 L', w: 24, h: 38 },
+          { name: '10 L', w: 28, h: 45 },
+        ],
+      },
+    ],
+    build: buildDispenser,
   },
   island: {
     label: 'Kitchen island',
@@ -1745,6 +1838,8 @@ export const colorsOf = (item) => styleOf(item).colors ?? CATALOG[item.type].col
 export const isOnWall = (item) => Boolean(styleOf(item).onWall);
 export const isStackable = (item) => Boolean(styleOf(item).stackable ?? CATALOG[item.type].stackable) && !isOnWall(item);
 export const isFlat = (item) => Boolean(CATALOG[item.type].flat);
+// Other things can stand on it (a table, a worktop). A design can say otherwise (a wall cabinet).
+export const isSurface = (item) => Boolean(styleOf(item).surface ?? CATALOG[item.type].surface);
 
 // A new piece of the given design.
 export function newItemOf(type, styleId) {
@@ -4044,6 +4139,117 @@ function buildCounter({ w, d, h }, item) {
     }
     gooseneck(sink, steel(), { y: h, z: -d / 2 + 0.06 });
     g.add(sink);
+  }
+  return g;
+}
+
+// A small round knob on a front at z, turned to face out.
+function dial(g, material, { x, y, z, r = 0.018 }) {
+  const knob = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.018, 24), material);
+  knob.rotation.x = Math.PI / 2;
+  knob.position.set(x, y, z + 0.009);
+  g.add(knob);
+}
+
+function buildMicrowave({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const finish = appliance(item.color);
+  const glass = darkGlass();
+  const inner = new THREE.MeshStandardMaterial({ color: '#2f343a', roughness: 0.2, metalness: 0.3 });
+  const front = d / 2;
+  const style = item.style;
+
+  if (style === 'retro') {
+    // Rounded, on little feet, with a chrome-framed window, two dials and a chrome handle.
+    const chrome = metal('#d5d8db');
+    const feet = 0.015;
+    for (const [sx, sz] of CORNERS) g.add(post(0.012, 0.012, feet, chrome, sx * (w / 2 - 0.05), sz * (d / 2 - 0.05)));
+    const bh = h - feet;
+    g.add(block(w, bh, d, finish, { y: feet, r: Math.min(0.04, bh / 4) }));
+    const ww = w * 0.58;
+    g.add(block(ww + 0.03, bh * 0.66, 0.004, chrome, { x: -w * 0.12, y: feet + bh * 0.17, z: front }));
+    g.add(block(ww, bh * 0.58, 0.004, glass, { x: -w * 0.12, y: feet + bh * 0.21, z: front + 0.002 }));
+    g.add(block(0.02, bh * 0.5, 0.025, chrome, { x: -w * 0.12 + ww / 2 + 0.035, y: feet + bh * 0.25, z: front + 0.0125, r: 0.008 }));
+    for (const y of [0.62, 0.32]) dial(g, chrome, { x: w / 2 - 0.07, y: feet + bh * y, z: front });
+    return g;
+  }
+
+  // Countertop and over-the-cooker: a box with a dark glass door and a control strip on the right.
+  g.add(block(w, h, d, finish, { r: 0.01 }));
+  const panelW = Math.min(0.13, w * 0.24);
+  const doorW = w - panelW - 0.03;
+  const doorX = -w / 2 + 0.015 + doorW / 2;
+  const top = style === 'otr' ? h - 0.07 : h - 0.02; // an over-the-cooker one has a vent along its top
+  g.add(block(doorW, top - 0.02, 0.006, glass, { x: doorX, y: 0.02, z: front }));
+  g.add(block(doorW * 0.7, (top - 0.02) * 0.6, 0.002, inner, { x: doorX - doorW * 0.05, y: 0.02 + (top - 0.02) * 0.2, z: front + 0.004 }));
+  const panel = new THREE.MeshStandardMaterial({ color: new THREE.Color(item.color).multiplyScalar(0.8), roughness: 0.35 });
+  const px = w / 2 - 0.01 - panelW / 2;
+  g.add(block(panelW - 0.01, top - 0.02, 0.004, panel, { x: px, y: 0.02, z: front }));
+  g.add(block(panelW * 0.6, 0.022, 0.002, acDisplay(), { x: px, y: top - 0.06, z: front + 0.003 }));
+  dial(g, metal('#8f9397'), { x: px, y: top * 0.45, z: front, r: Math.min(0.022, panelW * 0.25) });
+  if (style === 'otr') {
+    g.add(block(w - 0.02, 0.006, 0.004, finish, { y: top + 0.012, z: front }));
+    for (let k = 0; k < 3; k++) g.add(block(w * 0.6, 0.006, 0.003, new THREE.MeshStandardMaterial({ color: '#2a2c2f' }), { y: top + 0.025 + 0.012 * k, z: front }));
+    barHandle(g, steel(), { x: doorX, y: top - 0.04, z: front + 0.006, length: doorW * 0.8 });
+  }
+  return g;
+}
+
+function buildDispenser({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const finish = appliance(item.color);
+  const dark = new THREE.MeshStandardMaterial({ color: '#2a2c2f', roughness: 0.4 });
+  const tray = metal('#a9adb1');
+  const front = d / 2;
+  const style = item.style;
+
+  if (style === 'urn') {
+    // A steel urn on a dark base, with a lid, a handle on each side and a tap at the front.
+    const r = w / 2;
+    g.add(post(r * 0.9, r * 0.95, 0.025, dark, 0, 0, 0, 40));
+    g.add(post(r * 0.96, r, h - 0.065, finish, 0, 0, 0.025, 40));
+    g.add(post(r * 0.55, r * 0.92, 0.04, finish, 0, 0, h - 0.04, 40));
+    g.add(post(0.012, 0.016, 0.02, dark, 0, 0, h - 0.005, 16));
+    for (const s of [-1, 1]) {
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.006, 8, 16, Math.PI), dark);
+      handle.rotation.z = -s * (Math.PI / 2);
+      handle.position.set(s * r, h * 0.72, 0);
+      g.add(handle);
+    }
+    g.add(block(0.03, 0.035, 0.05, dark, { y: h * 0.1, z: r + 0.01, r: 0.008 }));
+    g.add(block(0.012, 0.03, 0.012, dark, { y: h * 0.1 + 0.035, z: r + 0.02 }));
+    return g;
+  }
+
+  if (style === 'bottle') {
+    // A base with hot and cold taps over a drip tray, and a big water bottle upside down on top.
+    const baseH = h * 0.5;
+    g.add(block(w, baseH, d, finish, { r: 0.02 }));
+    g.add(block(w * 0.7, 0.012, 0.06, tray, { y: baseH * 0.25, z: front - 0.03 }));
+    g.add(block(w * 0.8, baseH * 0.45, 0.006, dark, { y: baseH * 0.25, z: front }));
+    for (const [x, c] of [[-w * 0.18, '#3a7bd5'], [w * 0.18, '#d9473d']]) {
+      g.add(block(0.025, 0.03, 0.035, new THREE.MeshStandardMaterial({ color: c, roughness: 0.3 }), { x, y: baseH * 0.62, z: front + 0.01, r: 0.006 }));
+    }
+    const water = new THREE.MeshStandardMaterial({ color: '#8fc3e6', roughness: 0.08, transparent: true, opacity: 0.5, depthWrite: false });
+    const r = Math.min(w, d) * 0.45;
+    g.add(post(0.025, 0.025, 0.05, water, 0, 0, baseH, 16));
+    g.add(post(r * 0.9, r * 0.35, 0.05, water, 0, 0, baseH + 0.04, 32));
+    g.add(post(r, r * 0.9, h - baseH - 0.11, water, 0, 0, baseH + 0.09, 32));
+    g.add(post(r * 0.85, r, 0.02, water, 0, 0, h - 0.02, 32));
+    return g;
+  }
+
+  // Water bar: a slim tower with a dispensing alcove, spout and drip tray, and a touch panel on top.
+  g.add(block(w, h, d, finish, { r: 0.02 }));
+  const alcove = h * 0.45;
+  g.add(block(w - 0.05, alcove, 0.006, dark, { y: 0.03, z: front }));
+  g.add(block(w - 0.06, 0.012, 0.07, tray, { y: 0.03, z: front - 0.03 }));
+  g.add(post(0.008, 0.008, 0.03, metal('#c9ccd0'), 0, front - 0.02, 0.03 + alcove - 0.03, 12));
+  g.add(block(w - 0.04, 0.05, 0.004, darkGlass(), { y: h - 0.09, z: front }));
+  for (const [x, c] of [[-0.035, '#4aa3e8'], [0, '#f4f4f0'], [0.035, '#e8574a']]) {
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.006, 16), new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.6 }));
+    dot.position.set(x * Math.min(1, w / 0.22), h - 0.065, front + 0.003);
+    g.add(dot);
   }
   return g;
 }

@@ -1,5 +1,5 @@
 // Furniture rules: footprints, not passing through walls, stacking and auto-placement. All values in cm.
-import { CATALOG, dimsOf, isFlat, isOnWall, isStackable, limitsOf, styleOf } from './catalog.js';
+import { CATALOG, dimsOf, isFlat, isOnWall, isStackable, isSurface, limitsOf, styleOf } from './catalog.js';
 import { boundsOf, boxesOf, boxesOverlap, contains, floorsOf, lengthOf, midpointOf, openingSpan, signedArea } from './walls.js';
 
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -120,7 +120,7 @@ export function elevationOf(item, items) {
   if (!isStackable(item)) return 0;
   let top = 0;
   for (const other of items) {
-    if (other.id !== item.id && CATALOG[other.type].surface && !isStackable(other) && containsPoint(other, item.x, item.z)) {
+    if (other.id !== item.id && isSurface(other) && !isStackable(other) && containsPoint(other, item.x, item.z)) {
       top = Math.max(top, elevationOf(other, items) + dimsOf(other).h);
     }
   }
@@ -378,6 +378,41 @@ function atWindow(item, items, walls, openings) {
   return null;
 }
 
+// Where a counter's sink is, as [from, to] in cm from its left end; a sink unit's top is all sink.
+function sinkSpanOf(host) {
+  const width = styleOf(host).sink;
+  if (host.type === 'counter') return width ? [host.sink - width / 2, host.sink + width / 2] : null;
+  return host.type === 'sinkunit' ? [0, dimsOf(host).w] : null;
+}
+
+// A countertop appliance (a microwave, a water dispenser) on a kitchen worktop, against the back,
+// clear of the sink and of what already stands there: from the left end along, or, for a water
+// dispenser, as close to a sink as it can be. Any other surface (a table) will do if there's no
+// worktop free.
+function onCounter(item, items, walls) {
+  const { w, d } = dimsOf(item);
+  const nearSink = styleOf(item).nearSink ?? CATALOG[item.type].nearSink;
+  const kitchen = (o) => (CATALOG[o.type].room === 'kitchen' ? 1 : 0);
+  const hosts = items.filter((o) => o.id !== item.id && isSurface(o) && !isOnWall(o) && !isStackable(o));
+  hosts.sort((a, b) => kitchen(b) - kitchen(a) || (nearSink ? Number(Boolean(sinkSpanOf(b))) - Number(Boolean(sinkSpanOf(a))) : 0));
+  const standing = items.filter((o) => o.id !== item.id && isStackable(o));
+  for (const host of hosts) {
+    const size = dimsOf(host);
+    const sink = sinkSpanOf(host);
+    const lz = -(size.d / 2 - d / 2 - 3);
+    const along = [];
+    for (let t = w / 2 + 3; t <= size.w - w / 2 - 3; t += 5) {
+      if (!sink || t + w / 2 <= sink[0] - 3 || t - w / 2 >= sink[1] + 3) along.push(t);
+    }
+    if (nearSink && sink) along.sort((p, q) => Math.min(Math.abs(p - sink[0]), Math.abs(p - sink[1])) - Math.min(Math.abs(q - sink[0]), Math.abs(q - sink[1])));
+    for (const t of along) {
+      const spot = { ...item, ...localToFloor(host, t - size.w / 2, lz), rotation: host.rotation };
+      if (!hitsWall(spot, walls, items) && !standing.some((o) => overlaps(spot, o))) return { x: spot.x, z: spot.z, rotation: spot.rotation };
+    }
+  }
+  return null;
+}
+
 // Where a new piece naturally goes: bathroom, kitchen and bedroom pieces along the walls (showers,
 // baths and armchairs in corners, hanging pieces over what they belong above), curtains over windows,
 // a ceiling air conditioner in the middle of the ceiling, bar stools at the
@@ -395,6 +430,7 @@ export function preferredSpot(item, items, walls, openings = []) {
   let spot = null;
   if (place === 'island' || place === 'desk') spot = seatAt(item, items, walls, openings, place);
   else if (place === 'surface') spot = onSurface(item, items);
+  else if (place === 'counter') spot = onCounter(item, items, walls);
   else if (place === 'bed') spot = besideBed(item, items, walls, openings) ?? alongWalls(item, items, walls, openings);
   else if (place === 'window') spot = atWindow(item, items, walls, openings) ?? alongWalls(item, items, walls, openings);
   else if (place === 'ceiling') {
@@ -437,7 +473,7 @@ export function findSpot(item, items, walls) {
   const blockers =
     isOnWall(item) || isFlat(item)
       ? []
-      : items.filter((o) => o.id !== item.id && !isStackable(o) && !isOnWall(o) && !isFlat(o) && !(stacks && CATALOG[o.type].surface));
+      : items.filter((o) => o.id !== item.id && !isStackable(o) && !isOnWall(o) && !isFlat(o) && !(stacks && isSurface(o)));
   const isFree = (c) => !hitsWall(c, walls, items) && !blockers.some((o) => overlaps(c, o));
   if (isFree(item)) return item;
 
