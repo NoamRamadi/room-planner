@@ -194,12 +194,17 @@ function againstWall(item, s) {
 }
 
 // Floor-standing and hanging pieces get in each other's way only where their heights overlap: a
-// base cabinet fits under a wall cabinet, a fridge doesn't. Curtains are never in the way.
+// base cabinet fits under a wall cabinet, a fridge doesn't. Curtains and sockets lie flat on the wall:
+// furniture can stand in front of them, so they keep clear only of each other and of what hangs on
+// the wall.
 function blockersOf(item, items) {
   const bottom = elevationOf(item, items);
   const top = bottom + dimsOf(item).h;
+  const flatOnWall = (o) => Boolean(CATALOG[o.type].behind);
   return items.filter((o) => {
-    if (o.id === item.id || isFlat(o) || isStackable(o) || CATALOG[o.type].behind) return false;
+    if (o.id === item.id || isFlat(o) || isStackable(o)) return false;
+    if (flatOnWall(o) && !flatOnWall(item)) return false;
+    if (flatOnWall(item) && !flatOnWall(o) && !isOnWall(o)) return false;
     const from = elevationOf(o, items);
     return from < top && from + dimsOf(o).h > bottom;
   });

@@ -183,6 +183,15 @@ const AC_FINISHES = [
   { name: 'Black', hex: '#1e1f22' },
 ];
 
+const SOCKET_PLATES = [
+  { name: 'White', hex: '#f6f6f3' },
+  { name: 'Cream', hex: '#efe9da' },
+  { name: 'Light grey', hex: '#d3d4d2' },
+  { name: 'Black', hex: '#232427' },
+  { name: 'Brushed steel', hex: '#b9bcbf' },
+  { name: 'Brass', hex: '#b8924a' },
+];
+
 // Outer sizes (cm) of beds for the usual mattress widths.
 const BED_SIZES = [
   { name: 'Single 90', w: 100, d: 210 },
@@ -1661,6 +1670,30 @@ export const CATALOG = {
       },
     ],
     build: buildCurtain,
+  },
+  socket: {
+    label: 'Wall socket',
+    room: 'any',
+    place: 'wall',
+    behind: true,
+    defaults: { style: 'single', w: 8, d: 1, h: 8, color: '#f6f6f3', mount: 30 },
+    limits: { w: [5, 40], d: [1, 6], h: [5, 15], mount: [0, 250] },
+    colors: [{ key: 'color', label: 'Plate', palette: SOCKET_PLATES }],
+    // Sockets come in standard sizes; what's worth choosing is how high they sit.
+    presets: [
+      { name: 'Low · 30 cm', mount: 30 },
+      { name: 'Desk · 80 cm', mount: 80 },
+      { name: 'Counter · 110 cm', mount: 110 },
+    ],
+    styles: [
+      { id: 'single', label: 'Single', name: 'Socket', onWall: true },
+      { id: 'double', label: 'Double', name: 'Double socket', onWall: true, defaults: { w: 15 } },
+      { id: 'triple', label: 'Triple', name: 'Triple socket', onWall: true, defaults: { w: 22 } },
+      { id: 'usb', label: 'With USB', name: 'USB socket', onWall: true, defaults: { w: 15 } },
+      { id: 'waterproof', label: 'Waterproof', name: 'Waterproof socket', onWall: true, defaults: { w: 9, d: 4, h: 10 } },
+      { id: 'data', label: 'Network / TV', name: 'Network point', onWall: true },
+    ],
+    build: buildSocket,
   },
 };
 
@@ -3876,6 +3909,55 @@ function buildCurtain({ w, d, h }, item) {
     const panel = drape(pw, fall, open ? 3 : Math.max(3, Math.round(w / 0.24)), open ? 0.07 : 0.05, cloth);
     panel.position.set(open ? s * (w / 2 - 0.04 - pw / 2) : s * (w / 4 - 0.01), fall / 2, rodZ);
     g.add(panel);
+  }
+  return g;
+}
+
+// A socket outlet centred at x on a plate whose face is at z: a round recess with three pin holes.
+function outlet(g, plate, { x = 0, y, z, r = 0.022 }) {
+  const recess = new THREE.Mesh(new THREE.CircleGeometry(r, 32), new THREE.MeshStandardMaterial({ color: new THREE.Color(plate).multiplyScalar(0.86), roughness: 0.5 }));
+  recess.position.set(x, y, z + 0.0005);
+  g.add(recess);
+  const hole = new THREE.MeshStandardMaterial({ color: '#1c1d1f', roughness: 0.6 });
+  for (const [hx, hy] of [[-0.0085, 0.005], [0.0085, 0.005], [0, -0.009]]) {
+    const pin = new THREE.Mesh(new THREE.CircleGeometry(0.0028, 12), hole);
+    pin.position.set(x + hx, y + hy, z + 0.001);
+    g.add(pin);
+  }
+}
+
+function buildSocket({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const plate = new THREE.MeshStandardMaterial({ color: item.color, roughness: 0.35 });
+  const dark = new THREE.MeshStandardMaterial({ color: '#1c1d1f', roughness: 0.6 });
+  const face = d / 2;
+  const cy = h / 2;
+  const style = item.style;
+  g.add(block(w, h, d, plate, { r: Math.min(0.004, d / 2) }));
+
+  if (style === 'waterproof') {
+    // A deeper box with a hinged lid over the outlet.
+    outlet(g, item.color, { y: cy - 0.005, z: face, r: 0.02 });
+    const lid = block(w - 0.012, h - 0.025, 0.006, new THREE.MeshStandardMaterial({ color: item.color, roughness: 0.3, transparent: true, opacity: 0.55 }), { y: 0.008, z: face + 0.004 });
+    g.add(lid, block(w - 0.01, 0.01, 0.008, plate, { y: h - 0.018, z: face + 0.002 }));
+    return g;
+  }
+  if (style === 'data') {
+    // Two network ports side by side.
+    for (const s of [-1, 1]) g.add(block(0.014, 0.012, 0.002, dark, { x: s * 0.012, y: cy - 0.004, z: face }));
+    g.add(block(0.03, 0.003, 0.001, shade(item.color, 0.7), { y: cy - 0.022, z: face }));
+    return g;
+  }
+  // One, two or three outlets in a row; a USB socket has its USB ports where the second would be.
+  const modules = style === 'triple' ? 3 : style === 'double' || style === 'usb' ? 2 : 1;
+  const step = w / modules;
+  for (let i = 0; i < modules; i++) {
+    const x = -w / 2 + step * (i + 0.5);
+    if (style === 'usb' && i === 1) {
+      for (const dy of [0.009, -0.009]) g.add(block(0.012, 0.005, 0.002, dark, { x, y: cy + dy - 0.0025, z: face }));
+    } else {
+      outlet(g, item.color, { x, y: cy, z: face, r: Math.min(0.022, step * 0.32, h * 0.32) });
+    }
   }
   return g;
 }

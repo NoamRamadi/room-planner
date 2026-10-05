@@ -36,6 +36,7 @@ const ICONS = {
   ac: '<rect x="6" y="7" width="36" height="12" rx="3"/><path d="M10 16h28"/><path d="M14 23l-2 5M24 23v5M34 23l2 5"/>',
   curtain:
     '<path d="M4 4h40"/><circle cx="4" cy="4" r="1.5"/><circle cx="44" cy="4" r="1.5"/><path d="M7 4c-1 8 1 16-1 26M12 4c1 8-1 16 1 26M6 30h7M36 4c-1 8 1 16-1 26M41 4c1 8-1 16 1 26M35 30h7"/><rect x="17" y="8" width="14" height="15" stroke-dasharray="2 2"/>',
+  socket: '<rect x="15" y="7" width="18" height="18" rx="2"/><circle cx="24" cy="16" r="6"/><path d="M21.5 14.5h.01M26.5 14.5h.01M24 18.5h.01"/>',
   rug: '<rect x="10" y="4" width="28" height="24" rx="1"/><rect x="14" y="8" width="20" height="16"/><path d="M13 4V1M18 4V1M23 4V1M28 4V1M33 4V1M13 28v3M18 28v3M23 28v3M28 28v3M33 28v3"/>',
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
@@ -169,6 +170,12 @@ Object.assign(DESIGN_ICONS, {
   'curtain:sheer': '<path d="M4 4h40"/><circle cx="4" cy="4" r="1.5"/><circle cx="44" cy="4" r="1.5"/><path d="M7 4v26M41 4v26M7 30h34" stroke-dasharray="2 2"/><path d="M14 4v26M21 4v26M28 4v26M35 4v26" stroke-dasharray="1 3"/>',
   'curtain:roller': '<rect x="8" y="3" width="32" height="4" rx="2"/><path d="M10 7v13h28V7M9 20h30"/><path d="M12 22v7h24v-7" stroke-dasharray="2 2"/>',
   'curtain:roman': '<path d="M8 4h32v3H8z"/><path d="M10 7v11h28V7"/><path d="M10 18q14 3 28 0M10 14q14 3 28 0"/><path d="M12 23v6h24v-6" stroke-dasharray="2 2"/>',
+  'socket:single': ICONS.socket,
+  'socket:double': '<rect x="8" y="8" width="32" height="16" rx="2"/><circle cx="16" cy="16" r="5"/><circle cx="32" cy="16" r="5"/><path d="M14 14.8h.01M18 14.8h.01M16 18h.01M30 14.8h.01M34 14.8h.01M32 18h.01"/>',
+  'socket:triple': '<rect x="3" y="9" width="42" height="14" rx="2"/><circle cx="10" cy="16" r="4.5"/><circle cx="24" cy="16" r="4.5"/><circle cx="38" cy="16" r="4.5"/><path d="M8.3 15h.01M11.7 15h.01M10 17.8h.01M22.3 15h.01M25.7 15h.01M24 17.8h.01M36.3 15h.01M39.7 15h.01M38 17.8h.01"/>',
+  'socket:usb': '<rect x="8" y="8" width="32" height="16" rx="2"/><circle cx="17" cy="16" r="5"/><path d="M15 14.8h.01M19 14.8h.01M17 18h.01"/><path d="M29 11.5h6v3h-6zM29 17.5h6v3h-6z"/>',
+  'socket:waterproof': '<rect x="14" y="4" width="20" height="24" rx="2"/><path d="M14 9h20"/><rect x="16.5" y="11" width="15" height="14" rx="1" stroke-dasharray="2 2"/><circle cx="24" cy="18" r="4"/>',
+  'socket:data': '<rect x="15" y="7" width="18" height="18" rx="2"/><path d="M18 12h5v5h-5zM25 12h5v5h-5zM20 21h8"/>',
   'door:single': ICONS.door,
   'door:double': '<path d="M9 30V3h30v27M24 3v27"/><path d="M5 30h38"/><path d="M21 16v2M27 16v2"/>',
   'door:sliding': '<path d="M7 30V3h34v27"/><path d="M10 6h15v24M23 6h15v24"/><path d="M3 30h42"/>',
@@ -474,7 +481,7 @@ export function initUI(view) {
 
   // Each type opens a menu of its designs; picking one adds that piece. Furniture comes in sets by
   // room (living room, kitchen, bedroom, bathroom), doors and windows are a set of their own, and
-  // pieces for any room (air conditioners, curtains) another; one set is shown at a time.
+  // pieces for any room (air conditioners, curtains, sockets) another; one set is shown at a time.
   const rooms = [
     { id: 'living', label: 'Living' },
     { id: 'kitchen', label: 'Kitchen' },
