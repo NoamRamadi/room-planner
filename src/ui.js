@@ -33,6 +33,9 @@ const ICONS = {
   bookcase: '<rect x="13" y="2" width="22" height="27"/><path d="M13 11h22M13 20h22"/><path d="M16 11V5M18 11V6M20 11V4M25 20v-6M27 20v-5M16 29v-6M18 29v-5M21 29v-6"/>',
   lamp: '<path d="M17 4h14l4 10H13z"/><path d="M24 14v4"/><path d="M20 18h8c2 3 2 7-1 10h-6c-3-3-3-7-1-10z"/>',
   crib: '<path d="M6 4v25M42 4v25M6 7h36M6 21h36"/><path d="M11 7v14M16 7v14M21 7v14M26 7v14M31 7v14M36 7v14"/><path d="M6 25h36"/>',
+  ac: '<rect x="6" y="7" width="36" height="12" rx="3"/><path d="M10 16h28"/><path d="M14 23l-2 5M24 23v5M34 23l2 5"/>',
+  curtain:
+    '<path d="M4 4h40"/><circle cx="4" cy="4" r="1.5"/><circle cx="44" cy="4" r="1.5"/><path d="M7 4c-1 8 1 16-1 26M12 4c1 8-1 16 1 26M6 30h7M36 4c-1 8 1 16-1 26M41 4c1 8-1 16 1 26M35 30h7"/><rect x="17" y="8" width="14" height="15" stroke-dasharray="2 2"/>',
   rug: '<rect x="10" y="4" width="28" height="24" rx="1"/><rect x="14" y="8" width="20" height="16"/><path d="M13 4V1M18 4V1M23 4V1M28 4V1M33 4V1M13 28v3M18 28v3M23 28v3M28 28v3M33 28v3"/>',
   turnLeft: '<path d="M9 7H4V2"/><path d="M4.6 7A8 8 0 1 1 4 12"/>',
   turnRight: '<path d="M15 7h5V2"/><path d="M19.4 7A8 8 0 1 0 20 12"/>',
@@ -155,6 +158,17 @@ Object.assign(DESIGN_ICONS, {
   'lamp:arc': '<path d="M8 29h8M12 29V14a12 12 0 0 1 24 0v2"/><path d="M30 22a6 6 0 0 1 12 0z"/>',
   'crib:cot': ICONS.crib,
   'crib:bassinet': '<path d="M8 8h32l-3 9H11z"/><path d="M14 17l20 12M34 17L14 29"/>',
+  'ac:split': ICONS.ac,
+  'ac:floor': '<rect x="16" y="2" width="16" height="28" rx="2"/><path d="M19 6h10M19 9h10M19 12h10M22 18h4"/>',
+  'ac:portable': '<rect x="12" y="6" width="20" height="21" rx="3"/><path d="M16 10h12M16 13h12M15 27v2M29 27v2"/><path d="M32 12c6 0 9 3 9 8v9"/>',
+  'ac:cassette': '<path d="M3 4h42" stroke-dasharray="2 3"/><path d="M8 7h32v6H8z"/><path d="M11 10h6M31 10h6M21 10h6"/><path d="M14 17l-3 6M24 17v6M34 17l3 6"/>',
+  'ac:vent': '<path d="M3 4h42" stroke-dasharray="2 3"/><rect x="6" y="9" width="36" height="9" rx="1"/><path d="M9 12h30M9 15h30"/>',
+  'ac:outdoor': '<rect x="6" y="6" width="36" height="20" rx="2"/><circle cx="19" cy="16" r="7"/><circle cx="19" cy="16" r="2"/><path d="M32 10v12M36 10v12M9 26v3M39 26v3"/>',
+  'curtain:panels': ICONS.curtain,
+  'curtain:closed': '<path d="M4 4h40"/><circle cx="4" cy="4" r="1.5"/><circle cx="44" cy="4" r="1.5"/><path d="M8 4v26M13 4v26M18 4v26M23 4v26M25 4v26M30 4v26M35 4v26M40 4v26M6 30h17M25 30h17"/>',
+  'curtain:sheer': '<path d="M4 4h40"/><circle cx="4" cy="4" r="1.5"/><circle cx="44" cy="4" r="1.5"/><path d="M7 4v26M41 4v26M7 30h34" stroke-dasharray="2 2"/><path d="M14 4v26M21 4v26M28 4v26M35 4v26" stroke-dasharray="1 3"/>',
+  'curtain:roller': '<rect x="8" y="3" width="32" height="4" rx="2"/><path d="M10 7v13h28V7M9 20h30"/><path d="M12 22v7h24v-7" stroke-dasharray="2 2"/>',
+  'curtain:roman': '<path d="M8 4h32v3H8z"/><path d="M10 7v11h28V7"/><path d="M10 18q14 3 28 0M10 14q14 3 28 0"/><path d="M12 23v6h24v-6" stroke-dasharray="2 2"/>',
   'door:single': ICONS.door,
   'door:double': '<path d="M9 30V3h30v27M24 3v27"/><path d="M5 30h38"/><path d="M21 16v2M27 16v2"/>',
   'door:sliding': '<path d="M7 30V3h34v27"/><path d="M10 6h15v24M23 6h15v24"/><path d="M3 30h42"/>',
@@ -280,7 +294,7 @@ function adder({ id, kinds, onPick }) {
       h(
         'div',
         { class: 'design-menu__head' },
-        h('span', {}, `Choose a ${noun(def.label)}`),
+        h('span', {}, `Choose ${/^[aeiou]/i.test(def.label) ? 'an' : 'a'} ${noun(def.label)}`),
         h('button', { type: 'button', class: 'icon-btn icon-btn--small', 'aria-label': 'Close', html: icon('close'), onclick: () => show(null) }),
       ),
       h(
@@ -459,14 +473,15 @@ export function initUI(view) {
   // ---- Furniture ----
 
   // Each type opens a menu of its designs; picking one adds that piece. Furniture comes in sets by
-  // room (living room, kitchen, bedroom, bathroom), with doors and windows as a set of their own; one
-  // set is shown at a time.
+  // room (living room, kitchen, bedroom, bathroom), doors and windows are a set of their own, and
+  // pieces for any room (air conditioners, curtains) another; one set is shown at a time.
   const rooms = [
     { id: 'living', label: 'Living' },
     { id: 'kitchen', label: 'Kitchen' },
     { id: 'bedroom', label: 'Bedroom' },
     { id: 'bath', label: 'Bathroom' },
     { id: 'openings', label: 'Doors & windows' },
+    { id: 'any', label: 'Any room' },
   ];
   const furnitureFor = (room) =>
     adder({

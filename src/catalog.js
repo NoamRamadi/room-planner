@@ -162,6 +162,27 @@ const SHADES = [
   { name: 'Black', hex: '#2b2c2f' },
 ];
 
+const CURTAINS = [
+  { name: 'White', hex: '#f4f2ed' },
+  { name: 'Linen', hex: '#e2d9c8' },
+  { name: 'Sand', hex: '#cdbb9c' },
+  { name: 'Grey', hex: '#9a9c9e' },
+  { name: 'Sage', hex: '#a9b59d' },
+  { name: 'Dusty blue', hex: '#9fb0c2' },
+  { name: 'Terracotta', hex: '#b9714f' },
+  { name: 'Velvet green', hex: '#3e5a4a' },
+  { name: 'Navy', hex: '#2f3c56' },
+  { name: 'Charcoal', hex: '#4a4c50' },
+];
+
+const AC_FINISHES = [
+  { name: 'White', hex: '#f3f3f0' },
+  { name: 'Light grey', hex: '#e2e3e0' },
+  { name: 'Silver', hex: '#c9ccd0' },
+  { name: 'Graphite', hex: '#4a4c50' },
+  { name: 'Black', hex: '#1e1f22' },
+];
+
 // Outer sizes (cm) of beds for the usual mattress widths.
 const BED_SIZES = [
   { name: 'Single 90', w: 100, d: 210 },
@@ -200,8 +221,9 @@ const TV_SIZES = [
 // design is called. `surface`: other items can stand on it. `stackable`: rests on a surface when
 // placed over one. `room`: the furniture set it's listed under. `place` (for a type or a design):
 // where a new one goes: 'wall', 'corner', 'bed' (beside one), 'desk' or 'island' (in front of one,
-// facing it) or 'surface' (on a bedside table, desk or chest). A hanging design's `over` lists what it
-// hangs above. `flip`: the label of a design's mirror-image option.
+// facing it), 'surface' (on a bedside table, desk or chest), 'window' (over one, sized to it) or
+// 'ceiling'. A hanging design's `over` lists what it hangs above. `flip`: the label of a design's
+// mirror-image option. `behind`: hangs flat against the wall, so furniture can stand in front of it.
 export const CATALOG = {
   sofa: {
     label: 'Sofa',
@@ -1504,6 +1526,141 @@ export const CATALOG = {
       },
     ],
     build: buildCrib,
+  },
+
+  // ---- Any room ----
+
+  ac: {
+    label: 'Air conditioner',
+    room: 'any',
+    place: 'wall',
+    defaults: { style: 'split', w: 90, d: 22, h: 30, color: '#f3f3f0', mount: 210 },
+    limits: { w: [20, 120], d: [3, 100], h: [8, 200], mount: [0, 400] },
+    colors: [{ key: 'color', label: 'Finish', palette: AC_FINISHES }],
+    styles: [
+      {
+        id: 'split',
+        label: 'Wall split unit',
+        name: 'Air conditioner',
+        onWall: true, // `mount` is the height of its bottom edge
+        limits: { w: [60, 120], d: [16, 30], h: [24, 36] },
+        presets: [
+          { name: 'Small', w: 78, d: 20, h: 28 },
+          { name: 'Medium', w: 90, d: 22, h: 30 },
+          { name: 'Large', w: 105, d: 24, h: 32 },
+        ],
+      },
+      {
+        id: 'floor',
+        label: 'Floor standing',
+        name: 'Floor air conditioner',
+        place: 'corner',
+        defaults: { w: 40, d: 32, h: 180 },
+        limits: { w: [30, 60], d: [25, 45], h: [150, 200] },
+        presets: [{ name: 'Standard', w: 40, d: 32, h: 180 }],
+      },
+      {
+        id: 'portable',
+        label: 'Portable',
+        name: 'Portable air conditioner',
+        defaults: { w: 45, d: 38, h: 75 },
+        limits: { w: [30, 60], d: [28, 50], h: [55, 90] },
+        presets: [{ name: 'Standard', w: 45, d: 38, h: 75 }],
+      },
+      {
+        id: 'cassette',
+        label: 'Ceiling cassette',
+        name: 'Ceiling air conditioner',
+        place: 'ceiling',
+        onWall: true,
+        defaults: { w: 84, d: 84, h: 28, mount: 240 },
+        limits: { w: [57, 95], d: [57, 95], h: [20, 35] },
+        presets: [
+          { name: 'Compact', w: 62, d: 62, h: 25 },
+          { name: 'Standard', w: 84, d: 84, h: 28 },
+        ],
+      },
+      {
+        id: 'vent',
+        label: 'Ducted vent',
+        name: 'Air vent',
+        onWall: true,
+        defaults: { w: 100, d: 5, h: 15, mount: 235 },
+        limits: { w: [40, 300], d: [3, 10], h: [8, 40] },
+        presets: [
+          { name: '60 cm', w: 60, d: 5, h: 15 },
+          { name: '100 cm', w: 100, d: 5, h: 15 },
+          { name: '150 cm', w: 150, d: 5, h: 15 },
+        ],
+      },
+      {
+        id: 'outdoor',
+        label: 'Outdoor unit',
+        name: 'Outdoor unit',
+        defaults: { w: 80, d: 30, h: 55, color: '#e2e3e0' },
+        limits: { w: [60, 100], d: [25, 40], h: [45, 110] },
+        presets: [
+          { name: 'Small', w: 72, d: 27, h: 50 },
+          { name: 'Standard', w: 80, d: 30, h: 55 },
+          { name: 'Large', w: 90, d: 34, h: 70 },
+        ],
+      },
+    ],
+    build: buildAc,
+  },
+  curtain: {
+    label: 'Curtain',
+    room: 'any',
+    place: 'window',
+    behind: true,
+    defaults: { style: 'panels', w: 200, d: 15, h: 250, color: '#e2d9c8', color2: '#26272a', mount: 1 },
+    limits: { w: [40, 600], d: [4, 30], h: [40, 300], mount: [0, 250] },
+    colors: [
+      { key: 'color', label: 'Fabric', palette: CURTAINS },
+      { key: 'color2', label: 'Rod', palette: TRIMS },
+    ],
+    presets: [
+      { name: '140 × 250', w: 140, h: 250 },
+      { name: '200 × 250', w: 200, h: 250 },
+      { name: '300 × 250', w: 300, h: 250 },
+    ],
+    styles: [
+      { id: 'panels', label: 'Open panels', name: 'Curtains', onWall: true },
+      { id: 'closed', label: 'Closed', name: 'Closed curtains', onWall: true },
+      { id: 'sheer', label: 'Sheer', name: 'Sheer curtain', onWall: true, defaults: { color: '#f4f2ed' } },
+      {
+        id: 'roller',
+        label: 'Roller blind',
+        name: 'Roller blind',
+        onWall: true,
+        blind: true, // fits the window itself rather than the wall around it
+        defaults: { w: 130, d: 8, h: 150, mount: 80, color: '#cdbb9c', color2: '#ecebe6' },
+        colors: [
+          { key: 'color', label: 'Fabric', palette: CURTAINS },
+          { key: 'color2', label: 'Cassette', palette: TRIMS },
+        ],
+        presets: [
+          { name: '100 × 140', w: 100, h: 140 },
+          { name: '130 × 150', w: 130, h: 150 },
+          { name: '170 × 160', w: 170, h: 160 },
+        ],
+      },
+      {
+        id: 'roman',
+        label: 'Roman blind',
+        name: 'Roman blind',
+        onWall: true,
+        blind: true,
+        defaults: { w: 130, d: 8, h: 150, mount: 80, color: '#a9b59d' },
+        colors: [{ key: 'color', label: 'Fabric', palette: CURTAINS }],
+        presets: [
+          { name: '100 × 140', w: 100, h: 140 },
+          { name: '130 × 150', w: 130, h: 150 },
+          { name: '170 × 160', w: 170, h: 160 },
+        ],
+      },
+    ],
+    build: buildCurtain,
   },
 };
 
@@ -3557,5 +3714,168 @@ function buildCrib({ w, d, h }, item) {
   for (const sx of [-1, 1]) g.add(block(0.02, h - base + 0.01, d - 2 * p, frame, { x: sx * (w / 2 - p / 2), y: base - 0.05 }));
   g.add(block(w - 2 * p - 0.01, 0.1, d - 2 * p - 0.01, linen, { y: base, r: 0.02 }));
   g.add(block((w - 2 * p) * 0.35, 0.03, d - 2 * p - 0.05, shade(item.color2, 0.85), { x: w * 0.2, y: base + 0.1, r: 0.012 }));
+  return g;
+}
+
+// ---- Any room ----
+
+const acBody = (hex) => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.35, metalness: 0.05 });
+const acSlot = () => new THREE.MeshStandardMaterial({ color: '#2a2c2f', roughness: 0.5 });
+const acDisplay = () => new THREE.MeshStandardMaterial({ color: '#7fd0ff', emissive: '#3fa9e8', emissiveIntensity: 0.8 });
+
+function buildAc({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const body = acBody(item.color);
+  const dark = acSlot();
+  const front = d / 2 + 0.001;
+  const style = item.style;
+
+  if (style === 'split') {
+    // A rounded box high on the wall: a front panel, the air outlet with its flap, and a display.
+    g.add(block(w, h, d, body, { r: Math.min(0.04, h / 3) }));
+    g.add(block(w - 0.04, 0.004, 0.004, shade(item.color, 0.6), { y: h * 0.45, z: d / 2 }));
+    g.add(block(w - 0.1, 0.03, 0.004, dark, { y: 0.025, z: front }));
+    const flap = block(w - 0.12, 0.006, 0.06, body, { y: 0.008, z: d / 2 + 0.005 });
+    flap.rotation.x = 0.5;
+    g.add(flap);
+    g.add(block(0.06, 0.018, 0.004, acDisplay(), { x: w / 2 - 0.12, y: h * 0.25, z: front }));
+    return g;
+  }
+
+  if (style === 'cassette') {
+    // In the ceiling: the unit above, and a square panel underneath with an outlet along each side.
+    const p = 0.03;
+    g.add(block(w - 0.12, h - p, d - 0.12, shade(item.color, 0.8), { y: p }));
+    g.add(block(w, p, d, body, { r: 0.01 }));
+    const slotL = w * 0.55;
+    for (const s of [-1, 1]) {
+      g.add(block(slotL, 0.004, 0.06, dark, { y: -0.002, z: s * (d / 2 - 0.09) }));
+      g.add(block(0.06, 0.004, slotL, dark, { x: s * (w / 2 - 0.09), y: -0.002 }));
+    }
+    g.add(block(w * 0.35, 0.004, d * 0.35, shade(item.color, 0.85), { y: -0.002 }));
+    return g;
+  }
+
+  if (style === 'vent') {
+    // A linear grille: a frame with louvres across it.
+    g.add(block(w, h, d, body, { r: 0.003 }));
+    const n = Math.max(2, Math.round((h - 0.03) / 0.018));
+    for (let k = 0; k < n; k++) g.add(block(w - 0.04, 0.006, 0.004, dark, { y: 0.015 + ((h - 0.03) * (k + 0.5)) / n, z: front }));
+    return g;
+  }
+
+  if (style === 'floor') {
+    // A tall tower on a darker base: louvres at the top, a display, an intake grille lower down.
+    g.add(block(w - 0.02, 0.06, d - 0.02, shade(item.color, 0.5), {}));
+    g.add(block(w, h - 0.06, d, body, { y: 0.06, r: 0.03 }));
+    for (let k = 1; k <= 8; k++) g.add(block(w - 0.08, 0.008, 0.004, dark, { y: h - 0.08 - 0.04 * k, z: front }));
+    g.add(block(0.08, 0.03, 0.004, acDisplay(), { y: h * 0.5, z: front }));
+    for (let k = 0; k < 6; k++) g.add(block(w - 0.1, 0.004, 0.003, shade(item.color, 0.75), { y: 0.2 + 0.03 * k, z: front }));
+    return g;
+  }
+
+  if (style === 'portable') {
+    // On castors, with the air outlet on top and a control panel.
+    const castorH = 0.04;
+    for (const [sx, sz] of CORNERS) g.add(post(0.018, 0.018, castorH, dark, sx * (w / 2 - 0.06), sz * (d / 2 - 0.06), 0, 12));
+    g.add(block(w, h - castorH, d, body, { y: castorH, r: 0.05 }));
+    g.add(block(w - 0.12, 0.004, d * 0.4, dark, { y: h, z: d * 0.12 }));
+    g.add(block(w * 0.5, 0.04, 0.004, dark, { y: h - 0.1, z: front }));
+    g.add(block(0.04, 0.012, 0.004, acDisplay(), { x: w * 0.12, y: h - 0.086, z: front + 0.001 }));
+    return g;
+  }
+
+  // Outdoor unit: a box on two feet with a round fan grille and slatted side.
+  const feet = 0.05;
+  for (const s of [-1, 1]) g.add(block(0.05, feet, d, shade(item.color, 0.5), { x: s * (w / 2 - 0.08) }));
+  g.add(block(w, h - feet, d, body, { y: feet, r: 0.01 }));
+  const r = Math.min((h - feet) * 0.42, w * 0.32);
+  const cx = -w / 2 + r + 0.05;
+  const cy = feet + (h - feet) / 2;
+  const fan = new THREE.Mesh(new THREE.CircleGeometry(r, 40), dark);
+  fan.position.set(cx, cy, front);
+  g.add(fan);
+  const wire = metal('#9a9c9e');
+  for (let k = 1; k <= 3; k++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry((r * k) / 3, 0.003, 6, 40), wire);
+    ring.position.set(cx, cy, front + 0.004);
+    g.add(ring);
+  }
+  g.add(block(2 * r, 0.006, 0.004, wire, { x: cx, y: cy - 0.003, z: front + 0.004 }));
+  g.add(block(0.006, 2 * r, 0.004, wire, { x: cx, y: cy - r, z: front + 0.004 }));
+  for (let x = cx + r + 0.06; x < w / 2 - 0.03; x += 0.025) g.add(block(0.004, h - feet - 0.1, 0.003, shade(item.color, 0.7), { x, y: feet + 0.05, z: front }));
+  return g;
+}
+
+// A length of fabric hanging in soft vertical pleats, centred on the origin and facing +z.
+function drape(width, height, folds, depth, material) {
+  const geometry = new THREE.PlaneGeometry(width, height, Math.max(8, folds * 8), 1);
+  const pos = geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const t = (pos.getX(i) + width / 2) / width;
+    pos.setZ(i, (Math.sin(t * folds * Math.PI * 2) * depth) / 2);
+  }
+  geometry.computeVertexNormals();
+  return new THREE.Mesh(geometry, material);
+}
+
+function buildCurtain({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const style = item.style;
+  const back = -d / 2;
+  const cloth = new THREE.MeshStandardMaterial({ color: item.color, roughness: 0.9, side: THREE.DoubleSide });
+  const hardware = trim(item.color2);
+  const drop = h * 0.5; // blinds are drawn half way down
+
+  if (style === 'roller') {
+    // A cassette across the top, the blind hanging from it and a bar along its bottom edge.
+    const cassette = Math.min(0.07, h * 0.2);
+    g.add(block(w, cassette, Math.min(d, 0.08), hardware, { y: h - cassette, r: 0.02 }));
+    g.add(block(w - 0.02, drop, 0.004, cloth, { y: h - cassette - drop }));
+    g.add(block(w - 0.02, 0.025, 0.015, hardware, { y: h - cassette - drop - 0.012 }));
+    return g;
+  }
+  if (style === 'roman') {
+    // A fabric-covered headrail and the blind pulled up into soft folds at its bottom.
+    g.add(block(w, 0.05, Math.min(d, 0.06), cloth, { y: h - 0.05 }));
+    g.add(block(w - 0.01, drop, 0.006, cloth, { y: h - 0.05 - drop }));
+    for (let k = 0; k < 3; k++) {
+      const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, w - 0.01, 16), cloth);
+      roll.rotation.z = Math.PI / 2;
+      roll.position.set(0, h - 0.05 - drop + 0.03 + 0.055 * k, 0.02);
+      g.add(roll);
+    }
+    return g;
+  }
+
+  // Curtains: a rod on two brackets with a ball at each end, and the fabric hanging to the floor.
+  const rodY = h - 0.04;
+  const rodZ = back + Math.min(d - 0.03, 0.1);
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, w - 0.06, 14), hardware);
+  rod.rotation.z = Math.PI / 2;
+  rod.position.set(0, rodY, rodZ);
+  g.add(rod);
+  for (const s of [-1, 1]) {
+    const finial = new THREE.Mesh(new THREE.SphereGeometry(0.025, 14, 10), hardware);
+    finial.position.set(s * (w / 2 - 0.025), rodY, rodZ);
+    g.add(finial);
+    g.add(block(0.015, 0.015, rodZ - back, hardware, { x: s * (w / 2 - 0.12), y: rodY - 0.0075, z: back + (rodZ - back) / 2 }));
+  }
+  const fall = rodY - 0.015;
+  if (style === 'sheer') {
+    const sheer = new THREE.MeshStandardMaterial({ color: item.color, roughness: 0.9, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide });
+    const panel = drape(w - 0.08, fall, Math.max(4, Math.round(w / 0.1)), 0.03, sheer);
+    panel.position.set(0, fall / 2, rodZ);
+    g.add(panel);
+    return g;
+  }
+  // Open: a gathered panel at each side. Closed: two panels meeting in the middle.
+  const open = style === 'panels';
+  const pw = open ? Math.min(0.45, Math.max(0.2, w * 0.17)) : w / 2 - 0.04;
+  for (const s of [-1, 1]) {
+    const panel = drape(pw, fall, open ? 3 : Math.max(3, Math.round(w / 0.24)), open ? 0.07 : 0.05, cloth);
+    panel.position.set(open ? s * (w / 2 - 0.04 - pw / 2) : s * (w / 4 - 0.01), fall / 2, rodZ);
+    g.add(panel);
+  }
   return g;
 }

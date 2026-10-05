@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildItem, dimsOf, isFlat } from './catalog.js';
+import { CATALOG, buildItem, dimsOf, isFlat } from './catalog.js';
 import { buildOpening, buildSwing } from './openings.js';
 import { elevationOf, halfExtents } from './layout.js';
 import * as store from './state.js';
@@ -18,6 +18,7 @@ import {
   lengthOf,
   midpointOf,
   openingSpan,
+  pointToSegment,
   rayDistance,
   signedArea,
   takesOpenings,
@@ -428,9 +429,19 @@ export function createScene(container) {
     }
   }
 
-  // A door or window shows when its wall does; its swing on the floor always shows.
+  // A door or window shows when its wall does; its swing on the floor always shows. So does a curtain,
+  // which hangs on the wall right behind its back.
   function showOpeningsWithWalls() {
     for (const m of openingModels.values()) m.model.visible = wallMeshes.get(m.wallId)?.full.visible ?? true;
+    for (const model of models.values()) {
+      if (!CATALOG[model.item.type].behind) continue;
+      const { item } = model;
+      const r = THREE.MathUtils.degToRad(item.rotation);
+      const back = dimsOf(item).d / 2 + 2;
+      const p = { x: item.x - Math.sin(r) * back, z: item.z - Math.cos(r) * back };
+      const wall = [...wallMeshes.values()].find((m) => pointToSegment(p, { x: m.wall.x1, z: m.wall.z1 }, { x: m.wall.x2, z: m.wall.z2 }).d < m.wall.thickness / 2 + 1);
+      model.group.visible = wall?.full.visible ?? true;
+    }
   }
 
   // ---- Furniture ----
@@ -458,6 +469,7 @@ export function createScene(container) {
         model = { key, group };
         models.set(item.id, model);
       }
+      model.item = item;
       model.group.position.set(item.x * CM, elevationOf(item, items) * CM, item.z * CM);
       model.group.rotation.y = THREE.MathUtils.degToRad(item.rotation);
     }

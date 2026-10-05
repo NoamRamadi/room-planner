@@ -194,12 +194,12 @@ function againstWall(item, s) {
 }
 
 // Floor-standing and hanging pieces get in each other's way only where their heights overlap: a
-// base cabinet fits under a wall cabinet, a fridge doesn't.
+// base cabinet fits under a wall cabinet, a fridge doesn't. Curtains are never in the way.
 function blockersOf(item, items) {
   const bottom = elevationOf(item, items);
   const top = bottom + dimsOf(item).h;
   return items.filter((o) => {
-    if (o.id === item.id || isFlat(o) || isStackable(o)) return false;
+    if (o.id === item.id || isFlat(o) || isStackable(o) || CATALOG[o.type].behind) return false;
     const from = elevationOf(o, items);
     return from < top && from + dimsOf(o).h > bottom;
   });
@@ -331,8 +331,51 @@ function onSurface(item, items) {
   return { ...localToFloor(host, lx, lz), rotation: host.rotation };
 }
 
+// A curtain or blind over the first window that doesn't have one, on the room side of the wall:
+// curtains from just above the window to the floor and wider than it, blinds just around the window.
+function atWindow(item, items, walls, openings) {
+  const others = items.filter((o) => o.type === item.type && o.id !== item.id);
+  const floors = floorsOf(walls);
+  const main = mainFloor(walls);
+  const blind = styleOf(item).blind;
+  const limits = limitsOf(item);
+  const fit = (v, [lo, hi]) => Math.min(hi, Math.max(lo, Math.round(v)));
+  const { d } = dimsOf(item);
+  for (const o of openings) {
+    const wall = o.kind === 'window' && walls.find((x) => x.id === o.wall);
+    if (!wall) continue;
+    const span = openingSpan(o, wall);
+    const len = lengthOf(wall);
+    const u = { x: (wall.x2 - wall.x1) / len, z: (wall.z2 - wall.z1) / len };
+    const mid = { x: wall.x1 + u.x * span.centre, z: wall.z1 + u.z * span.centre };
+    // The room side: into the main floor if the wall borders it, else into any floor.
+    let n = { x: -u.z, z: u.x };
+    const into = (floor, m) => contains(floor, mid.x + m.x * 20, mid.z + m.z * 20);
+    const flipped = { x: -n.x, z: -n.z };
+    if ((main && into(main, flipped) && !into(main, n)) || (!floors.some((f) => into(f, n)) && floors.some((f) => into(f, flipped)))) n = flipped;
+    const off = wall.thickness / 2 + d / 2 + 0.5;
+    const x = mid.x + n.x * off;
+    const z = mid.z + n.z * off;
+    if (others.some((c) => containsPoint(c, x, z))) continue;
+    // Not past the wall's ends, where it meets the next wall.
+    const room = 2 * Math.min(span.centre, len - span.centre) - 16;
+    const top = Math.min(wall.height - (blind ? 2 : 3), span.top + (blind ? 8 : 15));
+    const bottom = blind ? Math.max(0, span.bottom - 5) : 1;
+    return {
+      x,
+      z,
+      rotation: normAngle(Math.round(deg(Math.atan2(n.x, n.z)))),
+      w: fit(Math.min(room, span.width + (blind ? 10 : 40)), limits.w),
+      h: fit(top - bottom, limits.h),
+      mount: fit(bottom, limits.mount),
+    };
+  }
+  return null;
+}
+
 // Where a new piece naturally goes: bathroom, kitchen and bedroom pieces along the walls (showers,
-// baths and armchairs in corners, hanging pieces over what they belong above), bar stools at the
+// baths and armchairs in corners, hanging pieces over what they belong above), curtains over windows,
+// a ceiling air conditioner in the middle of the ceiling, bar stools at the
 // island, desk chairs at the desk, bedside tables beside the bed with a lamp on top, the TV stand
 // against the main wall, the TV on a free stand (or on the main wall if it's wall-mounted), the sofa
 // against the opposite wall facing it, anything else in the middle of the floor.
@@ -348,6 +391,13 @@ export function preferredSpot(item, items, walls, openings = []) {
   if (place === 'island' || place === 'desk') spot = seatAt(item, items, walls, openings, place);
   else if (place === 'surface') spot = onSurface(item, items);
   else if (place === 'bed') spot = besideBed(item, items, walls, openings) ?? alongWalls(item, items, walls, openings);
+  else if (place === 'window') spot = atWindow(item, items, walls, openings) ?? alongWalls(item, items, walls, openings);
+  else if (place === 'ceiling') {
+    // In the middle of the room, up against the ceiling (the top of its tallest wall).
+    const ceiling = Math.max(...walls.filter((w) => !w.gap).map((w) => w.height));
+    const [lo, hi] = limitsOf(item).mount;
+    spot = { ...centroid(floor), rotation: 0, mount: Math.min(hi, Math.max(lo, ceiling - dimsOf(item).h - 1)) };
+  }
   else if (place) spot = overSpot(item, items, walls, openings) ?? alongWalls(item, items, walls, openings, { corner });
   if (spot) return spot;
   const centre = centroid(floor);
