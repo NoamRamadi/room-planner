@@ -970,8 +970,10 @@ export function createScene(container) {
       return;
     }
     if (itemDrag && e.pointerId === itemDrag.pointerId) {
+      // It slides along walls; holding Ctrl (or Alt / Option, or ⌘) takes it through them.
       const p = planePoint(e, dragPlane);
-      if (p) store.dragItem(itemDrag.id, p.x + itemDrag.dx, p.z + itemDrag.dz);
+      const through = e.ctrlKey || e.altKey || e.metaKey;
+      if (p) (through ? store.dragItem : store.moveItem)(itemDrag.id, p.x + itemDrag.dx, p.z + itemDrag.dz);
       return;
     }
     if (sinkDrag && e.pointerId === sinkDrag.pointerId) {
@@ -1042,7 +1044,8 @@ export function createScene(container) {
     press = null;
   });
 
-  // A piece of furniture let go over a wall moves to the nearest spot where it fits.
+  // A piece of furniture let go over a wall (taken there with Ctrl) moves to the nearest spot where it
+  // fits.
   function dropDragged() {
     const id = itemDrag?.id;
     if (id) store.dropItem(id);

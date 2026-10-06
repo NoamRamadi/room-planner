@@ -795,7 +795,7 @@ export function initUI(view) {
       ? 'Measuring: click two points to see the distance between them. Points snap to the corners and faces of walls, doors, windows and furniture; hold Shift for a straight line. Backspace removes the last one, Esc stops.'
       : locked
         ? 'Locked: look around and click things to see their measurements. Nothing can be moved or changed.'
-        : 'Drag walls, doors, windows and furniture to move them; furniture can be dragged through walls into the next room. Drag empty space to look around. Scroll or pinch to zoom.';
+        : `Drag walls, doors, windows and furniture to move them; hold Ctrl (or ${mac ? '⌥' : 'Alt'}) while dragging furniture to take it through walls. Drag empty space to look around. Scroll or pinch to zoom.`;
   });
   const lockNote = h('p', { class: 'lock-note' }, 'Locked. Unlock to make changes.');
 
@@ -945,6 +945,7 @@ function buildHelp(root) {
         h('li', {}, 'The floor fills in wherever walls enclose a space.'),
         h('li', {}, 'Add doors and windows under Add furniture → Doors & windows, then drag them along a wall or onto another one.'),
         h('li', {}, 'Lock, above the view, keeps everything in place while you look around and check measurements.'),
+        h('li', {}, 'Furniture stops at walls when you drag it. To take a piece through a wall, into the next room say, hold Ctrl while you drag it; let go where it fits.'),
         h('li', {}, 'Select a wall to see the gap from each of its free ends to the next wall. Measure, above the view, measures between any two points.'),
       ),
       h(

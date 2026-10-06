@@ -959,8 +959,9 @@ export function updateItem(id, patch) {
   replaceItem(before, settle(normalizeItem({ ...before, ...patch }), state.walls, state.items));
 }
 
-// Dragging furniture: it follows the pointer exactly, through walls if need be (a sofa can go through
-// a narrow hallway into the next room). Letting go (`dropItem`) moves it clear of any wall it's in.
+// Dragging furniture with Ctrl held: it follows the pointer exactly, through walls if need be (a sofa
+// can go through a narrow hallway into the next room). Letting go (`dropItem`) moves it clear of any
+// wall it ended up in.
 export function dragItem(id, x, z) {
   if (ui.locked) return null;
   nextKey = `move:${id}`;
@@ -978,7 +979,8 @@ export function dropItem(id) {
   replaceItem(before, after);
 }
 
-// Arrow keys: a step at a time, stopping at walls.
+// Dragging furniture, or the arrow keys: it moves towards (x, z) until a wall is in the way, then
+// slides along it.
 export function moveItem(id, x, z) {
   if (ui.locked) return null;
   nextKey = `move:${id}`;

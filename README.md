@@ -84,7 +84,7 @@ Click **Draw walls** at the top of the Walls panel to swap the 3D view for a flo
 - **Group walls:** Shift-click walls (or turn on **Select several**), then **Group these walls** or press Ctrl/Cmd+G. Clicking a grouped wall selects the whole group; click it again to edit just that wall. Groups can be renamed, turned, duplicated, ungrouped or removed. In the **Walls and groups** list, the arrow beside a group folds it down to a single row (click it again to unfold); folded groups are remembered, and a group unfolds by itself when you pick one of its walls in the view.
 - **Floor:** filled automatically wherever walls enclose a space. A room with one open side gets its floor from the outline of its walls.
 
-While you drag a piece of furniture it follows the pointer exactly, through walls if need be, so a sofa can go through a narrow hallway into the next room. Where it overlaps a wall it shows red, and if you let go there it moves to the nearest spot where it fits. The arrow keys move it a step at a time and stop at walls. Furniture fits under beams.
+Furniture can't pass through walls when you drag it: it stops at a wall and slides along it. To take a piece through a wall, for example a sofa through a narrow hallway into the next room, hold **Ctrl** (or Alt / ⌥ Option, or ⌘) while you drag it; it then follows the pointer exactly, shows red while it overlaps a wall, and if you let go there it moves to the nearest spot where it fits. You can press or release the key during the drag. Furniture fits under beams.
 
 ## Doors and windows
 
@@ -118,7 +118,7 @@ Carpets lie flat on the floor: furniture can stand on them, and carpets and furn
 
 | Action | How |
 | --- | --- |
-| Move a wall, group or piece of furniture | Drag it, or select it and use the arrow keys (Shift: 10 cm steps) |
+| Move a wall, group or piece of furniture | Drag it, or select it and use the arrow keys (Shift: 10 cm steps). Hold Ctrl (or Alt / ⌥, or ⌘) while dragging furniture to take it through walls |
 | Look around | Drag empty space; scroll or pinch to zoom; right-drag to pan |
 | Turn | R turns right 90°, Shift+R turns left, or use the turn buttons |
 | Remove | Delete, or the Remove button |
