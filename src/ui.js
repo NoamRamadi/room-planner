@@ -795,7 +795,7 @@ export function initUI(view) {
       ? 'Measuring: click two points to see the distance between them. Points snap to the corners and faces of walls, doors, windows and furniture; hold Shift for a straight line. Backspace removes the last one, Esc stops.'
       : locked
         ? 'Locked: look around and click things to see their measurements. Nothing can be moved or changed.'
-        : 'Drag walls, doors, windows and furniture to move them. Drag empty space to look around. Scroll or pinch to zoom.';
+        : 'Drag walls, doors, windows and furniture to move them; furniture can be dragged through walls into the next room. Drag empty space to look around. Scroll or pinch to zoom.';
   });
   const lockNote = h('p', { class: 'lock-note' }, 'Locked. Unlock to make changes.');
 

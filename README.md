@@ -84,7 +84,7 @@ Click **Draw walls** at the top of the Walls panel to swap the 3D view for a flo
 - **Group walls:** Shift-click walls (or turn on **Select several**), then **Group these walls** or press Ctrl/Cmd+G. Clicking a grouped wall selects the whole group; click it again to edit just that wall. Groups can be renamed, turned, duplicated, ungrouped or removed. In the **Walls and groups** list, the arrow beside a group folds it down to a single row (click it again to unfold); folded groups are remembered, and a group unfolds by itself when you pick one of its walls in the view.
 - **Floor:** filled automatically wherever walls enclose a space. A room with one open side gets its floor from the outline of its walls.
 
-Furniture can't pass through walls (it slides along them) but fits under beams.
+While you drag a piece of furniture it follows the pointer exactly, through walls if need be, so a sofa can go through a narrow hallway into the next room. Where it overlaps a wall it shows red, and if you let go there it moves to the nearest spot where it fits. The arrow keys move it a step at a time and stop at walls. Furniture fits under beams.
 
 ## Doors and windows
 

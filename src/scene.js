@@ -6,7 +6,7 @@ import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CATALOG, buildItem, dimsOf, isFlat, styleOf } from './catalog.js';
 import { buildOpening, buildSwing } from './openings.js';
-import { elevationOf, halfExtents } from './layout.js';
+import { elevationOf, halfExtents, hitsWall } from './layout.js';
 import * as store from './state.js';
 import { PATTERN_SIZE, floorTexture } from './textures.js';
 import {
@@ -505,6 +505,14 @@ export function createScene(container) {
   gaps.add(...gapDims);
   const sinkDims = [new Dim('gap'), new Dim('gap')];
   selection.add(...sinkDims);
+  // While a dragged piece overlaps a wall: a red box around it and a note that it doesn't fit there.
+  const blockedBox = new THREE.Mesh(UNIT_BOX, new THREE.MeshBasicMaterial({ color: '#d64545', transparent: true, opacity: 0.3, depthWrite: false }));
+  blockedBox.renderOrder = 4;
+  const blockedEl = document.createElement('span');
+  blockedEl.className = 'dim dim--warn';
+  blockedEl.textContent = 'Doesn’t fit here. Let go and it moves to where it fits.';
+  const blockedNote = new CSS2DObject(blockedEl);
+  selection.add(blockedBox, blockedNote);
   scene.add(selection, gaps);
 
   function updateItemSelection(state, ui) {
@@ -528,6 +536,15 @@ export function createScene(container) {
     sizeDims[1].visible = item.type !== 'tv'; // a TV's depth is just its foot
     sizeDims[2].measure(v3(hw + off, 0, hd + off), v3(hw + off, h * CM, hd + off), fmt(h), v3(1, 0, 0));
     if (isFlat(item)) sizeDims[2].visible = false; // a carpet's thickness isn't worth a label
+
+    const blocked = itemDrag?.id === item.id && hitsWall(item, state.walls, state.items);
+    blockedBox.visible = blockedNote.visible = blocked;
+    gaps.visible = !blocked;
+    if (blocked) {
+      blockedBox.scale.set(w * CM + 0.02, h * CM + 0.02, d * CM + 0.02);
+      blockedBox.position.set(0, (h * CM) / 2, 0);
+      blockedNote.position.set(0, h * CM + 0.2, 0);
+    }
 
     // A counter's sink: its distance from each end of the counter, along the front of the top.
     const sinkW = styleOf(item).sink;
@@ -954,7 +971,7 @@ export function createScene(container) {
     }
     if (itemDrag && e.pointerId === itemDrag.pointerId) {
       const p = planePoint(e, dragPlane);
-      if (p) store.moveItem(itemDrag.id, p.x + itemDrag.dx, p.z + itemDrag.dz);
+      if (p) store.dragItem(itemDrag.id, p.x + itemDrag.dx, p.z + itemDrag.dz);
       return;
     }
     if (sinkDrag && e.pointerId === sinkDrag.pointerId) {
@@ -996,7 +1013,7 @@ export function createScene(container) {
       return;
     }
     if ([itemDrag, openingDrag, sinkDrag].some((drag) => drag && e.pointerId === drag.pointerId)) {
-      endDrags();
+      dropDragged();
       return;
     }
     if (store.getUI().measuring) {
@@ -1021,9 +1038,17 @@ export function createScene(container) {
 
   container.addEventListener('pointercancel', () => {
     if (cornerDrag?.moved || wallDrag?.moved) store.finishWallEdit();
-    endDrags();
+    dropDragged();
     press = null;
   });
+
+  // A piece of furniture let go over a wall moves to the nearest spot where it fits.
+  function dropDragged() {
+    const id = itemDrag?.id;
+    if (id) store.dropItem(id);
+    endDrags();
+    updateItemSelection(store.getState(), store.getUI());
+  }
 
   // ---- Camera views ----
 

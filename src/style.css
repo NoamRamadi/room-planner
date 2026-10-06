@@ -1473,6 +1473,19 @@ h3 {
   box-shadow: 0 0 0 1px var(--graphite);
 }
 
+.dim--warn {
+  z-index: 5;
+  max-width: 170px;
+  padding: 4px 7px;
+  font-size: 12px;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+  color: #fff;
+  background: #c43d3d;
+  box-shadow: 0 0 0 1px var(--graphite);
+}
+
 .dim--gap {
   z-index: 2;
   padding: 2px 5px;
