@@ -25,7 +25,18 @@ Plan a room of your apartment in 3D, right in the browser.
 - **Measure** anything: select a wall to see the gap at its free ends, or use the Measure tool to measure between any two points
 - **Undo and redo** any change: the arrows at the start of the bar above the view, or Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z
 
-Your design is saved automatically in the browser. Use **Save design file** / **Open design file** to move it to another computer or share it.
+Your design is saved automatically in the browser. Use **Save design file** / **Open design file** (in the **⋯** menu at the top of the side panel) to move it to another computer or share it.
+
+## The side panel
+
+A rail down the side panel's edge switches between four sections, one at a time (the panel remembers the last one; on phones the rail is a row of tabs):
+
+- **Rooms:** **Draw walls**, add a room by its inside size, add a single wall (folded away under **Add a single wall**), and the list of your rooms and walls.
+- **Add:** search every design by name (for example "lamp", "sink" or "window") and click one to add it, or pick a category (Living, Kitchen, Bedroom, Bath, Doors & windows, Any room), then a type, then a design.
+- **Placed:** everything in your plan, grouped by the room it's for, with counts. Filter by group, fold groups away, and click a piece to select it.
+- **Style:** wall height, floor pattern and color, and wall color.
+
+The **⋯** menu next to the title has **Save design file**, **Open design file** and **Start over**.
 
 ## Run it
 
@@ -64,7 +75,7 @@ Changing a wall's thickness keeps the face on the room side where it is, so the 
 
 ## Drawing walls
 
-Click **Draw walls** at the top of the Walls panel to swap the 3D view for a floor plan seen from above, on a grid of squares (the corner of the plan says how big a square is; it gets finer as you zoom in). Your existing walls show in grey, with gaps for doors and windows.
+Click **Draw walls** at the top of the **Rooms** section to swap the 3D view for a floor plan seen from above, on a grid of squares (the corner of the plan says how big a square is; it gets finer as you zoom in). Your existing walls show in grey, with gaps for doors and windows.
 
 - **Draw:** click to start a wall, then click at each corner; every click ends one wall and starts the next. Draw along the inside of the room: the walls go outside your lines, so the room keeps the size you draw.
 - **End a line:** click its last corner again (a double-click), press Enter or Esc, or use **Finish line**. Clicking where the line started closes the room.
@@ -81,14 +92,14 @@ Click **Draw walls** at the top of the Walls panel to swap the 3D view for a flo
 - **Connect walls:** drag a wall. When one of its ends comes within 20 cm of another wall's end (or the middle of a straight wall), it snaps on and a yellow ring shows the connection.
 - **Stretch or turn a wall:** select it and drag the round handle at either end. Every wall joined at that corner moves with it. You can also type the length and angle in the panel; a new length moves the next wall along with the end, so a rectangular room stays rectangular.
 - **One wall's details:** thickness, height, **gap below** (for a beam over an opening), **bulge** (a curved wall), and color.
-- **Group walls:** Shift-click walls (or turn on **Select several**), then **Group these walls** or press Ctrl/Cmd+G. Clicking a grouped wall selects the whole group; click it again to edit just that wall. Groups can be renamed, turned, duplicated, ungrouped or removed. In the **Walls and groups** list, the arrow beside a group folds it down to a single row (click it again to unfold); folded groups are remembered, and a group unfolds by itself when you pick one of its walls in the view.
+- **Group walls:** Shift-click walls (or turn on **Select several**), then **Group these walls** or press Ctrl/Cmd+G. Clicking a grouped wall selects the whole group; click it again to edit just that wall. Groups can be renamed, turned, duplicated, ungrouped or removed. In the **Your rooms and walls** list, the arrow beside a group folds it down to a single row (click it again to unfold); folded groups are remembered, and a group unfolds by itself when you pick one of its walls in the view.
 - **Floor:** filled automatically wherever walls enclose a space. A room with one open side gets its floor from the outline of its walls.
 
 Furniture can't pass through walls when you drag it: it stops at a wall and slides along it. To take a piece through a wall, for example a sofa through a narrow hallway into the next room, hold **Ctrl** (or Alt / ⌥ Option, or ⌘) while you drag it; it then follows the pointer exactly, shows red while it overlaps a wall, and if you let go there it moves to the nearest spot where it fits. You can press or release the key during the drag. Furniture fits under beams.
 
 ## Doors and windows
 
-Under **Add furniture → Doors & windows**, click **Door** or **Window** and pick a design. It goes in the selected wall, or in a wall with room for it. Drag it along its wall or onto another wall; while it's selected, the view shows its size and its distance from each inside corner of the wall. In its panel you can set the width, height, how high a window starts above the floor, its distance from the inside corner, which side a door's hinges are on and which way it opens, and the colors. Doors show their swing on the floor. Doors and windows go in straight walls that stand on the floor (not curved walls or beams), and they move, turn, copy and disappear with their wall.
+Under **Add → Doors & windows**, click **Door** or **Window** and pick a design. It goes in the selected wall, or in a wall with room for it. Drag it along its wall or onto another wall; while it's selected, the view shows its size and its distance from each inside corner of the wall. In its panel you can set the width, height, how high a window starts above the floor, its distance from the inside corner, which side a door's hinges are on and which way it opens, and the colors. Doors show their swing on the floor. Doors and windows go in straight walls that stand on the floor (not curved walls or beams), and they move, turn, copy and disappear with their wall.
 
 ## Lock
 
@@ -102,7 +113,7 @@ Under **Add furniture → Doors & windows**, click **Door** or **Window** and pi
 
 ## Furniture designs
 
-Under **Add furniture**, pick **Living**, **Kitchen**, **Bedroom**, **Bathroom** or **Any room**, click a type and pick a design from the menu. To change a piece's design later, select it and pick another under **Design**; its size is kept wherever the new design allows. Each design has its own size presets. A round table has a single size, its diameter. A wall-mounted TV has a height above the floor. A corner sofa can have its chaise on the left, and a corner desk its return on the right.
+Under **Add**, search for a design by name, or pick **Living**, **Kitchen**, **Bedroom**, **Bath** or **Any room**, click a type and pick a design from the menu. To change a piece's design later, select it and pick another under **Design**; its size is kept wherever the new design allows. Each design has its own size presets. A round table has a single size, its diameter. A wall-mounted TV has a height above the floor. A corner sofa can have its chaise on the left, and a corner desk its return on the right.
 
 Bathroom pieces find their own place: toilets, sinks, washing machines and cabinets line up along a wall, showers and bathtubs go into corners, a mirror cabinet hangs over the sink, and none of them block a door (tall ones stay clear of windows too). A mirror cabinet and a shower head hang on the wall at a height you set (**Above floor**).
 

@@ -52,6 +52,15 @@ const ICONS = {
   chevronLeft: '<path d="M15 5l-7 7 7 7"/>',
   chevronRight: '<path d="M9 5l7 7-7 7"/>',
   chevronDown: '<path d="M5 9l7 7 7-7"/>',
+  paneRooms: '<path d="M4 10.5L12 4l8 6.5V20H4z"/><path d="M9.5 20v-5h5v5"/>',
+  paneAdd: '<path d="M6 11V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v3"/><path d="M4 12a2 2 0 0 1 4 0v2h8v-2a2 2 0 0 1 4 0v5H4z"/><path d="M6 17v2M18 17v2"/>',
+  panePlaced: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke-width="3"/>',
+  paneStyle: '<path d="M5 4h12v5H5z"/><path d="M17 6.5h2v5h-7v3"/><path d="M11 14.5h2V20h-2z"/>',
+  pencil: '<path d="M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="M14 7l3 3"/>',
+  dots: '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.4"/>',
+  save: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19h14"/>',
+  open: '<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M5 19h14"/>',
+  restart: '<path d="M5 12a7 7 0 1 0 2.1-5"/><path d="M5 4v4h4"/>',
   door: '<path d="M15 30V3h18v27"/><path d="M10 30h28"/><path d="M29 16v2"/>',
   window: '<rect x="8" y="4" width="32" height="22"/><path d="M24 4v22"/><path d="M5 28h38"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
@@ -259,6 +268,18 @@ function segmented({ label, options, get, set }) {
   const buttons = options.map((o) => h('button', { type: 'button', onclick: () => set(o.id) }, o.label));
   return {
     el: h('div', { class: 'segmented', role: 'group', 'aria-label': label }, buttons),
+    sync() {
+      const value = get();
+      buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i].id === value)));
+    },
+  };
+}
+
+// A row of rounded choices (one of them on), wrapping onto more lines as needed.
+function pills({ label, options, get, set }) {
+  const buttons = options.map((o) => h('button', { type: 'button', class: 'pill', onclick: () => set(o.id) }, o.label));
+  return {
+    el: h('div', { class: 'pills', role: 'group', 'aria-label': label }, buttons),
     sync() {
       const value = get();
       buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i].id === value)));
@@ -537,7 +558,7 @@ export function initUI(view) {
   });
   syncers.push(wallHeight.sync, pattern.sync, floor.sync, walls.sync);
 
-  // ---- Furniture ----
+  // ---- Add: search every design, or browse by category ----
 
   // Each type opens a menu of its designs; picking one adds that piece. Furniture comes in sets by
   // room (living room, kitchen, bedroom, bathroom), doors and windows are a set of their own, and
@@ -546,23 +567,20 @@ export function initUI(view) {
     { id: 'living', label: 'Living' },
     { id: 'kitchen', label: 'Kitchen' },
     { id: 'bedroom', label: 'Bedroom' },
-    { id: 'bath', label: 'Bathroom' },
+    { id: 'bath', label: 'Bath' },
     { id: 'openings', label: 'Doors & windows' },
     { id: 'any', label: 'Any room' },
   ];
+  const addOpening = (kind, style) => {
+    if (store.addOpening(kind, style) === false) say(`No wall has room for a ${noun(OPENINGS[kind].label)}. Make a wall longer, or move a door or window.`);
+  };
   const furnitureFor = (room) =>
     adder({
       id: `design-menu-${room}`,
       kinds: Object.fromEntries(Object.entries(CATALOG).filter(([, def]) => (def.room ?? 'living') === room)),
       onPick: (type, style) => store.addItem(type, style),
     });
-  const openings = adder({
-    id: 'opening-menu',
-    kinds: OPENINGS,
-    onPick: (kind, style) => {
-      if (store.addOpening(kind, style) === false) say(`No wall has room for a ${noun(OPENINGS[kind].label)}. Make a wall longer, or move a door or window.`);
-    },
-  });
+  const openings = adder({ id: 'opening-menu', kinds: OPENINGS, onPick: addOpening });
   const sets = Object.fromEntries(rooms.map((r) => [r.id, r.id === 'openings' ? openings : furnitureFor(r.id)]));
   const furniture = { close: () => Object.values(sets).forEach((set) => set.close()) };
   let shownSet = 'living';
@@ -578,8 +596,8 @@ export function initUI(view) {
       ),
     ]),
   );
-  const roomTabs = segmented({
-    label: 'Which furniture',
+  const roomTabs = pills({
+    label: 'Category',
     options: rooms,
     get: () => shownSet,
     set: (id) => {
@@ -594,37 +612,147 @@ export function initUI(view) {
   };
   syncRoomTabs();
 
-  const inventory = h('ol', { class: 'inventory', 'data-always': '' });
+  // Search: every design of every kind whose names hold all the words typed; picking one adds it.
+  const designIndex = [
+    ...Object.entries(CATALOG).flatMap(([type, def]) =>
+      def.styles.map((s) => ({ add: () => store.addItem(type, s.id), type, style: s.id, label: s.label, kind: def.label, words: `${def.label} ${s.label} ${s.name}`.toLowerCase() })),
+    ),
+    ...Object.entries(OPENINGS).flatMap(([kind, def]) =>
+      def.styles.map((s) => ({ add: () => addOpening(kind, s.id), type: kind, style: s.id, label: s.label, kind: def.label, words: `${def.label} ${s.label} ${s.name ?? ''}`.toLowerCase() })),
+    ),
+  ];
+  const search = h('input', { type: 'search', class: 'search', placeholder: 'Search: sofa, sink, lamp…', 'aria-label': 'Search furniture', autocomplete: 'off' });
+  const results = h('div', { class: 'designs designs--results', role: 'group', 'aria-label': 'Search results', hidden: true });
+  const browse = h('div', { class: 'browse' }, roomTabs.el, Object.values(setBlocks));
+  function runSearch() {
+    const words = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    results.hidden = !words.length;
+    browse.hidden = Boolean(words.length);
+    if (!words.length) return;
+    furniture.close();
+    const hits = designIndex.filter((d) => words.every((w) => d.words.includes(w)));
+    results.replaceChildren(
+      ...(hits.length
+        ? hits.slice(0, 40).map((d) =>
+            h(
+              'button',
+              { type: 'button', class: 'design-btn', title: `Add ${noun(d.kind)}: ${d.label}`, onclick: d.add },
+              h('span', { html: designIcon(d.type, d.style) }),
+              h('span', {}, d.label),
+              h('span', { class: 'design-btn__kind' }, d.kind),
+            ),
+          )
+        : [h('p', { class: 'empty' }, `Nothing matches “${search.value.trim()}”. Try another word, or browse by category.`)]),
+    );
+  }
+  search.addEventListener('input', runSearch);
+  search.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !search.value) return;
+    e.stopPropagation();
+    search.value = '';
+    runSearch();
+  });
+
+  // ---- In your plan: everything placed, grouped by the room it's for, each group folding away ----
+
+  const CATEGORIES = [
+    ['living', 'Living room'],
+    ['kitchen', 'Kitchen'],
+    ['bedroom', 'Bedroom'],
+    ['bath', 'Bathroom'],
+    ['any', 'Any room'],
+  ];
+  const categoryOf = (item) => CATALOG[item.type].room ?? 'living';
+  let placedFilter = 'all';
+  const placedFolded = new Set();
+  const placedFilters = h('div', { class: 'pills', role: 'group', 'aria-label': 'Show' });
+  const inventory = h('ol', { class: 'inventory' });
   const count = h('span', { class: 'section__meta' });
   let inventoryKey = '';
+  const rerenderInventory = () => {
+    inventoryKey = '';
+    renderInventory(store.getState(), store.getUI());
+  };
   function renderInventory(state, ui) {
     const selectedId = ui.sel?.type === 'item' ? ui.sel.id : null;
-    const key = JSON.stringify([selectedId, state.items.map((i) => [i.id, i.name, i.color, sizeText(i)])]);
+    // The selected piece's group unfolds, so it shows in the list.
+    const picked = selectedId && state.items.find((i) => i.id === selectedId);
+    if (picked) placedFolded.delete(categoryOf(picked));
+    const key = JSON.stringify([selectedId, placedFilter, [...placedFolded], state.items.map((i) => [i.id, i.name, i.color, i.type, sizeText(i)])]);
     if (key === inventoryKey) return;
     inventoryKey = key;
     count.textContent = state.items.length ? `${state.items.length} ${state.items.length === 1 ? 'piece' : 'pieces'}` : '';
-    if (!state.items.length) {
-      inventory.replaceChildren(h('li', { class: 'empty' }, 'No furniture yet. Pick a room under Add furniture and add a piece to start arranging.'));
-      return;
-    }
-    inventory.replaceChildren(
-      ...state.items.map((item) =>
+    const groups = CATEGORIES.map(([id, label]) => ({ id, label, items: state.items.filter((i) => categoryOf(i) === id) })).filter((g) => g.items.length);
+    if (placedFilter !== 'all' && !groups.some((g) => g.id === placedFilter)) placedFilter = 'all';
+    placedFilters.hidden = groups.length < 2;
+    placedFilters.replaceChildren(
+      ...[{ id: 'all', label: 'All', n: state.items.length }, ...groups.map((g) => ({ id: g.id, label: g.label, n: g.items.length }))].map((f) =>
         h(
-          'li',
-          {},
-          h(
-            'button',
-            { type: 'button', 'aria-current': item.id === selectedId ? 'true' : null, onclick: () => store.select(item.id) },
-            h('span', { class: 'inventory__dot', style: `--chip:${item.color}` }),
-            h('span', { class: 'inventory__name' }, item.name),
-            h('span', { class: 'inventory__size' }, sizeText(item)),
-          ),
+          'button',
+          {
+            type: 'button',
+            class: 'pill',
+            'aria-pressed': String(placedFilter === f.id),
+            onclick: () => {
+              placedFilter = f.id;
+              rerenderInventory();
+            },
+          },
+          f.label,
+          h('span', { class: 'pill__count' }, String(f.n)),
         ),
       ),
     );
+    if (!state.items.length) {
+      inventory.replaceChildren(
+        h('li', { class: 'empty' }, 'Nothing placed yet. ', h('button', { type: 'button', class: 'btn btn--plain btn--small', onclick: () => showPane('add') }, 'Add furniture')),
+      );
+      return;
+    }
+    const row = (item) =>
+      h(
+        'li',
+        {},
+        h(
+          'button',
+          { type: 'button', 'aria-current': item.id === selectedId ? 'true' : null, onclick: () => store.select(item.id) },
+          h('span', { class: 'inventory__dot', style: `--chip:${item.color}` }),
+          h('span', { class: 'inventory__name' }, item.name),
+          h('span', { class: 'inventory__size' }, sizeText(item)),
+        ),
+      );
+    inventory.replaceChildren(
+      ...groups
+        .filter((g) => placedFilter === 'all' || g.id === placedFilter)
+        .flatMap((g) => {
+          const open = !placedFolded.has(g.id);
+          return [
+            h(
+              'li',
+              { class: 'inventory__group' },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  'aria-expanded': String(open),
+                  onclick: () => {
+                    if (open) placedFolded.add(g.id);
+                    else placedFolded.delete(g.id);
+                    rerenderInventory();
+                  },
+                },
+                h('span', { class: 'inventory__fold', html: icon(open ? 'chevronDown' : 'chevronRight') }),
+                h('span', { class: 'inventory__name' }, g.label),
+                h('span', { class: 'inventory__size' }, String(g.items.length)),
+              ),
+            ),
+            ...(open ? g.items.map(row) : []),
+          ];
+        }),
+    );
   }
 
-  // ---- Design file ----
+  // ---- Design file: a menu at the top of the panel ----
 
   const fileInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true });
   fileInput.addEventListener('change', async () => {
@@ -650,21 +778,70 @@ export function initUI(view) {
     store.resetDesign();
     view.setView('overview');
   };
+  const menuItem = (label, iconName, onclick, extra = {}) =>
+    h('button', { type: 'button', role: 'menuitem', ...extra, onclick: () => (closeFileMenu(), onclick()) }, h('span', { html: icon(iconName) }), label);
+  const fileMenu = h(
+    'div',
+    { class: 'file-menu', role: 'menu', 'aria-label': 'Design file', hidden: true },
+    menuItem('Save design file', 'save', saveDesign, { 'data-always': '' }),
+    menuItem('Open design file', 'open', () => fileInput.click()),
+    menuItem('Start over', 'restart', startOver, { class: 'is-danger' }),
+    h('p', { class: 'note' }, 'Your design is also saved automatically in this browser.'),
+  );
+  const fileButton = h('button', {
+    type: 'button',
+    class: 'icon-btn',
+    'aria-label': 'Design file',
+    title: 'Save, open or start over',
+    'aria-haspopup': 'menu',
+    'aria-expanded': 'false',
+    'data-always': '',
+    html: icon('dots'),
+    onclick: () => (fileMenu.hidden ? openFileMenu() : closeFileMenu()),
+  });
+  function openFileMenu() {
+    fileMenu.hidden = false;
+    fileButton.setAttribute('aria-expanded', 'true');
+    fileMenu.querySelector('button:not(:disabled)')?.focus();
+  }
+  function closeFileMenu() {
+    fileMenu.hidden = true;
+    fileButton.setAttribute('aria-expanded', 'false');
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (!fileMenu.hidden && !fileMenu.contains(e.target) && !fileButton.contains(e.target)) closeFileMenu();
+  });
+  fileMenu.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    closeFileMenu();
+    fileButton.focus();
+  });
 
-  panel.append(
-    h('header', { class: 'brand' }, h('h1', {}, 'Room planner')),
-    h(
+  // ---- The panel: a rail of sections down its edge, one section shown at a time ----
+
+  const PANES = [
+    { id: 'rooms', label: 'Rooms', icon: 'paneRooms' },
+    { id: 'add', label: 'Add', icon: 'paneAdd' },
+    { id: 'placed', label: 'Placed', icon: 'panePlaced' },
+    { id: 'style', label: 'Style', icon: 'paneStyle' },
+  ];
+  const PANE_KEY = 'room-planner:pane';
+  let pane = 'rooms';
+  try {
+    const saved = localStorage.getItem(PANE_KEY);
+    if (PANES.some((p) => p.id === saved)) pane = saved;
+  } catch {
+    // nothing remembered
+  }
+  const panes = {
+    rooms: h(
       'section',
-      { class: 'section', 'aria-labelledby': 'walls-heading' },
-      h('div', { class: 'section__head' }, h('h2', { id: 'walls-heading' }, 'Walls'), wallCount),
-      h(
-        'div',
-        { class: 'draw-entry' },
-        h('button', { type: 'button', class: 'btn btn--tape', onclick: () => draw.open() }, 'Draw walls'),
-        h('p', { class: 'help help--first' }, 'Draw the inside of a room corner by corner on a floor plan.'),
-      ),
-      h('div', { class: 'adder' }, nextLength.el, h('button', { type: 'button', class: 'btn', onclick: () => store.addWall(next.length, view.focus()) }, 'Add wall')),
-      addWallHelp,
+      { class: 'pane' },
+      h('div', { class: 'pane__head' }, h('h2', {}, 'Rooms'), wallCount),
+      h('button', { type: 'button', class: 'btn btn--tape btn--wide', onclick: () => draw.open() }, h('span', { html: icon('pencil') }), 'Draw walls'),
+      h('p', { class: 'help' }, 'Draw the inside of a room, corner by corner, on a floor plan.'),
+      h('h3', { class: 'pane__label' }, 'Or add a room by its inside size'),
       h(
         'div',
         { class: 'adder adder--room' },
@@ -672,45 +849,77 @@ export function initUI(view) {
         roomDepth.el,
         h('button', { type: 'button', class: 'btn', onclick: () => store.addRoom(next.width, next.depth) }, 'Add room'),
       ),
-      h('p', { class: 'help' }, 'Width and length are the room’s inside size, as you’d measure it with a tape; the walls go around it.'),
-      h('div', { class: 'section__head section__head--list' }, h('h3', { class: 'list-title' }, 'Walls and groups'), several),
+      h(
+        'details',
+        { class: 'more' },
+        h('summary', {}, 'Add a single wall'),
+        h('div', { class: 'adder' }, nextLength.el, h('button', { type: 'button', class: 'btn', onclick: () => store.addWall(next.length, view.focus()) }, 'Add wall')),
+        addWallHelp,
+      ),
+      h('div', { class: 'pane__label-row' }, h('h3', { class: 'pane__label' }, 'Your rooms and walls'), several),
       wallList,
     ),
-    h(
+    add: h('section', { class: 'pane' }, h('div', { class: 'pane__head' }, h('h2', {}, 'Add')), search, results, browse),
+    placed: h('section', { class: 'pane' }, h('div', { class: 'pane__head' }, h('h2', {}, 'In your plan'), count), placedFilters, h('div', { 'data-always': '' }, inventory)),
+    style: h(
       'section',
-      { class: 'section', 'aria-labelledby': 'look-heading' },
-      h('h2', { id: 'look-heading' }, 'Floor and walls'),
+      { class: 'pane' },
+      h('div', { class: 'pane__head' }, h('h2', {}, 'Floor and walls')),
       h('div', { class: 'field-row field-row--first' }, wallHeight.el, h('p', { class: 'help help--side' }, 'Sets every wall. Change one wall by selecting it.')),
       h('div', { class: 'field-row' }, h('span', { class: 'field-row__label' }, 'Floor pattern'), pattern.el),
       floor.el,
       walls.el,
     ),
+  };
+  const tabs = PANES.map((p) => {
+    const tab = h(
+      'button',
+      { type: 'button', role: 'tab', id: `tab-${p.id}`, class: 'rail__tab', 'aria-controls': `pane-${p.id}`, onclick: () => showPane(p.id) },
+      h('span', { html: icon(p.icon) }),
+      h('span', { class: 'rail__label' }, p.label),
+    );
+    panes[p.id].id = `pane-${p.id}`;
+    panes[p.id].setAttribute('role', 'tabpanel');
+    panes[p.id].setAttribute('aria-labelledby', `tab-${p.id}`);
+    return tab;
+  });
+  const rail = h('nav', { class: 'rail', role: 'tablist', 'aria-label': 'Panel sections', 'aria-orientation': 'vertical', 'data-always': '' }, tabs);
+  // Arrow keys move between the sections, as in any list of tabs.
+  rail.addEventListener('keydown', (e) => {
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const k = (PANES.findIndex((p) => p.id === pane) + step + PANES.length) % PANES.length;
+    showPane(PANES[k].id);
+    tabs[k].focus();
+  });
+  function showPane(id) {
+    pane = id;
+    try {
+      localStorage.setItem(PANE_KEY, id);
+    } catch {
+      // private browsing: just don't remember it
+    }
+    furniture.close();
+    PANES.forEach((p, k) => {
+      tabs[k].setAttribute('aria-selected', String(p.id === id));
+      tabs[k].tabIndex = p.id === id ? 0 : -1;
+      panes[p.id].hidden = p.id !== id;
+    });
+    if (id === 'add' && matchMedia('(min-width: 821px)').matches) search.focus({ preventScroll: true });
+  }
+
+  panel.append(
+    rail,
     h(
-      'section',
-      { class: 'section', 'aria-labelledby': 'add-heading' },
-      h('div', { class: 'section__head section__head--tabs' }, h('h2', { id: 'add-heading' }, 'Add furniture'), roomTabs.el),
-      Object.values(setBlocks),
-    ),
-    h(
-      'section',
-      { class: 'section', 'aria-labelledby': 'list-heading' },
-      h('div', { class: 'section__head' }, h('h2', { id: 'list-heading' }, 'Furniture'), count),
-      inventory,
-    ),
-    h(
-      'footer',
-      { class: 'section panel__footer' },
-      h(
-        'div',
-        { class: 'file-actions' },
-        h('button', { type: 'button', class: 'btn', 'data-always': '', onclick: saveDesign }, 'Save design file'),
-        h('button', { type: 'button', class: 'btn', onclick: () => fileInput.click() }, 'Open design file'),
-        h('button', { type: 'button', class: 'btn btn--plain', onclick: startOver }, 'Start over'),
-      ),
-      h('p', { class: 'note' }, 'Your design is saved automatically in this browser.'),
+      'div',
+      { class: 'panel__body' },
+      h('header', { class: 'brand panel__head' }, h('h1', {}, 'Room planner'), fileButton, fileMenu),
+      Object.values(panes),
       fileInput,
     ),
   );
+  showPane(pane);
 
   // On: walls between the camera and the room are cut down so you can see in. Off: walls always stand.
   const seeThrough = h(
@@ -952,7 +1161,7 @@ function buildHelp(root) {
         h('li', {}, 'Shift-click several walls and group them to move them as one. Click a grouped wall again to edit just that wall.'),
         h('li', {}, 'The quickest way to lay out a room or a whole apartment is Draw walls: click its corners on a floor plan.'),
         h('li', {}, 'The floor fills in wherever walls enclose a space.'),
-        h('li', {}, 'Add doors and windows under Add furniture → Doors & windows, then drag them along a wall or onto another one.'),
+        h('li', {}, 'Add doors and windows from Add → Doors & windows in the side panel, then drag them along a wall or onto another one.'),
         h('li', {}, 'Lock, above the view, keeps everything in place while you look around and check measurements.'),
         h('li', {}, 'Furniture stops at walls when you drag it. To take a piece through a wall, into the next room say, hold Ctrl while you drag it; let go where it fits.'),
         h('li', {}, 'Select a wall to see the gap from each of its free ends to the next wall. Measure, above the view, measures between any two points.'),
@@ -1088,7 +1297,7 @@ function wallOpenings(w) {
           list.map((o) => h('button', { type: 'button', class: 'preset', 'data-always': '', onclick: () => store.selectOpening(o.id) }, `${o.name}, ${o.width} cm`)),
         )
       : null,
-    h('p', { class: 'help help--first' }, list.length ? 'Pick one to change it.' : 'None yet. While this wall is selected, Door or Window under Add furniture → Doors & windows adds one here.'),
+    h('p', { class: 'help help--first' }, list.length ? 'Pick one to change it.' : 'None yet. While this wall is selected, Door or Window under Add → Doors & windows adds one here.'),
   ];
 }
 
