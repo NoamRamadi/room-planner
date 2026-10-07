@@ -200,6 +200,22 @@ const BED_SIZES = [
   { name: 'King 180', w: 190, d: 215 },
 ];
 
+const COFFEE_FINISHES = [...FINISHES, { name: 'Red', hex: '#b5332e' }];
+
+const RACKS = [
+  { name: 'Stainless steel', hex: '#c3c6c9' },
+  { name: 'White', hex: '#f2f2ef' },
+  { name: 'Black', hex: '#1e1f22' },
+  { name: 'Bamboo', hex: '#c9a46a' },
+];
+
+const TRAYS = [
+  { name: 'White', hex: '#f2f2ef' },
+  { name: 'Light grey', hex: '#cfd2d3' },
+  { name: 'Charcoal', hex: '#3b3e43' },
+  { name: 'Sage', hex: '#a9b59d' },
+];
+
 const TV_FINISHES = [
   { name: 'Black', hex: '#1d1e21' },
   { name: 'Graphite', hex: '#4a4c50' },
@@ -231,7 +247,8 @@ const TV_SIZES = [
 // placed over one. `room`: the furniture set it's listed under. `place` (for a type or a design):
 // where a new one goes: 'wall', 'corner', 'bed' (beside one), 'desk' or 'island' (in front of one,
 // facing it), 'surface' (on a bedside table, desk or chest), 'counter' (on a kitchen worktop, next
-// to the sink if `nearSink`), 'window' (over one, sized to it) or 'ceiling'. A hanging design's `over` lists what it hangs above. `flip`: the label of a design's
+// to the sink if `nearSink`, or standing over it if `overSink`), 'window' (over one, sized to it) or
+// 'ceiling'. A hanging design's `over` lists what it hangs above. `flip`: the label of a design's
 // mirror-image option. `behind`: hangs flat against the wall, so furniture can stand in front of it.
 export const CATALOG = {
   sofa: {
@@ -1116,6 +1133,52 @@ export const CATALOG = {
       },
     ],
     build: buildDispenser,
+  },
+  coffee: {
+    label: 'Coffee machine',
+    room: 'kitchen',
+    place: 'counter',
+    stackable: true,
+    defaults: { style: 'espresso', w: 32, d: 28, h: 38, color: '#c3c6c9' },
+    limits: { w: [12, 45], d: [20, 48], h: [22, 50] },
+    colors: [{ key: 'color', label: 'Finish', palette: COFFEE_FINISHES }],
+    styles: [
+      { id: 'espresso', label: 'Espresso machine', name: 'Espresso machine', presets: [{ name: 'Compact', w: 28, d: 26, h: 34 }, { name: 'Standard', w: 32, d: 28, h: 38 }] },
+      { id: 'capsule', label: 'Capsule machine', name: 'Capsule coffee machine', defaults: { w: 15, d: 33, h: 26, color: '#1e1f22' }, presets: [{ name: 'Slim', w: 12, d: 32, h: 24 }, { name: 'Standard', w: 15, d: 33, h: 26 }] },
+      { id: 'drip', label: 'Drip coffee maker', name: 'Coffee maker', defaults: { w: 22, d: 25, h: 35, color: '#1e1f22' }, presets: [{ name: '10 cups', w: 22, d: 25, h: 35 }] },
+      { id: 'bean', label: 'Bean to cup', name: 'Bean-to-cup machine', defaults: { w: 26, d: 42, h: 36, color: '#1e1f22' }, presets: [{ name: 'Standard', w: 26, d: 42, h: 36 }] },
+    ],
+    build: buildCoffee,
+  },
+  dishrack: {
+    label: 'Dish dryer',
+    room: 'kitchen',
+    place: 'counter',
+    nearSink: true,
+    stackable: true,
+    defaults: { style: 'rack', w: 45, d: 32, h: 28, color: '#c3c6c9', color2: '#f2f2ef' },
+    limits: { w: [25, 90], d: [20, 45], h: [8, 70] },
+    colors: [
+      { key: 'color', label: 'Frame', palette: RACKS },
+      { key: 'color2', label: 'Tray', palette: TRAYS },
+    ],
+    styles: [
+      { id: 'rack', label: 'Dish rack', name: 'Dish rack', presets: [{ name: 'Small', w: 38, d: 30, h: 25 }, { name: 'Standard', w: 45, d: 32, h: 28 }] },
+      { id: 'twotier', label: 'Two-tier rack', name: 'Two-tier dish rack', defaults: { w: 45, d: 30, h: 45 }, presets: [{ name: 'Standard', w: 45, d: 30, h: 45 }] },
+      {
+        id: 'oversink',
+        label: 'Over the sink',
+        name: 'Over-the-sink dish rack',
+        overSink: true,
+        defaults: { w: 70, d: 30, h: 55, color: '#1e1f22' },
+        colors: [{ key: 'color', label: 'Frame', palette: RACKS }],
+        presets: [
+          { name: '65 cm', w: 65, d: 30, h: 55 },
+          { name: '85 cm', w: 85, d: 30, h: 60 },
+        ],
+      },
+    ],
+    build: buildDishRack,
   },
   island: {
     label: 'Kitchen island',
@@ -4251,5 +4314,172 @@ function buildDispenser({ w, d, h }, item) {
     dot.position.set(x * Math.min(1, w / 0.22), h - 0.065, front + 0.003);
     g.add(dot);
   }
+  return g;
+}
+
+// A mug standing at (x, y, z), its handle on the right.
+function mug(g, { x = 0, y, z, r = 0.035, h = 0.06, color = '#f4f3ef' }) {
+  const material = ceramic(color);
+  g.add(post(r, r * 0.85, h, material, x, z, y, 20));
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(h * 0.28, 0.006, 6, 16), material);
+  handle.position.set(x + r + h * 0.18, y + h * 0.5, z);
+  g.add(handle);
+}
+
+function buildCoffee({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const finish = appliance(item.color);
+  const dark = new THREE.MeshStandardMaterial({ color: '#232427', roughness: 0.4 });
+  const chrome = metal('#d5d8db');
+  const front = d / 2;
+  const style = item.style;
+
+  if (style === 'espresso') {
+    // A box with a cup warmer on top, a pressure gauge, the group head with its portafilter over a cup,
+    // a steam wand at the side and a drip tray.
+    // The body sits back so the portafilter's handle stays within the depth.
+    const bodyH = h * 0.86;
+    const reach = Math.min(0.1, d * 0.35);
+    const face = front - reach;
+    g.add(block(w, bodyH, d - reach, finish, { z: -reach / 2, r: 0.012 }));
+    g.add(block(w * 0.7, bodyH * 0.45, 0.006, dark, { y: 0.03, z: face }));
+    g.add(block(w * 0.72, 0.015, reach, chrome, { y: 0.02, z: face + reach / 2 }));
+    const gx = -w * 0.1;
+    g.add(post(0.03, 0.034, 0.035, chrome, gx, face + 0.03, bodyH * 0.55, 24));
+    g.add(block(0.024, 0.02, reach - 0.04, dark, { x: gx, y: bodyH * 0.55 + 0.005, z: face + 0.04 + (reach - 0.04) / 2, r: 0.008 }));
+    mug(g, { x: gx, y: 0.035, z: face + 0.03, r: 0.028, h: 0.05 });
+    g.add(rod([w / 2 - 0.05, bodyH * 0.72, face + 0.004], [w / 2 - 0.04, bodyH * 0.28, face + Math.min(0.04, reach)], 0.005, chrome));
+    const dial = new THREE.Mesh(new THREE.CircleGeometry(0.028, 24), new THREE.MeshStandardMaterial({ color: '#f4f3ef', roughness: 0.3 }));
+    dial.position.set(w * 0.15, bodyH * 0.8, face + 0.002);
+    const bezel = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.004, 8, 24), chrome);
+    bezel.position.copy(dial.position);
+    g.add(dial, bezel);
+    g.add(block(w - 0.04, 0.008, d - 0.06, chrome, { y: bodyH }));
+    for (const x of [-w * 0.18, w * 0.12]) mug(g, { x, y: bodyH + 0.008, z: -d * 0.1, r: 0.024, h: h - bodyH - 0.01 });
+    return g;
+  }
+
+  if (style === 'capsule') {
+    // Slim: a water tank at the back, the column with the brewing head on top, and a cup on the tray.
+    const water = new THREE.MeshStandardMaterial({ color: '#bfdcec', roughness: 0.1, transparent: true, opacity: 0.5, depthWrite: false });
+    const tankD = d * 0.3;
+    g.add(block(w, 0.035, d - 0.02, finish, { z: 0.01, r: 0.008 }));
+    g.add(block(w * 0.9, h * 0.8, tankD, water, { y: 0.035, z: -d / 2 + tankD / 2 }));
+    const colD = d * 0.4;
+    g.add(block(w, h - 0.035, colD, finish, { y: 0.035, z: -d / 2 + tankD + colD / 2, r: 0.015 }));
+    g.add(block(w, h * 0.28, d - tankD - colD + 0.01, finish, { y: h * 0.72, z: front - (d - tankD - colD) / 2, r: 0.015 }));
+    g.add(block(w * 0.7, 0.012, 0.06, dark, { y: h - 0.006, z: front - 0.05 }));
+    g.add(block(w * 0.8, 0.012, 0.08, chrome, { y: 0.035, z: front - 0.05 }));
+    mug(g, { y: 0.047, z: front - 0.05, r: Math.min(0.028, w * 0.3), h: 0.05 });
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.006, 16), acDisplay());
+    dot.position.set(0, h * 0.86, front + 0.001);
+    g.add(dot);
+    return g;
+  }
+
+  if (style === 'drip') {
+    // A base with a warming plate and a glass jug, a tower at the back with the water tank, and the
+    // filter head over the jug.
+    const baseH = 0.045;
+    const towerD = d * 0.36;
+    g.add(block(w, baseH, d, finish, { r: 0.01 }));
+    g.add(block(w, h - baseH, towerD, finish, { y: baseH, z: -d / 2 + towerD / 2, r: 0.01 }));
+    const headH = h * 0.22;
+    g.add(block(w, headH, d - towerD, finish, { y: h - headH, z: towerD / 2, r: 0.012 }));
+    const r = Math.min(w, d - towerD) * 0.36;
+    const jz = towerD / 2;
+    const jugH = Math.min(h * 0.45, h - headH - baseH - 0.02);
+    const glass = new THREE.MeshStandardMaterial({ color: '#d8e4ea', roughness: 0.05, transparent: true, opacity: 0.35, depthWrite: false });
+    g.add(post(r, r * 0.9, jugH, glass, 0, jz, baseH, 28));
+    g.add(post(r * 0.92, r * 0.84, jugH * 0.45, new THREE.MeshStandardMaterial({ color: '#3a2417', roughness: 0.3 }), 0, jz, baseH + 0.004, 28));
+    g.add(block(0.015, jugH * 0.6, 0.03, dark, { x: r + 0.012, y: baseH + jugH * 0.25, z: jz }));
+    g.add(block(0.012, 0.012, 0.004, new THREE.MeshStandardMaterial({ color: '#d9473d', emissive: '#d9473d', emissiveIntensity: 0.5 }), { x: w * 0.3, y: baseH * 0.4, z: front }));
+    return g;
+  }
+
+  // Bean to cup: a tall box with a touch panel, twin spouts over a cup in a recess, a drip tray and the
+  // bean hopper lid on top.
+  g.add(block(w, h, d, finish, { r: 0.02 }));
+  g.add(block(w * 0.7, h * 0.5, 0.006, dark, { y: 0.03, z: front }));
+  g.add(block(w * 0.75, 0.015, 0.06, chrome, { y: 0.03, z: front - 0.03 }));
+  for (const s of [-1, 1]) g.add(post(0.007, 0.007, 0.03, chrome, s * 0.012, front - 0.015, 0.03 + h * 0.5 - 0.03, 12));
+  mug(g, { y: 0.045, z: front - 0.03, r: 0.028, h: 0.055 });
+  g.add(block(w * 0.8, h * 0.16, 0.004, darkGlass(), { y: h * 0.64, z: front }));
+  g.add(block(w * 0.3, 0.012, 0.002, acDisplay(), { y: h * 0.71, z: front + 0.003 }));
+  g.add(post(Math.min(0.07, w * 0.27), Math.min(0.075, w * 0.29), 0.018, dark, -w * 0.12, -d * 0.18, h, 24));
+  return g;
+}
+
+function buildDishRack({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const frame = item.color === '#c9a46a' ? wood(item.color) : trim(item.color);
+  const tray = new THREE.MeshStandardMaterial({ color: item.color2, roughness: 0.35 });
+  const plate = ceramic('#f2f1ec');
+  const r = 0.004; // the wires' thickness
+  const style = item.style;
+
+  // A wire basket from y to y + bh: corner posts, a rim round the top and bottom, bars across the floor.
+  const basket = (y, bh, bw, bd) => {
+    const c = CORNERS.map(([sx, sz]) => [(sx * bw) / 2, (sz * bd) / 2]);
+    const order = [0, 1, 3, 2]; // round the rectangle
+    for (const [x, z] of c) g.add(rod([x, y, z], [x, y + bh, z], r, frame));
+    for (const level of [y, y + bh]) {
+      order.forEach((k, i) => {
+        const [x1, z1] = c[k];
+        const [x2, z2] = c[order[(i + 1) % 4]];
+        g.add(rod([x1, level, z1], [x2, level, z2], r, frame));
+      });
+    }
+    for (let x = -bw / 2 + 0.04; x < bw / 2 - 0.02; x += 0.05) g.add(rod([x, y, -bd / 2], [x, y, bd / 2], r * 0.8, frame));
+  };
+  // Plates standing on edge in a row across the rack, between x0 and x1, at z, from height y.
+  const plates = (x0, x1, y, z, size) => {
+    for (let x = x0; x <= x1; x += 0.032) {
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(size / 2, size / 2, 0.008, 28), plate);
+      disc.rotation.z = Math.PI / 2;
+      disc.position.set(x, y + size / 2, z);
+      g.add(disc);
+    }
+  };
+  // Cups upside down to drain.
+  const cups = (xs, y, z) => xs.forEach((x, i) => g.add(post(0.032, 0.026, 0.07, ceramic(i % 2 ? '#a9b59d' : '#f4f3ef'), x, z, y, 18)));
+
+  if (style === 'oversink') {
+    // Standing over the sink: a post at each corner, a shelf of plates up top and one of cups below,
+    // leaving the sink open underneath.
+    for (const [sx, sz] of CORNERS) {
+      g.add(rod([sx * (w / 2 - 0.02), 0, sz * (d / 2 - 0.02)], [sx * (w / 2 - 0.02), h, sz * (d / 2 - 0.02)], 0.008, frame));
+      g.add(block(0.03, 0.01, 0.03, tray, { x: sx * (w / 2 - 0.02), z: sz * (d / 2 - 0.02) }));
+    }
+    for (const y of [h * 0.35, h * 0.62, h]) {
+      for (const s of [-1, 1]) g.add(rod([-w / 2 + 0.02, y, s * (d / 2 - 0.02)], [w / 2 - 0.02, y, s * (d / 2 - 0.02)], 0.006, frame));
+    }
+    for (const y of [h * 0.35, h * 0.62]) {
+      for (let x = -w / 2 + 0.05; x < w / 2 - 0.03; x += 0.06) g.add(rod([x, y, -d / 2 + 0.02], [x, y, d / 2 - 0.02], r, frame));
+    }
+    const size = Math.min(h * 0.36, d * 0.8, 0.24);
+    plates(-w / 2 + 0.06, w * 0.15, h * 0.62, 0, size);
+    cups([w * 0.22, w * 0.22 + 0.08], h * 0.62, 0);
+    cups([-w * 0.25, -w * 0.25 + 0.08, -w * 0.25 + 0.16], h * 0.35, 0);
+    return g;
+  }
+
+  // A drip tray under it all.
+  g.add(block(w, 0.015, d, tray, { r: 0.008 }));
+  if (style === 'twotier') {
+    // Cups and bowls below, plates standing up on the top tier.
+    for (const [sx, sz] of CORNERS) g.add(rod([sx * (w / 2 - 0.02), 0.015, sz * (d / 2 - 0.02)], [sx * (w / 2 - 0.02), h * 0.62, sz * (d / 2 - 0.02)], r * 1.5, frame));
+    basket(0.02, 0.08, w - 0.04, d - 0.04);
+    basket(h * 0.55, 0.06, w - 0.04, d - 0.04);
+    cups([-w * 0.3, -w * 0.3 + 0.08, w * 0.05, w * 0.05 + 0.08], 0.025, 0);
+    plates(-w / 2 + 0.06, w / 2 - 0.08, h * 0.55, 0, Math.min(h * 0.42, d * 0.75, 0.22));
+    return g;
+  }
+  // Dish rack: a wire basket with plates at the back, cups at the front and a cutlery basket.
+  basket(0.02, Math.min(0.1, h * 0.4), w - 0.03, d - 0.03);
+  plates(-w / 2 + 0.05, w * 0.12, 0.02, -d * 0.12, Math.min(h - 0.03, d * 0.7, 0.24));
+  cups([w * 0.24, w * 0.24 + 0.075], 0.025, d * 0.2);
+  g.add(block(0.08, Math.min(0.11, h * 0.45), 0.06, frame, { x: w / 2 - 0.06, y: 0.02, z: -d / 2 + 0.05 }));
+  for (const dx of [-0.02, 0, 0.02]) g.add(block(0.006, 0.05, 0.006, metal('#c9ccd0'), { x: w / 2 - 0.06 + dx, y: 0.02 + Math.min(0.11, h * 0.45), z: -d / 2 + 0.05 }));
   return g;
 }

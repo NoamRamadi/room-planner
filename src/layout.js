@@ -385,13 +385,14 @@ function sinkSpanOf(host) {
   return host.type === 'sinkunit' ? [0, dimsOf(host).w] : null;
 }
 
-// A countertop appliance (a microwave, a water dispenser) on a kitchen worktop, against the back,
-// clear of the sink and of what already stands there: from the left end along, or, for a water
-// dispenser, as close to a sink as it can be. Any other surface (a table) will do if there's no
-// worktop free.
+// A countertop appliance (a microwave, a coffee machine, a dish rack) on a kitchen worktop, against
+// the back, clear of the sink and of what already stands there: from the left end along, or, for a
+// water dispenser or a dish rack, as close to a sink as it can be; an over-the-sink rack stands over
+// the sink. Any other surface (a table) will do if there's no worktop free.
 function onCounter(item, items, walls) {
   const { w, d } = dimsOf(item);
   const nearSink = styleOf(item).nearSink ?? CATALOG[item.type].nearSink;
+  const overSink = styleOf(item).overSink;
   const kitchen = (o) => (CATALOG[o.type].room === 'kitchen' ? 1 : 0);
   const hosts = items.filter((o) => o.id !== item.id && isSurface(o) && !isOnWall(o) && !isStackable(o));
   hosts.sort((a, b) => kitchen(b) - kitchen(a) || (nearSink ? Number(Boolean(sinkSpanOf(b))) - Number(Boolean(sinkSpanOf(a))) : 0));
@@ -401,13 +402,19 @@ function onCounter(item, items, walls) {
     const sink = sinkSpanOf(host);
     const lz = -(size.d / 2 - d / 2 - 3);
     const along = [];
-    for (let t = w / 2 + 3; t <= size.w - w / 2 - 3; t += 5) {
-      if (!sink || t + w / 2 <= sink[0] - 3 || t - w / 2 >= sink[1] + 3) along.push(t);
+    if (overSink) {
+      // Standing over the sink, centred on it.
+      if (host.type === 'counter' && sink) along.push(Math.min(size.w - w / 2, Math.max(w / 2, (sink[0] + sink[1]) / 2)));
+    } else {
+      for (let t = w / 2 + 3; t <= size.w - w / 2 - 3; t += 5) {
+        if (!sink || t + w / 2 <= sink[0] - 3 || t - w / 2 >= sink[1] + 3) along.push(t);
+      }
     }
     if (nearSink && sink) along.sort((p, q) => Math.min(Math.abs(p - sink[0]), Math.abs(p - sink[1])) - Math.min(Math.abs(q - sink[0]), Math.abs(q - sink[1])));
     for (const t of along) {
       const spot = { ...item, ...localToFloor(host, t - size.w / 2, lz), rotation: host.rotation };
-      if (!hitsWall(spot, walls, items) && !standing.some((o) => overlaps(spot, o))) return { x: spot.x, z: spot.z, rotation: spot.rotation };
+      // A rack over the sink straddles whatever stands beside the sink.
+      if (!hitsWall(spot, walls, items) && (overSink || !standing.some((o) => overlaps(spot, o)))) return { x: spot.x, z: spot.z, rotation: spot.rotation };
     }
   }
   return null;
