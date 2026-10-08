@@ -1,5 +1,6 @@
 // Walls are independent pieces: a run from (x1, z1) to (x2, z2) in cm, with its own thickness, height,
-// gap below (a beam over an opening) and color, optionally curved. Walls whose ends meet are joined:
+// gap below (a beam over an opening) and color, optionally curved. A room divider (`divider`) is a
+// wall that isn't built: a line across an open passage that closes a room for its floor and name only. Walls whose ends meet are joined:
 // their corners are mitred, and dragging the corner moves every end that meets there. The floor is
 // filled wherever walls enclose an area.
 
@@ -170,10 +171,18 @@ export function footprintOf(w, joins) {
 // between the faces of the walls it meets: to the mitre where it turns a corner, or to the face of a
 // wall it butts into at a T.
 
+// The walls that are built (room dividers aren't), and their joints, kept per list of walls.
+const solidCache = new WeakMap();
+export const solidOf = (walls) => {
+  let solid = solidCache.get(walls);
+  if (!solid) solidCache.set(walls, (solid = walls.filter((w) => !w.divider)));
+  return solid;
+};
 const jointCache = new WeakMap();
 const jointsFor = (walls) => {
-  let joins = jointCache.get(walls);
-  if (!joins) jointCache.set(walls, (joins = jointsOf(walls)));
+  const solid = solidOf(walls);
+  let joins = jointCache.get(solid);
+  if (!joins) jointCache.set(solid, (joins = jointsOf(solid)));
   return joins;
 };
 
@@ -198,7 +207,7 @@ export function facesOf(w, walls) {
   for (const end of [0, 1]) {
     if (joins.get(w.id)?.[end].length) continue;
     const p = endsOf(w)[end];
-    const host = walls.find((v) => v.id !== w.id && !v.curve && pointToSegment(p, { x: v.x1, z: v.z1 }, { x: v.x2, z: v.z2 }).d <= JOIN + 0.5);
+    const host = walls.find((v) => v.id !== w.id && !v.curve && !v.divider && pointToSegment(p, { x: v.x1, z: v.z1 }, { x: v.x2, z: v.z2 }).d <= JOIN + 0.5);
     if (!host) continue;
     const hl = lengthOf(host) || 1;
     const sin = Math.abs(u.x * (host.z2 - host.z1) - u.z * (host.x2 - host.x1)) / hl;
@@ -222,7 +231,7 @@ export const insideLengthOf = (w, walls) => facesOf(w, walls).inside.length;
 // The overall outside size of what's built: the bounds of the walls' outlines.
 export function outsideBoundsOf(walls) {
   const joins = jointsFor(walls);
-  const pts = walls.flatMap((w) => footprintOf(w, joins));
+  const pts = walls.flatMap((w) => footprintOf(w, w.divider ? null : joins));
   if (!pts.length) return boundsOf(walls);
   const xs = pts.map((p) => p.x);
   const zs = pts.map((p) => p.z);
@@ -485,22 +494,25 @@ export function rayDistance(outlines, ox, oz, dx, dz) {
 
 // The open gaps at the free ends of walls: from the end of a wall straight on to the face of the next
 // wall it points at (an opening left between walls, like a doorway without a door). Beams don't
-// count, as you can walk under them. Each gap is listed once, as { a, b, length } in cm.
+// count, as you can walk under them, and nor do room dividers. Each gap is listed once, as
+// { a, b, length } in cm, with `close`: where a room divider across it ends, on the far wall's centre
+// line (so it joins that wall).
 export function gapsOf(chosen, walls, max = 1500) {
   const joins = jointsFor(walls);
-  const outline = new Map(walls.map((w) => [w.id, footprintOf(w, joins)]));
+  const solid = solidOf(walls).filter((v) => !v.gap);
+  const outline = new Map(solid.map((w) => [w.id, footprintOf(w, joins)]));
   const gaps = [];
   for (const w of chosen) {
     const len = lengthOf(w);
-    if (!len || w.gap || Math.abs(w.curve || 0) >= 0.5) continue;
+    if (!len || w.gap || w.divider || Math.abs(w.curve || 0) >= 0.5) continue;
     const u = { x: (w.x2 - w.x1) / len, z: (w.z2 - w.z1) / len };
     const nl = left(u);
-    const others = walls.filter((v) => v.id !== w.id && !v.gap).map((v) => outline.get(v.id));
+    const others = solid.filter((v) => v.id !== w.id).map((v) => outline.get(v.id));
     for (const end of [0, 1]) {
       if (joins.get(w.id)?.[end].some((j) => !j.wall.gap)) continue; // a corner (a beam on it leaves the way open)
       const p = endsOf(w)[end];
       // An end butting into another wall has no gap.
-      if (walls.some((v) => v.id !== w.id && !v.gap && pointToSegment(p, { x: v.x1, z: v.z1 }, { x: v.x2, z: v.z2 }).d <= v.thickness / 2 + 0.5)) continue;
+      if (solid.some((v) => v.id !== w.id && pointToSegment(p, { x: v.x1, z: v.z1 }, { x: v.x2, z: v.z2 }).d <= v.thickness / 2 + 0.5)) continue;
       const dir = end ? u : { x: -u.x, z: -u.z };
       // Straight on from the middle of the end and from both its corners: the nearest wall in front.
       let best = Infinity;
@@ -511,7 +523,18 @@ export function gapsOf(chosen, walls, max = 1500) {
       if (!Number.isFinite(best) || best < 1 || best > max) continue;
       const b = { x: p.x + dir.x * best, z: p.z + dir.z * best };
       if (gaps.some((g) => dist(g.a, b) < 5 && dist(g.b, p) < 5)) continue; // the same gap, seen from the other side
-      gaps.push({ a: p, b, length: best });
+      // Where a divider closing it would end: on the centre line of the wall it reaches (or at that
+      // wall's end, if it reaches the end of a wall in line with this one).
+      const far = solid.filter((v) => v.id !== w.id).sort((v1, v2) => pointToSegment(b, endsOf(v1)[0], endsOf(v1)[1]).d - pointToSegment(b, endsOf(v2)[0], endsOf(v2)[1]).d)[0];
+      let close = b;
+      if (far) {
+        const fl = lengthOf(far) || 1;
+        const fu = { x: (far.x2 - far.x1) / fl, z: (far.z2 - far.z1) / fl };
+        const hit = intersectLines(p, dir, { x: far.x1, z: far.z1 }, fu);
+        const onIt = hit && pointToSegment(hit, endsOf(far)[0], endsOf(far)[1]).d < 1;
+        close = onIt ? hit : endsOf(far).reduce((q, e) => (dist(e, b) < dist(q, b) ? e : q));
+      }
+      gaps.push({ a: p, b, length: best, close });
     }
   }
   return gaps;
@@ -553,7 +576,7 @@ export function rectangleWalls(width, length, cx = 0, cz = 0) {
 const END_MARGIN = 5; // cm kept solid at each end of a wall
 
 // Doors and windows go in straight walls that stand on the floor (not curved walls or beams).
-export const takesOpenings = (w) => Boolean(w) && !w.curve && !w.gap;
+export const takesOpenings = (w) => Boolean(w) && !w.curve && !w.gap && !w.divider;
 
 // Where a door or window sits in its wall, in cm: a–b along the wall from its start, bottom–top in
 // height. Kept inside the wall and below its top.

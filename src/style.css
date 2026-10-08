@@ -1952,3 +1952,176 @@ h3 {
     flex: 1;
   }
 }
+
+/* ---- Named rooms: labels on the floor, the list in the Rooms section, the type picker ---- */
+
+.room-label {
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 10px 5px;
+  border: 1px solid rgb(38 41 45 / 0.35);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--tint, #e3e3dd) 55%, #fff);
+  font: 650 12.5px/1.15 var(--font);
+  color: var(--graphite);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.room-label:hover {
+  border-color: var(--graphite);
+}
+
+.room-label.is-selected {
+  border: 2px solid var(--graphite);
+  box-shadow: 0 0 0 2px var(--tape);
+}
+
+.room-label__area {
+  font-size: 11.5px;
+  font-weight: 450;
+  font-stretch: 75%;
+  font-variant-numeric: tabular-nums;
+  color: var(--pencil);
+}
+
+.room-label--ghost {
+  padding: 4px 11px;
+  border: 1px dashed var(--pencil);
+  border-radius: 999px;
+  background: rgb(237 238 234 / 0.82);
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--pencil);
+  cursor: pointer;
+}
+
+.room-label--ghost:hover {
+  border-style: solid;
+  color: var(--graphite);
+}
+
+.stage.is-locked .room-label,
+.stage.is-measuring .room-label {
+  cursor: pointer;
+}
+
+.room-list button {
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.room-list .wall-list__name {
+  flex: 1;
+}
+
+.room-list__icon,
+.room-type__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: var(--tint);
+}
+
+.room-list__icon svg,
+.room-type__icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--graphite);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.room-types {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.room-type {
+  gap: 4px;
+  padding: 8px 4px 7px;
+  font-size: 12px;
+}
+
+.room-type__icon {
+  width: 30px;
+  height: 30px;
+}
+
+.room-type__icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.check--gap {
+  margin-top: 16px;
+}
+
+/* "Close with a divider" under a gap's label, and the Walls / Room divider switch in Draw walls. */
+.gap-close {
+  z-index: 4;
+  margin-top: 30px;
+  padding: 3px 9px;
+  border: 1px solid var(--graphite);
+  border-radius: 999px;
+  background: var(--plaster);
+  font: 600 11.5px/1.3 var(--font);
+  color: var(--graphite);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.gap-close:hover {
+  background: var(--tape);
+}
+
+.draw__kind {
+  align-self: end;
+}
+
+.draw__kind button {
+  padding: 4px 9px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* The room divider tool: its button in the Rooms section, and Done above the view while it's on. */
+.divider-entry {
+  margin-top: 12px;
+}
+
+.divider-entry .btn,
+.tool--on {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.divider-entry svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.tool--on {
+  border-color: var(--graphite);
+  background: var(--tape);
+}
+
+.tool--on:hover {
+  background: #f7cf45;
+}

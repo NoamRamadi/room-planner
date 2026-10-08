@@ -9,14 +9,16 @@ const GRID_MINOR = '#e6e8e2';
 const GRID_MAJOR = '#ccd0c8';
 const OLD_WALL = '#b3b6b9';
 const NEW_WALL = '#26292d';
+const DIVIDER = '#b07a16'; // room dividers already in the plan
 const TAPE = '#f4c21b';
 const SNAP_PX = 14; // how close (screen pixels) the pointer must come to a wall end to connect to it
 
 const round = (v) => Math.round(v * 10) / 10;
 
 export function createDrawMode(stage, { onClose }) {
-  const settings = { thickness: 12, height: 270 };
-  let segments = []; // drawn walls: { x1, z1, x2, z2, thickness, height }
+  // `divider`: draw room dividers (dashed lines that close a room without a wall) instead of walls.
+  const settings = { thickness: 12, height: 270, divider: false };
+  let segments = []; // drawn walls: { x1, z1, x2, z2, thickness, height, divider }
   let chain = null; // the line being drawn: its first corner, its last corner, and how many walls it has
   let cursor = null; // the pointer on the plan (cm), after snapping: { x, z, kind }
   let typed = ''; // a length typed while drawing
@@ -42,6 +44,25 @@ export function createDrawMode(stage, { onClose }) {
     get: () => settings.height,
     set: (v) => (settings.height = v),
   });
+  const kindButtons = [
+    ['Walls', false],
+    ['Room divider', true],
+  ].map(([label, divider]) =>
+    h('button', {
+      type: 'button',
+      onclick: () => {
+        settings.divider = divider;
+        syncKind();
+        render();
+      },
+    }, label),
+  );
+  const kind = h('div', { class: 'segmented draw__kind', role: 'group', 'aria-label': 'Draw' }, kindButtons);
+  function syncKind() {
+    kindButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(settings.divider === (i === 1))));
+    thickness.el.hidden = height.el.hidden = settings.divider;
+  }
+  syncKind();
   const undoBtn = h('button', { type: 'button', class: 'btn', onclick: () => act(undo) }, 'Undo');
   const finishBtn = h('button', { type: 'button', class: 'btn', onclick: () => act(finishLine) }, 'Finish line');
   const count = h('span', { class: 'draw__count', 'aria-live': 'polite' });
@@ -52,7 +73,7 @@ export function createDrawMode(stage, { onClose }) {
   const bar = h(
     'div',
     { class: 'draw__bar' },
-    h('div', { class: 'draw__fields' }, thickness.el, height.el),
+    h('div', { class: 'draw__fields' }, kind, thickness.el, height.el),
     h('div', { class: 'draw__actions' }, undoBtn, finishBtn, count),
     h(
       'div',
@@ -171,7 +192,7 @@ export function createDrawMode(stage, { onClose }) {
 
   function addWall(a, b) {
     if (dist(a, b) < LIMITS.length[0]) return false;
-    segments.push({ x1: round(a.x), z1: round(a.z), x2: round(b.x), z2: round(b.z), thickness: settings.thickness, height: settings.height });
+    segments.push({ x1: round(a.x), z1: round(a.z), x2: round(b.x), z2: round(b.z), thickness: settings.divider ? 4 : settings.thickness, height: settings.height, divider: settings.divider });
     chain.count++;
     chain.last = { x: round(b.x), z: round(b.z) };
     return true;
@@ -294,6 +315,22 @@ export function createDrawMode(stage, { onClose }) {
     }
   }
 
+  // A room divider: a dashed line along it.
+  function dashed(w, color) {
+    const a = toScreen({ x: w.x1, z: w.z1 });
+    const b = toScreen({ x: w.x2, z: w.z2 });
+    g.save();
+    g.setLineDash([9, 6]);
+    g.lineWidth = 3;
+    g.lineCap = 'round';
+    g.strokeStyle = color;
+    g.beginPath();
+    g.moveTo(a.x, a.y);
+    g.lineTo(b.x, b.y);
+    g.stroke();
+    g.restore();
+  }
+
   function render() {
     if (root.hidden) return;
     g.fillStyle = PAPER;
@@ -304,10 +341,16 @@ export function createDrawMode(stage, { onClose }) {
     // with mitred corners where they meet.
     const { walls, openings } = store.getState();
     const drawn = segments.map((s, i) => ({ ...s, id: `new${i}`, gap: 0, curve: 0 }));
-    const live = chain && cursor && dist(cursor, chain.last) >= 1 ? { id: 'live', x1: chain.last.x, z1: chain.last.z, x2: cursor.x, z2: cursor.z, thickness: settings.thickness, gap: 0, curve: 0 } : null;
+    const live =
+      chain && cursor && dist(cursor, chain.last) >= 1
+        ? { id: 'live', x1: chain.last.x, z1: chain.last.z, x2: cursor.x, z2: cursor.z, thickness: settings.divider ? 4 : settings.thickness, gap: 0, curve: 0, divider: settings.divider }
+        : null;
     const all = [...walls, ...drawn, ...(live ? [live] : [])];
-    const joins = jointsOf(all);
-    for (const w of walls) polygon(footprintOf(w, joins), w.gap ? '#d7d9d6' : OLD_WALL);
+    const joins = jointsOf(all.filter((w) => !w.divider)); // room dividers aren't built, so they don't join
+    for (const w of walls) {
+      if (w.divider) dashed(w, DIVIDER);
+      else polygon(footprintOf(w, joins), w.gap ? '#d7d9d6' : OLD_WALL);
+    }
     // Gaps for doors; a thin line across windows.
     for (const o of openings) {
       const w = walls.find((x) => x.id === o.wall);
@@ -320,8 +363,12 @@ export function createDrawMode(stage, { onClose }) {
       const at = (s, k) => ({ x: w.x1 + u.x * s + n.x * k, z: w.z1 + u.z * s + n.z * k });
       polygon([at(span.a, t), at(span.b, t), at(span.b, -t), at(span.a, -t)], PAPER, o.kind === 'window' ? OLD_WALL : null);
     }
-    for (const w of drawn) polygon(footprintOf(w, joins), NEW_WALL);
-    if (live) polygon(footprintOf(live, joins), 'rgba(244,194,27,0.85)', NEW_WALL);
+    for (const w of drawn) {
+      if (w.divider) dashed(w, NEW_WALL);
+      else polygon(footprintOf(w, joins), NEW_WALL);
+    }
+    if (live?.divider) dashed(live, '#c9940a');
+    else if (live) polygon(footprintOf(live, joins), 'rgba(244,194,27,0.85)', NEW_WALL);
 
     for (const w of drawn) lengthLabel(w, `${Math.round(Math.hypot(w.x2 - w.x1, w.z2 - w.z1))}`, { fill: PAPER, ink: NEW_WALL, edge: GRID_MAJOR });
 

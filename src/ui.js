@@ -4,7 +4,8 @@ import { OPENINGS, openingLimitsOf, openingStyleOf } from './openings.js';
 import { h, measureField } from './dom.js';
 import { createDrawMode } from './draw.js';
 import * as store from './state.js';
-import { LIMITS, angleOf, facesOf, insideLengthOf, maxCurve, openingSpan, takesOpenings } from './walls.js';
+import { ROOM_TYPES, floorOfRoom, formatArea, roomAt, roomSize, roomTypeOf } from './rooms.js';
+import { LIMITS, angleOf, facesOf, floorsOf, insideLengthOf, maxCurve, openingSpan, takesOpenings } from './walls.js';
 
 const ICONS = {
   sofa: '<path d="M9 15V9a2 2 0 0 1 2-2h26a2 2 0 0 1 2 2v6"/><path d="M5 16a2.5 2.5 0 0 1 5 0v4h28v-4a2.5 2.5 0 0 1 5 0v8H5z"/><path d="M8 24v3M40 24v3"/>',
@@ -57,6 +58,19 @@ const ICONS = {
   panePlaced: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke-width="3"/>',
   paneStyle: '<path d="M5 4h12v5H5z"/><path d="M17 6.5h2v5h-7v3"/><path d="M11 14.5h2V20h-2z"/>',
   pencil: '<path d="M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="M14 7l3 3"/>',
+  divider: '<path d="M4 4v16M20 4v16"/><path d="M4 12h2.5M9.5 12h5M17.5 12H20" stroke-width="2.4"/>',
+  room_living: '<path d="M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M3 12a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v5H3z"/><path d="M5 17v2M19 17v2"/>',
+  room_kitchen: '<path d="M5 10h14v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/><path d="M3 10h18M9 7c0-1.2 1.3-2 3-2s3 .8 3 2"/>',
+  room_bedroom: '<path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><path d="M6 11.5h2"/>',
+  room_bathroom: '<path d="M3 12h18v2a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z"/><path d="M6 12V6a2 2 0 0 1 4 0"/><path d="M7 19l-1 2M17 19l1 2"/>',
+  room_work: '<rect x="4" y="4" width="16" height="11" rx="1"/><path d="M9 20h6M12 15v5"/>',
+  room_kids: '<path d="M4 20v-6h6v6zM14 20v-6h6v6zM9 14V8h6v6z"/>',
+  room_dining: '<circle cx="12" cy="12" r="5"/><path d="M4 5v5a2 2 0 0 0 2 2v7M6 5v4M20 5c-2 0-2 3-2 6h2v8"/>',
+  room_hallway: '<path d="M6 21V3h12v18"/><path d="M3 21h18"/><path d="M14 12h.01" stroke-width="3"/>',
+  room_laundry: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M5 7h14"/><circle cx="12" cy="14" r="4"/>',
+  room_storage: '<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/>',
+  room_balcony: '<path d="M4 20h16M4 14h16M6 14v6M10 14v6M14 14v6M18 14v6"/><circle cx="12" cy="7" r="3"/>',
+  room_other: '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 12h8v8"/>',
   dots: '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.4"/>',
   save: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19h14"/>',
   open: '<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M5 19h14"/>',
@@ -528,6 +542,45 @@ export function initUI(view) {
     wallList.replaceChildren(...(state.walls.length ? rows.flat() : [h('li', { class: 'empty' }, 'No walls yet. Add a wall or a whole room.')]));
   }
 
+  // ---- Named rooms: the list in the Rooms section ----
+
+  const roomList = h('ul', { class: 'wall-list room-list', 'data-always': '' });
+  let roomListKey = '';
+  function renderRoomList(state, ui) {
+    const selected = ui.sel?.type === 'room' ? ui.sel.id : null;
+    const key = JSON.stringify([selected, state.rooms, state.walls.map((w) => [w.x1, w.z1, w.x2, w.z2, w.thickness, w.curve])]);
+    if (key === roomListKey) return;
+    roomListKey = key;
+    if (!state.rooms.length) {
+      roomList.replaceChildren(h('li', { class: 'empty' }, 'No named rooms yet. Click “+ Name this room” on a floor in the view.'));
+      return;
+    }
+    const floors = floorsOf(state.walls);
+    roomList.replaceChildren(
+      ...state.rooms.map((r) => {
+        const floor = floorOfRoom(r, floors);
+        return h(
+          'li',
+          {},
+          h(
+            'button',
+            {
+              type: 'button',
+              'aria-current': r.id === selected ? 'true' : null,
+              onclick: () => {
+                store.selectRoomLabel(r.id);
+                view.frameRoom(r.id);
+              },
+            },
+            h('span', { class: 'room-list__icon', style: `--tint:${roomTypeOf(r).tint}`, html: icon(`room_${roomTypeOf(r).id}`) }),
+            h('span', { class: 'wall-list__name' }, r.name),
+            h('span', { class: 'wall-list__size' }, floor ? formatArea(roomSize(floor, state.walls).area) : '–'),
+          ),
+        );
+      }),
+    );
+  }
+
   // ---- Floor and walls: colors, pattern, height ----
 
   const wallHeight = measureField({
@@ -557,6 +610,12 @@ export function initUI(view) {
     set: (v) => store.updateRoom({ wallColor: v }),
   });
   syncers.push(wallHeight.sync, pattern.sync, floor.sync, walls.sync);
+  const roomColorsBox = h('input', { type: 'checkbox' });
+  roomColorsBox.addEventListener('change', () => store.setRoomColors(roomColorsBox.checked));
+  const roomColors = h('label', { class: 'check check--gap', 'data-always': '' }, roomColorsBox, 'Color named rooms by their type');
+  syncers.push(() => {
+    roomColorsBox.checked = store.getUI().roomColors;
+  });
 
   // ---- Add: search every design, or browse by category ----
 
@@ -611,6 +670,22 @@ export function initUI(view) {
     for (const r of rooms) setBlocks[r.id].hidden = r.id !== shownSet;
   };
   syncRoomTabs();
+  // Selecting a named room (or changing its type) opens the furniture that suits it.
+  let suitedTo = null;
+  syncers.push(() => {
+    const sel = store.getUI().sel;
+    const r = sel?.type === 'room' ? store.roomLabelById(sel.id) : null;
+    const key = r ? `${r.id}:${r.type}` : null;
+    if (key && key !== suitedTo) {
+      const set = roomTypeOf(r).set;
+      if (set && set !== shownSet) {
+        shownSet = set;
+        furniture.close();
+        syncRoomTabs();
+      }
+    }
+    suitedTo = key;
+  });
 
   // Search: every design of every kind whose names hold all the words typed; picking one adds it.
   const designIndex = [
@@ -675,14 +750,25 @@ export function initUI(view) {
   };
   function renderInventory(state, ui) {
     const selectedId = ui.sel?.type === 'item' ? ui.sel.id : null;
+    // With named rooms, pieces are grouped by the room they stand in; otherwise by what they're for.
+    const byRoom = state.rooms.length > 0;
+    const floors = byRoom ? floorsOf(state.walls) : [];
+    const groupOf = byRoom ? (item) => roomAt(item, state.rooms, floors)?.id ?? 'elsewhere' : categoryOf;
+    const groupDefs = byRoom ? [...state.rooms.map((r) => [r.id, r.name]), ['elsewhere', 'Not in a named room']] : CATEGORIES;
     // The selected piece's group unfolds, so it shows in the list.
     const picked = selectedId && state.items.find((i) => i.id === selectedId);
-    if (picked) placedFolded.delete(categoryOf(picked));
-    const key = JSON.stringify([selectedId, placedFilter, [...placedFolded], state.items.map((i) => [i.id, i.name, i.color, i.type, sizeText(i)])]);
+    if (picked) placedFolded.delete(groupOf(picked));
+    const key = JSON.stringify([
+      selectedId,
+      placedFilter,
+      [...placedFolded],
+      state.items.map((i) => [i.id, i.name, i.color, i.type, i.x, i.z, sizeText(i)]),
+      byRoom && [state.rooms, state.walls.map((w) => [w.x1, w.z1, w.x2, w.z2])],
+    ]);
     if (key === inventoryKey) return;
     inventoryKey = key;
     count.textContent = state.items.length ? `${state.items.length} ${state.items.length === 1 ? 'piece' : 'pieces'}` : '';
-    const groups = CATEGORIES.map(([id, label]) => ({ id, label, items: state.items.filter((i) => categoryOf(i) === id) })).filter((g) => g.items.length);
+    const groups = groupDefs.map(([id, label]) => ({ id, label, items: state.items.filter((i) => groupOf(i) === id) })).filter((g) => g.items.length);
     if (placedFilter !== 'all' && !groups.some((g) => g.id === placedFilter)) placedFilter = 'all';
     placedFilters.hidden = groups.length < 2;
     placedFilters.replaceChildren(
@@ -856,7 +942,15 @@ export function initUI(view) {
         h('div', { class: 'adder' }, nextLength.el, h('button', { type: 'button', class: 'btn', onclick: () => store.addWall(next.length, view.focus()) }, 'Add wall')),
         addWallHelp,
       ),
-      h('div', { class: 'pane__label-row' }, h('h3', { class: 'pane__label' }, 'Your rooms and walls'), several),
+      h('h3', { class: 'pane__label' }, 'Named rooms'),
+      roomList,
+      h(
+        'div',
+        { class: 'divider-entry' },
+        h('button', { type: 'button', class: 'btn', onclick: () => store.setDividing(true) }, h('span', { html: icon('divider') }), 'Add a room divider'),
+        h('p', { class: 'help' }, 'Split an open space into rooms, like a kitchen open to the living room: click where the divider starts and where it ends.'),
+      ),
+      h('div', { class: 'pane__label-row' }, h('h3', { class: 'pane__label' }, 'Walls'), several),
       wallList,
     ),
     add: h('section', { class: 'pane' }, h('div', { class: 'pane__head' }, h('h2', {}, 'Add')), search, results, browse),
@@ -869,6 +963,7 @@ export function initUI(view) {
       h('div', { class: 'field-row' }, h('span', { class: 'field-row__label' }, 'Floor pattern'), pattern.el),
       floor.el,
       walls.el,
+      roomColors,
     ),
   };
   const tabs = PANES.map((p) => {
@@ -965,6 +1060,10 @@ export function initUI(view) {
     },
   });
   const clearMeasures = h('button', { type: 'button', class: 'tool', 'data-always': '', onclick: () => view.clearMeasures() }, 'Clear');
+  const doneDividing = h('button', { type: 'button', class: 'tool tool--on', onclick: () => store.setDividing(false) }, h('span', { html: icon('divider') }), 'Done adding dividers');
+  syncers.push(() => {
+    doneDividing.hidden = !store.getUI().dividing;
+  });
   syncers.push(() => {
     const { measuring } = store.getUI();
     measure.setAttribute('aria-pressed', String(measuring));
@@ -993,6 +1092,7 @@ export function initUI(view) {
     lock,
     measure,
     clearMeasures,
+    doneDividing,
     h(
       'button',
       {
@@ -1008,8 +1108,10 @@ export function initUI(view) {
   );
   const hint = document.querySelector('.hint');
   syncers.push(() => {
-    const { locked, measuring } = store.getUI();
-    hint.textContent = measuring
+    const { locked, measuring, dividing } = store.getUI();
+    hint.textContent = dividing
+      ? 'Room divider: click where it starts, then where it ends. It snaps to wall corners and onto walls; hold Shift for a straight line. Esc stops.'
+      : measuring
       ? 'Measuring: click two points to see the distance between them. Points snap to the corners and faces of walls, doors, windows and furniture; hold Shift for a straight line. Backspace removes the last one, Esc stops.'
       : locked
         ? 'Locked: look around and click things to see their measurements. Nothing can be moved or changed.'
@@ -1057,6 +1159,7 @@ export function initUI(view) {
   store.subscribe((state, ui) => {
     for (const sync of syncers) sync();
     renderWallList(state, ui);
+    renderRoomList(state, ui);
     renderInventory(state, ui);
     const key = inspectorKeyFor(state, ui);
     if (key !== inspectorKey) {
@@ -1089,6 +1192,7 @@ function inspectorKeyFor(state, ui) {
     return w ? `wall:${w.id}:${w.group}` : 'none';
   }
   if (sel.type === 'group') return `group:${sel.id}:${store.selectedWallIds(sel).join()}`;
+  if (sel.type === 'room') return state.rooms.some((r) => r.id === sel.id) ? `room:${sel.id}` : 'none';
   if (sel.type === 'opening') {
     const o = store.openingById(sel.id);
     return o ? `opening:${o.id}:${o.style}:${o.wall}` : 'none';
@@ -1108,7 +1212,100 @@ function buildInspector(root, state, ui) {
   if (sel?.type === 'group' && state.groups.some((g) => g.id === sel.id)) return buildGroupInspector(root, sel.id);
   if (sel?.type === 'walls') return buildWallsInspector(root, sel.ids);
   if (sel?.type === 'opening' && store.openingById(sel.id)) return buildOpeningInspector(root, sel.id);
+  if (sel?.type === 'room' && store.roomLabelById(sel.id)) return buildRoomInspector(root, sel.id);
   return buildHelp(root);
+}
+
+// A named room: its name, size, type and floor.
+function buildRoomInspector(root, id) {
+  const syncers = [];
+  const current = () => store.roomLabelById(id);
+  const update = (patch) => store.updateRoomLabel(id, patch);
+
+  const name = h('input', { class: 'inspector__name', 'aria-label': 'Name', maxlength: 40, autocomplete: 'off' });
+  name.addEventListener('input', () => update({ name: name.value }));
+  name.addEventListener('change', () => {
+    if (!name.value.trim()) update({ name: roomTypeOf(current()).label });
+  });
+  const size = h('p', { class: 'inspector__sub' });
+  syncers.push(() => {
+    const r = current();
+    if (document.activeElement !== name) name.value = r.name;
+    const { walls } = store.getState();
+    const floor = floorOfRoom(r, floorsOf(walls));
+    if (!floor) {
+      size.textContent = 'Not on a floor: drag its label into a room.';
+      return;
+    }
+    const { area, box } = roomSize(floor, walls);
+    const m = (cm) => (cm / 100).toFixed(2);
+    size.textContent = box ? `${formatArea(area)} · ${m(box.width)} × ${m(box.length)} m inside` : `${formatArea(area)} inside`;
+  });
+
+  const types = h(
+    'div',
+    { class: 'room-types', role: 'group', 'aria-label': 'Room type' },
+    ROOM_TYPES.map((t) => {
+      const button = h(
+        'button',
+        { type: 'button', class: 'design-btn room-type', onclick: () => update({ type: t.id }) },
+        h('span', { class: 'room-type__icon', style: `--tint:${t.tint}`, html: icon(`room_${t.id}`) }),
+        t.id === 'other' ? 'Other' : t.label,
+      );
+      syncers.push(() => button.setAttribute('aria-pressed', String(current().type === t.id)));
+      return button;
+    }),
+  );
+
+  // Its floor: the home's (set under Style), or one of its own.
+  const home = () => store.getState().room;
+  const own = h('input', { type: 'checkbox' });
+  own.addEventListener('change', () => update({ floor: own.checked ? { pattern: home().floorPattern, color: home().floorColor } : null }));
+  const pattern = segmented({
+    label: 'Floor pattern',
+    options: FLOOR_PATTERNS,
+    get: () => current().floor?.pattern,
+    set: (v) => update({ floor: { ...current().floor, pattern: v } }),
+  });
+  const floorColor = swatches({
+    label: 'Floor',
+    palette: FLOOR_FINISHES,
+    get: () => current().floor?.color ?? home().floorColor,
+    set: (v) => update({ floor: { ...current().floor, color: v } }),
+  });
+  const ownFloor = h('div', {}, h('div', { class: 'field-row' }, h('span', { class: 'field-row__label' }, 'Pattern'), pattern.el), floorColor.el);
+  syncers.push(() => {
+    own.checked = Boolean(current().floor);
+    ownFloor.hidden = !current().floor;
+    pattern.sync();
+    floorColor.sync();
+  });
+
+  root.append(
+    h('div', { class: 'inspector__head' }, h('div', { class: 'inspector__heading' }, name, size), h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', title: 'Close (Esc)', 'data-always': '', html: icon('close'), onclick: () => store.clearSelection() })),
+    h('div', { class: 'inspector__group' }, h('h3', {}, 'Room type'), types),
+    h(
+      'div',
+      { class: 'inspector__group' },
+      h('h3', {}, 'Floor'),
+      h('label', { class: 'check' }, own, 'A floor of its own'),
+      h('p', { class: 'help' }, 'Otherwise it has the floor set under Style.'),
+      ownFloor,
+    ),
+    h(
+      'div',
+      { class: 'inspector__group' },
+      h('p', { class: 'help help--first' }, 'Drag the label in the view to move it; it names whichever room it stands in.'),
+    ),
+    h(
+      'div',
+      { class: 'inspector__group' },
+      h('button', { type: 'button', class: 'btn', onclick: () => store.setDividing(true) }, 'Split with a divider'),
+      h('p', { class: 'help' }, 'For an open space that’s really two rooms: click where the divider starts and where it ends.'),
+    ),
+    h('div', { class: 'inspector__actions' }, h('button', { type: 'button', class: 'btn btn--danger', onclick: () => store.removeRoomLabel(id) }, 'Remove name')),
+  );
+  return syncers;
 }
 
 function buildDrawHelp(root) {
@@ -1126,6 +1323,7 @@ function buildDrawHelp(root) {
         h('li', {}, 'While drawing a wall, type its length and press Enter.'),
         h('li', {}, 'Draw along the inside of the room. The walls go outside your lines, so the room keeps the size you draw.'),
         h('li', {}, 'Set the thickness and height above the plan before drawing; they apply to the walls you draw next.'),
+        h('li', {}, 'Switch to Room divider to draw dashed lines across open passages: they close a room for its floor and name without building a wall.'),
         h('li', {}, 'Done adds the new walls and selects them, ready to group. Cancel throws them away.'),
       ),
       h(
@@ -1161,6 +1359,8 @@ function buildHelp(root) {
         h('li', {}, 'Shift-click several walls and group them to move them as one. Click a grouped wall again to edit just that wall.'),
         h('li', {}, 'The quickest way to lay out a room or a whole apartment is Draw walls: click its corners on a floor plan.'),
         h('li', {}, 'The floor fills in wherever walls enclose a space.'),
+        h('li', {}, 'Name a room: click “+ Name this room” on its floor and pick its type. Its label shows the floor area; drag it to move it.'),
+        h('li', {}, 'An open room, like a kitchen open to the hall, needs a room divider across the opening: select a wall beside it and click Close with a divider under its gap, or draw one with Room divider in Draw walls.'),
         h('li', {}, 'Add doors and windows from Add → Doors & windows in the side panel, then drag them along a wall or onto another one.'),
         h('li', {}, 'Lock, above the view, keeps everything in place while you look around and check measurements.'),
         h('li', {}, 'Furniture stops at walls when you drag it. To take a piece through a wall, into the next room say, hold Ctrl while you drag it; let go where it fits.'),
@@ -1188,7 +1388,37 @@ function buildHelp(root) {
   return [];
 }
 
+// A room divider: what it is, the opening it spans, and removing it.
+function buildDividerInspector(root, id) {
+  const syncers = [];
+  const wall = () => store.wallById(id);
+  const span = h('p', { class: 'readout readout--wall' });
+  syncers.push(() => {
+    span.textContent = `Spans ${Math.round(insideLengthOf(wall(), store.getState().walls))} cm, wall face to wall face.`;
+  });
+  root.append(
+    panelHead(h('h2', { class: 'inspector__title' }, wall().name), 'Room divider', () => store.clearSelection()),
+    h(
+      'div',
+      { class: 'inspector__group' },
+      span,
+      h(
+        'p',
+        { class: 'help' },
+        'A dashed line across an opening that closes a room for its floor, name and area. No wall is built: you walk through it, and furniture goes through it. Drag it, or the round handles at its ends, to move it.',
+      ),
+    ),
+    h(
+      'div',
+      { class: 'inspector__actions' },
+      h('button', { type: 'button', class: 'btn btn--danger', onclick: () => store.removeWalls([id]) }, 'Remove'),
+    ),
+  );
+  return syncers;
+}
+
 function buildWallInspector(root, id) {
+  if (store.wallById(id).divider) return buildDividerInspector(root, id);
   const syncers = [];
   const wall = () => store.wallById(id);
   const w0 = wall();
@@ -1674,6 +1904,12 @@ function bindShortcuts(view) {
       store.setMeasuring(!measuring);
       return;
     }
+    if (store.getUI().dividing) {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      if (!view.cancelDivider()) store.setDividing(false);
+      return;
+    }
     if (measuring) {
       if (e.key === 'Escape') {
         if (!view.cancelMeasure()) store.setMeasuring(false);
@@ -1711,6 +1947,13 @@ function bindShortcuts(view) {
       else if ((e.key === 'd' || e.key === 'D') && mod) store.duplicateItem(item.id);
       else return;
       e.preventDefault();
+      return;
+    }
+
+    if (sel?.type === 'room') {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      e.preventDefault();
+      store.removeRoomLabel(sel.id);
       return;
     }
 

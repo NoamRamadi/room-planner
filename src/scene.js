@@ -7,21 +7,25 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CATALOG, buildItem, dimsOf, isFlat, styleOf } from './catalog.js';
 import { buildOpening, buildSwing } from './openings.js';
 import { elevationOf, halfExtents, hitsWall } from './layout.js';
+import { floorOfRoom, formatArea, labelSpot, roomOnFloor, roomSize, roomTypeOf } from './rooms.js';
 import * as store from './state.js';
 import { PATTERN_SIZE, floorTexture } from './textures.js';
 import {
   boundsOf,
   contains,
   dist,
+  endsOf,
   facesOf,
   floorsOf,
   footprintOf,
   gapsOf,
+  intersectLines,
   jointsOf,
   lengthOf,
   midpointOf,
   openingSpan,
   outsideBoundsOf,
+  pathOf,
   pointToSegment,
   rayDistance,
   signedArea,
@@ -188,6 +192,24 @@ export function createScene(container) {
   scene.add(floorGroup, wallGroup);
   const floorMat = new THREE.MeshStandardMaterial({ roughness: 0.75 });
   let floorKey = '';
+  // A named room's own floor, and the light tint of its type: materials kept by look.
+  const roomFloorMats = new Map();
+  function roomFloorMaterial({ pattern, color }) {
+    const key = `${pattern}|${color}`;
+    if (!roomFloorMats.has(key)) {
+      const map = floorTexture(pattern);
+      if (map) map.repeat.set(1 / PATTERN_SIZE, 1 / PATTERN_SIZE);
+      roomFloorMats.set(key, new THREE.MeshStandardMaterial({ map, color, roughness: pattern === 'tiles' ? 0.45 : 0.75 }));
+    }
+    return roomFloorMats.get(key);
+  }
+  const tintMats = new Map();
+  function tintMaterial(color) {
+    if (!tintMats.has(color)) {
+      tintMats.set(color, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.38, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }));
+    }
+    return tintMats.get(color);
+  }
   let lightKey = '';
   const wallMeshes = new Map(); // wall id -> { key, wall, full, stub }
   let footprints = new Map(); // wall id -> outline on the floor (cm)
@@ -201,6 +223,29 @@ export function createScene(container) {
     const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
     geometry.rotateX(-Math.PI / 2); // extrude upward from the floor
     return geometry;
+  }
+
+  // Dashes along a path on the floor (cm points), for room dividers.
+  const dashMaterial = new THREE.MeshBasicMaterial({ color: '#b07a16', toneMapped: false });
+  function dashedLine(path) {
+    const group = new THREE.Group();
+    const DASH = 0.16;
+    const SPACE = 0.1;
+    for (let k = 1; k < path.length; k++) {
+      const a = v3(path[k - 1].x * CM, 0.008, path[k - 1].z * CM);
+      const b = v3(path[k].x * CM, 0.008, path[k].z * CM);
+      const len = a.distanceTo(b);
+      const dir = b.clone().sub(a).normalize();
+      const angle = Math.atan2(-dir.z, dir.x);
+      for (let t = 0; t < len; t += DASH + SPACE) {
+        const piece = Math.min(DASH, len - t);
+        const dash = new THREE.Mesh(new THREE.BoxGeometry(piece, 0.004, 0.045), dashMaterial);
+        dash.position.copy(a).addScaledVector(dir, t + piece / 2);
+        dash.rotation.y = angle;
+        group.add(dash);
+      }
+    }
+    return group;
   }
 
   function dropWallMesh(m) {
@@ -225,16 +270,26 @@ export function createScene(container) {
 
   function buildShell(state) {
     const { walls, room } = state;
-    const joins = jointsOf(walls);
-    footprints = new Map(walls.map((w) => [w.id, footprintOf(w, joins)]));
+    const joins = jointsOf(walls.filter((w) => !w.divider)); // room dividers aren't built, so they don't join
+    footprints = new Map(walls.map((w) => [w.id, footprintOf(w, w.divider ? null : joins)]));
 
     const alive = new Set();
     for (const w of walls) {
       alive.add(w.id);
       const outline = footprints.get(w.id);
       const spans = takesOpenings(w) ? state.openings.filter((o) => o.wall === w.id).map((o) => openingSpan(o, w)) : [];
-      const key = JSON.stringify([outline, w.height, w.gap, w.color, spans]);
+      const key = JSON.stringify([outline, w.height, w.gap, w.color, spans, w.divider]);
       let m = wallMeshes.get(w.id);
+      if (m?.key !== key && w.divider) {
+        // A room divider: a dashed line along the floor, never cut away.
+        if (m) dropWallMesh(m);
+        const full = dashedLine(pathOf(w));
+        full.traverse((o) => (o.userData.wallId = w.id));
+        const stub = new THREE.Group();
+        wallGroup.add(full, stub);
+        m = { key, full, stub, divider: true };
+        wallMeshes.set(w.id, m);
+      }
       if (m?.key !== key) {
         if (m) dropWallMesh(m);
         // The wall in solid pieces around its doors and windows. Cut away, it leaves a low stub
@@ -269,9 +324,12 @@ export function createScene(container) {
       }
     }
 
-    // Floor: every area the walls enclose, textured in real-world units.
+    // Floor: every area the walls enclose, textured in real-world units. A named room can have a floor
+    // of its own, and named rooms can be tinted by their type.
     const floors = floorsOf(walls);
-    const key = JSON.stringify([floors, room.floorPattern]);
+    const named = floors.map((f) => roomOnFloor(f, state.rooms));
+    const tinted = store.getUI().roomColors;
+    const key = JSON.stringify([floors, room.floorPattern, tinted, named.map((r) => r && [r.type, r.floor])]);
     if (key !== floorKey) {
       floorKey = key;
       floorGroup.traverse((o) => o.isMesh && o.geometry.dispose());
@@ -281,13 +339,20 @@ export function createScene(container) {
       floorMat.map = map;
       floorMat.roughness = room.floorPattern === 'tiles' ? 0.45 : 0.75;
       floorMat.needsUpdate = true;
-      for (const outline of floors) {
+      floors.forEach((outline, k) => {
         const geometry = new THREE.ShapeGeometry(planShape(outline));
         geometry.rotateX(-Math.PI / 2);
-        const floor = new THREE.Mesh(geometry, floorMat);
+        const own = named[k]?.floor;
+        const floor = new THREE.Mesh(geometry, own ? roomFloorMaterial(own) : floorMat);
         floor.receiveShadow = true;
         floorGroup.add(floor);
-      }
+        if (named[k] && tinted) {
+          const tint = new THREE.Mesh(geometry.clone(), tintMaterial(roomTypeOf(named[k]).tint));
+          tint.position.y = 0.002;
+          tint.renderOrder = 1;
+          floorGroup.add(tint);
+        }
+      });
     }
     floorMat.color.set(room.floorColor);
 
@@ -319,6 +384,7 @@ export function createScene(container) {
         m.full.visible = true;
         m.stub.visible = false;
       }
+
       showOpeningsWithWalls();
       return plan;
     }
@@ -326,6 +392,10 @@ export function createScene(container) {
     const tgt = { x: controls.target.x / CM, z: controls.target.z / CM };
     for (const m of wallMeshes.values()) {
       const w = m.wall;
+      if (m.divider) {
+        m.full.visible = true; // a line on the floor is never in the way
+        continue;
+      }
       let cut = plan;
       const ex = w.x2 - w.x1;
       const ez = w.z2 - w.z1;
@@ -385,6 +455,86 @@ export function createScene(container) {
       heightDim.measure(v3(hx, 0, hz), v3(hx, top, hz), fmt(top / CM), v3(1, 0, 0));
     }
     heightDim.visible = !plan; // seen from above it's only a dot
+  }
+
+  // ---- Named rooms: a label on each room's floor, and a "Name this room" tag on unnamed floors ----
+
+  const roomLabels = new THREE.Group();
+  scene.add(roomLabels);
+  let roomLabelKey = '';
+
+  function syncRoomLabels(state, ui) {
+    const floors = floorsOf(state.walls);
+    const selected = ui.sel?.type === 'room' ? ui.sel.id : null;
+    const key = JSON.stringify([floors, state.walls.map((w) => w.thickness), state.rooms, selected, ui.locked]);
+    if (key === roomLabelKey) return;
+    roomLabelKey = key;
+    roomLabels.clear(); // a CSS2D label leaves the page when it leaves the scene
+    const hasName = new Set();
+    for (const r of state.rooms) {
+      const floor = floorOfRoom(r, floors);
+      if (floor) hasName.add(floor);
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = `room-label${r.id === selected ? ' is-selected' : ''}`;
+      el.dataset.room = r.id;
+      el.style.setProperty('--tint', roomTypeOf(r).tint);
+      const name = document.createElement('span');
+      name.className = 'room-label__name';
+      name.textContent = r.name;
+      el.append(name);
+      if (floor) {
+        const area = document.createElement('span');
+        area.className = 'room-label__area';
+        area.textContent = formatArea(roomSize(floor, state.walls).area);
+        el.append(area);
+      }
+      el.title = ui.locked ? r.name : `${r.name}: click to change, drag to move`;
+      const label = new CSS2DObject(el);
+      label.position.set(r.x * CM, 0.02, r.z * CM);
+      roomLabels.add(label);
+    }
+    if (ui.locked) return;
+    for (const floor of floors) {
+      if (hasName.has(floor)) continue;
+      const spot = labelSpot(floor);
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'room-label room-label--ghost';
+      el.dataset.ghost = '';
+      el.dataset.x = spot.x;
+      el.dataset.z = spot.z;
+      el.textContent = '+ Name this room';
+      const label = new CSS2DObject(el);
+      label.position.set(spot.x * CM, 0.02, spot.z * CM);
+      roomLabels.add(label);
+    }
+  }
+
+  // Bring a named room into view: centred, filling most of the view, from the current direction.
+  function frameRoom(id) {
+    const { walls, rooms } = store.getState();
+    const r = rooms.find((x) => x.id === id);
+    if (!r) return;
+    const floor = floorOfRoom(r, floorsOf(walls)) ?? [
+      { x: r.x - 150, z: r.z - 150 },
+      { x: r.x + 150, z: r.z + 150 },
+    ];
+    const xs = floor.map((p) => p.x);
+    const zs = floor.map((p) => p.z);
+    const size = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) * CM;
+    const target = v3(((Math.min(...xs) + Math.max(...xs)) / 2) * CM, 0, ((Math.min(...zs) + Math.max(...zs)) / 2) * CM);
+    const dir = camera.position.clone().sub(controls.target);
+    if (dir.y < 0.5 * dir.length()) dir.y = 0.5 * dir.length(); // look down into it
+    dir.normalize();
+    const distance = Math.max(3, (size / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2))) * 1.5);
+    const position = target.clone().addScaledVector(dir, distance);
+    if (reducedMotion.matches) {
+      camera.position.copy(position);
+      controls.target.copy(target);
+      return;
+    }
+    tween = { from: camera.position.clone(), fromTarget: controls.target.clone(), position, target, start: performance.now() };
   }
 
   // ---- Doors and windows ----
@@ -558,7 +708,7 @@ export function createScene(container) {
     }
 
     // Clearance from each side of the footprint straight out to the nearest wall standing on the floor.
-    const solid = state.walls.filter((wall) => !wall.gap).map((wall) => footprints.get(wall.id));
+    const solid = state.walls.filter((wall) => !wall.gap && !wall.divider).map((wall) => footprints.get(wall.id));
     const { hx, hz } = halfExtents(item);
     const rays = [
       [item.x - hx, item.z, -1, 0],
@@ -616,6 +766,7 @@ export function createScene(container) {
   const wallLength = new Dim('sel');
   wallSel.add(wallLength);
   const wallGaps = []; // the open gap at each free end of the selected walls
+  const gapButtons = []; // "Close with a divider", under each gap's label
 
   function handle(className) {
     const el = document.createElement('button');
@@ -670,14 +821,28 @@ export function createScene(container) {
       wallGaps.push(dim);
       wallSel.add(dim);
     }
+    while (gapButtons.length < gapList.length) {
+      const button = handle('gap-close');
+      button.element.textContent = 'Close with a divider';
+      button.element.title = 'A room divider: a dashed line that closes the room for its floor and name, with no wall built';
+      gapButtons.push(button);
+      wallSel.add(button);
+    }
+    const near = (p, q) => Math.hypot(p.x - q.x, p.z - q.z) < 3;
+    const spanned = (g) => state.walls.some((w) => w.divider && ((near({ x: w.x1, z: w.z1 }, g.a) && near({ x: w.x2, z: w.z2 }, g.close)) || (near({ x: w.x2, z: w.z2 }, g.a) && near({ x: w.x1, z: w.z1 }, g.close))));
     wallGaps.forEach((dim, k) => {
       const g = gapList[k];
+      const button = gapButtons[k];
       if (!g) {
         dim.visible = false;
+        button.visible = false;
         return;
       }
       const across = v3(-(g.b.z - g.a.z) / g.length, 0, (g.b.x - g.a.x) / g.length);
       dim.measure(v3(g.a.x * CM, 0.03, g.a.z * CM), v3(g.b.x * CM, 0.03, g.b.z * CM), `Gap ${fmt(g.length)}`, across);
+      button.visible = !ui.locked && !spanned(g);
+      button.position.set(((g.a.x + g.b.x) / 2) * CM, 0.03, ((g.a.z + g.b.z) / 2) * CM);
+      Object.assign(button.element.dataset, { ax: g.a.x, az: g.a.z, bx: g.close.x, bz: g.close.z });
     });
 
     // One wall: its length alongside it, and a handle on each end for stretching and turning it.
@@ -832,6 +997,100 @@ export function createScene(container) {
     drawMeasures();
   }
 
+  // ---- Placing room dividers: click where one starts, then where it ends ----
+
+  const dividerGroup = new THREE.Group();
+  scene.add(dividerGroup);
+  const dividerDim = new Dim('sel');
+  const dividerDots = [handle('measure-dot'), handle('measure-dot')];
+  for (const dot of dividerDots) {
+    dot.element.tabIndex = -1;
+    dot.element.setAttribute('aria-hidden', 'true');
+  }
+  dividerGroup.add(dividerDim, ...dividerDots);
+  let dividerStart = null;
+  let dividerHover = null;
+
+  function drawDivider() {
+    dividerGroup.visible = store.getUI().dividing;
+    const [a, b] = [dividerStart ?? dividerHover, dividerStart ? dividerHover : null];
+    dividerDots.forEach((dot, k) => {
+      const p = [a, b][k];
+      dot.visible = Boolean(p);
+      if (p) dot.position.set(p.x * CM, 0.03, p.z * CM);
+    });
+    dividerDim.visible = Boolean(a && b);
+    if (a && b) {
+      const len = dist(a, b);
+      const across = len ? v3(-(b.z - a.z) / len, 0, (b.x - a.x) / len) : v3(1, 0, 0);
+      dividerDim.measure(v3(a.x * CM, 0.03, a.z * CM), v3(b.x * CM, 0.03, b.z * CM), fmt(len), across);
+    }
+  }
+
+  // Where a divider end goes under the pointer: on a wall's end or corner nearby, else onto the middle
+  // of a wall it's near (so the divider joins that wall and closes the room), else where it is. With
+  // Shift, it runs straight across or down the plan from where it started, to the wall it meets there.
+  function dividerPoint(e) {
+    const hit = pick(e);
+    const raw = hit ? { x: hit.point.x / CM, z: hit.point.z / CM } : planePoint(e, floorPlane);
+    if (!raw) return null;
+    const walls = store.getState().walls;
+    const reach = (camera.position.distanceTo(v3(raw.x * CM, 0, raw.z * CM)) / CM) * 0.02; // about 15 pixels
+    const start = dividerStart;
+    if (e.shiftKey && start) {
+      const across = Math.abs(raw.x - start.x) > Math.abs(raw.z - start.z);
+      const dir = across ? { x: Math.sign(raw.x - start.x) || 1, z: 0 } : { x: 0, z: Math.sign(raw.z - start.z) || 1 };
+      const straight = across ? { x: raw.x, z: start.z } : { x: start.x, z: raw.z };
+      let best = straight;
+      let bestD = Infinity;
+      for (const w of walls) {
+        const a = { x: w.x1, z: w.z1 };
+        const b = { x: w.x2, z: w.z2 };
+        const len = dist(a, b) || 1;
+        const at = intersectLines(start, dir, a, { x: (b.x - a.x) / len, z: (b.z - a.z) / len });
+        if (!at || pointToSegment(at, a, b).d > 1 || dist(at, start) < 1) continue;
+        const d = dist(at, straight);
+        if (d < w.thickness / 2 + reach && d < bestD) [best, bestD] = [at, d];
+      }
+      return best;
+    }
+    let best = null;
+    let bestD = Infinity;
+    for (const w of walls) {
+      for (const p of endsOf(w)) {
+        const d = dist(p, raw);
+        if (d < Math.max(reach, w.thickness / 2 + 4) && d < bestD) [best, bestD] = [{ x: p.x, z: p.z }, d];
+      }
+    }
+    if (best) return best;
+    for (const w of walls) {
+      if (Math.abs(w.curve || 0) >= 0.5) continue;
+      const on = pointToSegment(raw, { x: w.x1, z: w.z1 }, { x: w.x2, z: w.z2 });
+      if (on.d < w.thickness / 2 + reach * 0.6 && on.d < bestD) [best, bestD] = [{ x: on.x, z: on.z }, on.d];
+    }
+    return best ?? raw;
+  }
+
+  function dividerClick(e) {
+    const p = dividerPoint(e);
+    if (!p) return;
+    if (!dividerStart) dividerStart = p;
+    else if (dist(dividerStart, p) >= 5) {
+      store.addDivider(dividerStart, p);
+      dividerStart = null;
+    }
+    dividerHover = p;
+    drawDivider();
+  }
+
+  // Esc first drops a divider just started.
+  function cancelDivider() {
+    if (!dividerStart) return false;
+    dividerStart = null;
+    drawDivider();
+    return true;
+  }
+
   // ---- Pointer: dragging furniture, walls and wall corners ----
 
   const raycaster = new THREE.Raycaster();
@@ -844,6 +1103,7 @@ export function createScene(container) {
   let wallDrag = null;
   let cornerDrag = null;
   let sinkDrag = null;
+  let roomDrag = null;
   let press = null; // a press on empty space: a click if it doesn't move
 
   // How far along a piece of furniture (cm from its left end, as seen from the front) a floor point is.
@@ -887,8 +1147,38 @@ export function createScene(container) {
     (e) => {
       if (store.getUI().drawing || e.button !== 0 || !e.isPrimary) return; // the drawing tool handles its own
       tween = null;
+      // "Close with a divider" under a gap: a room divider across it.
+      const closeEl = e.target.closest?.('.gap-close');
+      if (closeEl) {
+        e.stopPropagation();
+        e.preventDefault();
+        const d = closeEl.dataset;
+        store.addDivider({ x: Number(d.ax), z: Number(d.az) }, { x: Number(d.bx), z: Number(d.bz) });
+        return;
+      }
+      // A room's label: select it, and drag it to move it. A "Name this room" tag names the room.
+      const roomEl = e.target.closest?.('[data-room]');
+      const ghostEl = e.target.closest?.('[data-ghost]');
+      if (roomEl || ghostEl) {
+        e.stopPropagation();
+        e.preventDefault();
+        const { locked, measuring } = store.getUI();
+        if (ghostEl) {
+          if (!locked && !measuring) store.addRoomLabel(Number(ghostEl.dataset.x), Number(ghostEl.dataset.z));
+          return;
+        }
+        const id = roomEl.dataset.room;
+        store.selectRoomLabel(id);
+        if (locked || measuring) return;
+        const r = store.roomLabelById(id);
+        const p = planePoint(e, floorPlane) ?? r;
+        roomDrag = { id, pointerId: e.pointerId, dx: r.x - p.x, dz: r.z - p.z };
+        store.beginGesture();
+        container.setPointerCapture(e.pointerId);
+        return;
+      }
       // Measuring: a click places a point; a drag still turns the camera.
-      if (store.getUI().measuring) {
+      if (store.getUI().measuring || store.getUI().dividing) {
         press = { x: e.clientX, y: e.clientY, additive: false };
         return;
       }
@@ -955,6 +1245,18 @@ export function createScene(container) {
       }
       return;
     }
+    if (store.getUI().dividing) {
+      if (e.buttons === 0) {
+        dividerHover = dividerPoint(e);
+        drawDivider();
+      }
+      return;
+    }
+    if (roomDrag && e.pointerId === roomDrag.pointerId) {
+      const p = planePoint(e, floorPlane);
+      if (p) store.moveRoomLabel(roomDrag.id, p.x + roomDrag.dx, p.z + roomDrag.dz);
+      return;
+    }
     if (cornerDrag && e.pointerId === cornerDrag.pointerId) {
       const p = planePoint(e, floorPlane);
       if (p) showSnap(store.dragCorner(cornerDrag.corner, cornerDrag.anchor, p.x, p.z));
@@ -995,7 +1297,7 @@ export function createScene(container) {
   });
 
   function endDrags() {
-    itemDrag = openingDrag = wallDrag = cornerDrag = sinkDrag = null;
+    itemDrag = openingDrag = wallDrag = cornerDrag = sinkDrag = roomDrag = null;
     store.endGesture();
     showSnap(null);
     container.classList.remove('is-dragging');
@@ -1003,6 +1305,10 @@ export function createScene(container) {
 
   container.addEventListener('pointerup', (e) => {
     if (store.getUI().drawing) return;
+    if (roomDrag && e.pointerId === roomDrag.pointerId) {
+      endDrags();
+      return;
+    }
     if (cornerDrag && e.pointerId === cornerDrag.pointerId) {
       if (cornerDrag.moved) store.finishWallEdit();
       endDrags();
@@ -1020,6 +1326,11 @@ export function createScene(container) {
     }
     if (store.getUI().measuring) {
       if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) measureClick(e);
+      press = null;
+      return;
+    }
+    if (store.getUI().dividing) {
+      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) dividerClick(e);
       press = null;
       return;
     }
@@ -1123,7 +1434,7 @@ export function createScene(container) {
 
   // PNG of the current view without measurements or handles.
   function savePhoto() {
-    const overlays = [selection, gaps, roomDims, wallSel, openingSel, snapMark, measureGroup];
+    const overlays = [selection, gaps, roomDims, wallSel, openingSel, snapMark, measureGroup, dividerGroup];
     const shown = overlays.map((o) => o.visible);
     overlays.forEach((o) => (o.visible = false));
     renderer.render(scene, camera);
@@ -1156,8 +1467,11 @@ export function createScene(container) {
     updateItemSelection(state, ui);
     updateWallSelection(state, ui);
     updateOpeningSelection(state, ui);
+    syncRoomLabels(state, ui);
     container.classList.toggle('is-locked', ui.locked);
-    container.classList.toggle('is-measuring', ui.measuring);
+    container.classList.toggle('is-measuring', ui.measuring || ui.dividing);
+    if (!ui.dividing) dividerStart = dividerHover = null;
+    drawDivider();
     if (!ui.measuring && (measures.length || measureStart)) clearMeasures(); // leaving the tool clears them
     else drawMeasures();
   });
@@ -1173,5 +1487,5 @@ export function createScene(container) {
     labelRenderer.render(scene, camera);
   });
 
-  return { setView, savePhoto, focus, cancelMeasure, undoMeasure, clearMeasures };
+  return { setView, savePhoto, focus, frameRoom, cancelMeasure, undoMeasure, clearMeasures, cancelDivider };
 }

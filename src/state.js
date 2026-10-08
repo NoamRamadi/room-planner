@@ -1,7 +1,10 @@
-// The design (walls, groups of walls, furniture, colors) and what's selected. Every change is saved to localStorage.
+// The design (walls, groups of walls, named rooms, furniture, colors) and what's selected. Every change
+// is saved to localStorage. `room` is the look of the whole home (wall height, floor, wall color);
+// `rooms` are the named rooms, each a label on a floor area.
 import { CATALOG, FLOOR_PATTERNS, isSurface, limitsOf, newItemOf, normalizeItem } from './catalog.js';
 import { carryStacked, findSpot, moveWithin, normAngle, preferredSpot, settle } from './layout.js';
 import { OPENINGS, newOpeningOf, normalizeOpening, openingLimitsOf } from './openings.js';
+import { ROOM_TYPES, roomTypeOf } from './rooms.js';
 import {
   JOIN,
   LIMITS,
@@ -31,6 +34,7 @@ export const ROOM_LIMITS = { width: [50, 3000], length: [50, 3000], height: LIMI
 
 const DEFAULT_LOOK = { height: 270, floorPattern: 'planks', floorColor: '#c09a6b', wallColor: '#f1f0ea' };
 const WALL_THICKNESS = 12;
+const DIVIDER_THICKNESS = 4; // only for picking it in the view: a room divider isn't built
 
 // crypto.randomUUID only exists on https/localhost, and the app may be opened over plain http on a LAN.
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -52,7 +56,7 @@ function newWall(ends, look, extra = {}) {
 
 function fresh() {
   const room = { ...DEFAULT_LOOK };
-  const group = { id: newId(), name: 'Room 1' };
+  const group = { id: newId(), name: 'Group 1' };
   // 400 × 500 inside: the walls' centre lines run half a thickness further out.
   const t = WALL_THICKNESS;
   const walls = rectangleWalls(400 + t, 500 + t).map((ends, i) => newWall(ends, room, { name: `Wall ${i + 1}`, group: group.id }));
@@ -61,7 +65,8 @@ function fresh() {
     { ...newOpeningOf('window', 'standard'), id: newId(), wall: walls[0].id, offset: (400 + t) / 2 },
     { ...newOpeningOf('door', 'single'), id: newId(), wall: walls[3].id, offset: 90 + t / 2 },
   ];
-  return { room, walls, groups: [group], items: [], openings };
+  const rooms = [{ id: newId(), x: 0, z: 0, type: 'living', name: 'Living room', floor: null }];
+  return { room, walls, groups: [group], rooms, items: [], openings };
 }
 
 let state = loadSaved() ?? fresh();
@@ -72,15 +77,18 @@ let state = loadSaved() ?? fresh();
 // Both are view settings, remembered separately from the design.
 // drawing: the wall drawing tool is open (the rest of the app waits until it closes).
 // measuring: the measuring tool is on (clicks in the view measure instead of selecting).
+// dividing: the room divider tool is on (clicks in the view place room dividers).
 // leftOpen, rightOpen: the side panels are showing (also remembered).
 const view = loadView();
 let ui = {
   sel: null,
   several: false,
   cutaway: view.cutaway ?? true,
+  roomColors: view.roomColors ?? true,
   locked: view.locked ?? false,
   drawing: false,
   measuring: false,
+  dividing: false,
   leftOpen: view.leftOpen ?? true,
   rightOpen: view.rightOpen ?? true,
 };
@@ -142,6 +150,7 @@ function stillThere(sel) {
   if (sel.type === 'wall') return has(state.walls, sel.id) ? sel : null;
   if (sel.type === 'group') return has(state.groups, sel.id) ? sel : null;
   if (sel.type === 'opening') return has(state.openings, sel.id) ? sel : null;
+  if (sel.type === 'room') return has(state.rooms, sel.id) ? sel : null;
   const ids = sel.ids.filter((id) => has(state.walls, id));
   return ids.length > 1 ? { type: 'walls', ids } : ids.length ? { type: 'wall', id: ids[0] } : null;
 }
@@ -176,11 +185,18 @@ function loadView() {
 
 function saveView() {
   try {
-    const { cutaway, locked, leftOpen, rightOpen } = ui;
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway, locked, leftOpen, rightOpen }));
+    const { cutaway, locked, leftOpen, rightOpen, roomColors } = ui;
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway, locked, leftOpen, rightOpen, roomColors }));
   } catch {
     // Not remembered for next time, but it still applies now.
   }
+}
+
+// Named rooms' floors tinted by their type in the plan.
+export function setRoomColors(on) {
+  ui = { ...ui, roomColors: on };
+  saveView();
+  emit();
 }
 
 export function setCutaway(on) {
@@ -197,18 +213,25 @@ export function setPanel(side, open) {
 }
 
 export function setDrawing(on) {
-  ui = { ...ui, drawing: on, several: false, sel: on ? null : ui.sel, measuring: on ? false : ui.measuring };
+  ui = { ...ui, drawing: on, several: false, sel: on ? null : ui.sel, measuring: on ? false : ui.measuring, dividing: on ? false : ui.dividing };
   emit();
 }
 
 // Measuring changes nothing, so it works while locked too.
 export function setMeasuring(on) {
-  ui = { ...ui, measuring: on, several: false };
+  ui = { ...ui, measuring: on, dividing: on ? false : ui.dividing, several: false };
+  emit();
+}
+
+// The room divider tool: click two points in the view to place a divider between them.
+export function setDividing(on) {
+  if (on && ui.locked) return null;
+  ui = { ...ui, dividing: on, measuring: on ? false : ui.measuring, several: false };
   emit();
 }
 
 export function setLocked(on) {
-  ui = { ...ui, locked: on, several: false };
+  ui = { ...ui, locked: on, several: false, dividing: on ? false : ui.dividing };
   saveView();
   emit();
 }
@@ -256,6 +279,8 @@ export const getSelected = () => (ui.sel?.type === 'item' ? (state.items.find((i
 export const wallById = (id) => state.walls.find((w) => w.id === id);
 export const openingById = (id) => state.openings.find((o) => o.id === id);
 export const selectOpening = (id) => setSel({ type: 'opening', id });
+export const roomLabelById = (id) => state.rooms.find((r) => r.id === id);
+export const selectRoomLabel = (id) => setSel({ type: 'room', id });
 
 // Ids of the walls that are selected, whether one wall, a group or several.
 export function selectedWallIds(sel = ui.sel) {
@@ -455,8 +480,10 @@ export function addDrawnWalls(segments) {
   let walls = [...state.walls];
   const ids = [];
   for (const s of segments) {
-    const { x1, z1, x2, z2, thickness, height } = s;
-    const wall = newWall({ x1, z1, x2, z2 }, state.room, { name: nextName(walls, 'Wall'), thickness, height });
+    const { x1, z1, x2, z2, thickness, height, divider } = s;
+    const wall = divider
+      ? newWall({ x1, z1, x2, z2 }, state.room, { name: nextName(walls, 'Divider'), thickness: DIVIDER_THICKNESS, divider: true })
+      : newWall({ x1, z1, x2, z2 }, state.room, { name: nextName(walls, 'Wall'), thickness, height });
     walls = [...walls, wall];
     ids.push(wall.id);
   }
@@ -477,7 +504,7 @@ function drawnInside(walls, ids, existing) {
   const pinned = new Set([...corners].filter(([, list]) => list.length > 2 || existing.some((o) => onWall(o, list[0].p))).map(([k]) => k));
   const shift = new Map();
   for (const w of drawn) {
-    if (endsOf(w).some((p) => pinned.has(key(p)))) continue;
+    if (w.divider || endsOf(w).some((p) => pinned.has(key(p)))) continue;
     const { side, nl } = facesOf(w, walls);
     if (side) shift.set(w.id, { x: (-side * nl.x * w.thickness) / 2, z: (-side * nl.z * w.thickness) / 2 });
   }
@@ -524,14 +551,74 @@ export function addRoom(width, length) {
     cx = round(b.maxX + 60 + width / 2);
     cz = round(b.minZ + length / 2);
   }
-  const group = { id: newId(), name: nextName(state.groups, 'Room') };
+  const group = { id: newId(), name: nextName(state.groups, 'Group') };
   let walls = [...state.walls];
   for (const ends of rectangleWalls(width, length, cx, cz)) {
     walls = [...walls, newWall(ends, state.room, { name: nextName(walls, 'Wall'), group: group.id })];
   }
-  state = { ...state, groups: [...state.groups, group] };
+  // A named room on its floor, ready to get its type.
+  const named = { id: newId(), x: cx, z: cz, type: 'other', name: nextName(state.rooms, 'Room'), floor: null };
+  state = { ...state, groups: [...state.groups, group], rooms: [...state.rooms, named] };
   ui = { ...ui, sel: { type: 'group', id: group.id } };
   commitWalls(walls);
+}
+
+// A room divider across an opening, from a to b: a line that closes a room for its floor and name
+// without building a wall. Selected, so it can be adjusted.
+export function addDivider(a, b) {
+  if (ui.locked || dist(a, b) < 1) return null;
+  const divider = newWall({ x1: round(a.x), z1: round(a.z), x2: round(b.x), z2: round(b.z) }, state.room, {
+    name: nextName(state.walls, 'Divider'),
+    thickness: DIVIDER_THICKNESS,
+    divider: true,
+  });
+  ui = { ...ui, sel: { type: 'wall', id: divider.id } };
+  commitWalls([...state.walls, divider]);
+  return divider.id;
+}
+
+// ---- Named rooms ----
+
+// Name the floor area at (x, z): a new room label there, selected so its type can be picked.
+export function addRoomLabel(x, z, type = 'other') {
+  if (ui.locked) return null;
+  const label = type === 'other' ? nextName(state.rooms, 'Room') : uniqueIn(state.rooms, roomTypeOf({ type }).label);
+  const named = { id: newId(), x: round(x), z: round(z), type, name: label, floor: null };
+  state = { ...state, rooms: [...state.rooms, named] };
+  ui = { ...ui, sel: { type: 'room', id: named.id } };
+  emit();
+  return named.id;
+}
+
+// Type, name or floor. A room still called after its type ("Kitchen", "Room 3") takes the new type's name.
+export function updateRoomLabel(id, patch) {
+  if (ui.locked) return null;
+  nextKey = `roomlabel:${id}:${Object.keys(patch).sort()}`;
+  const before = roomLabelById(id);
+  if (!before) return;
+  if (patch.type && patch.type !== before.type) {
+    const old = roomTypeOf(before).label;
+    if (new RegExp(`^(${old}|Room)( \\d+)?$`).test(before.name)) {
+      patch = { ...patch, name: uniqueIn(state.rooms.filter((r) => r.id !== id), roomTypeOf({ type: patch.type }).label) };
+    }
+  }
+  if ('name' in patch) patch = { ...patch, name: String(patch.name).slice(0, 40) };
+  state = { ...state, rooms: state.rooms.map((r) => (r.id === id ? { ...r, ...patch } : r)) };
+  emit();
+}
+
+export function moveRoomLabel(id, x, z) {
+  if (ui.locked) return null;
+  nextKey = `roomlabel:${id}:move`;
+  state = { ...state, rooms: state.rooms.map((r) => (r.id === id ? { ...r, x: round(x), z: round(z) } : r)) };
+  emit();
+}
+
+export function removeRoomLabel(id) {
+  if (ui.locked) return null;
+  state = { ...state, rooms: state.rooms.filter((r) => r.id !== id) };
+  if (ui.sel?.type === 'room' && ui.sel.id === id) ui = { ...ui, sel: null };
+  emit();
 }
 
 export function updateWall(id, patch) {
@@ -1080,6 +1167,7 @@ function sanitize(raw) {
           color: hex(w.color, room.wallColor),
           group: groupIds.has(w.group) ? w.group : null,
           ...(w.keep === 'left' || w.keep === 'right' ? { keep: w.keep } : {}),
+          ...(w.divider === true ? { divider: true, thickness: DIVIDER_THICKNESS } : {}),
         };
       });
     groups = groups.filter((g) => walls.some((w) => w.group === g.id));
@@ -1141,7 +1229,26 @@ function sanitize(raw) {
       return normalizeOpening(out);
     });
 
-  return { room, walls, groups, items, openings };
+  const roomIds = new Set();
+  const rooms = (Array.isArray(raw.rooms) ? raw.rooms : [])
+    .slice(0, 200)
+    .filter((r) => r && typeof r === 'object' && Number.isFinite(Number(r.x)) && Number.isFinite(Number(r.z)))
+    .map((r) => {
+      const id = typeof r.id === 'string' && !roomIds.has(r.id) ? r.id : newId();
+      roomIds.add(id);
+      const type = ROOM_TYPES.some((t) => t.id === r.type) ? r.type : 'other';
+      const floor =
+        r.floor && typeof r.floor === 'object'
+          ? {
+              pattern: FLOOR_PATTERNS.some((p) => p.id === r.floor.pattern) ? r.floor.pattern : room.floorPattern,
+              color: hex(r.floor.color, room.floorColor),
+            }
+          : null;
+      const name = typeof r.name === 'string' && r.name.trim() ? r.name.slice(0, 40) : roomTypeOf({ type }).label;
+      return { id, x: num(r.x, [-10000, 10000], 0), z: num(r.z, [-10000, 10000], 0), type, name, floor };
+    });
+
+  return { room, walls, groups, rooms, items, openings };
 }
 
 // Walls from an older design: a room outline (v2) with curved walls, openings and open sides, or a

@@ -31,10 +31,10 @@ Your design is saved automatically in the browser. Use **Save design file** / **
 
 A rail down the side panel's edge switches between four sections, one at a time (the panel remembers the last one; on phones the rail is a row of tabs):
 
-- **Rooms:** **Draw walls**, add a room by its inside size, add a single wall (folded away under **Add a single wall**), and the list of your rooms and walls.
+- **Rooms:** **Draw walls**, add a room by its inside size, add a single wall (folded away under **Add a single wall**), your **named rooms** with their floor area (click one to bring it into view), and the list of walls and wall groups.
 - **Add:** search every design by name (for example "lamp", "sink" or "window") and click one to add it, or pick a category (Living, Kitchen, Bedroom, Bath, Doors & windows, Any room), then a type, then a design.
-- **Placed:** everything in your plan, grouped by the room it's for, with counts. Filter by group, fold groups away, and click a piece to select it.
-- **Style:** wall height, floor pattern and color, and wall color.
+- **Placed:** everything in your plan, grouped by the named room it stands in (or, before you name any rooms, by the kind of room it's for), with counts. Filter by group, fold groups away, and click a piece to select it.
+- **Style:** wall height, floor pattern and color, wall color, and whether named rooms are colored by their type.
 
 The **⋯** menu next to the title has **Save design file**, **Open design file** and **Start over**.
 
@@ -66,6 +66,18 @@ git push
 ```
 
 `npm run build` also creates a `dist/` folder of plain static files that works on any other static host.
+
+## Named rooms
+
+Every floor area the walls enclose can be named. An unnamed one shows **+ Name this room** on its floor; click it, then pick the room's type in the panel on the right: living room, kitchen, bedroom, bathroom, work room, kids' room, dining room, hallway, laundry, storage, balcony or other. The room takes its type's name until you type a name of your own. Its label on the floor shows the name and the floor area inside the walls (the panel also shows the inside width and length of a rectangular room); in the Top view the plan reads like an architect's floor plan. Named rooms are lightly colored by their type (turn that off under **Style**), and a room can have **a floor of its own** (tiles in the kitchen and bathroom, say) instead of the home's floor.
+
+**Open rooms** (a kitchen open to the hall, a living room with an open passage) need a **room divider**: a dashed line across the opening that closes the room for its floor, name and area without building a wall. You walk through it, furniture goes through it, and it can't take a door or a window. There are three ways to add one:
+
+- **Add a room divider** (in the **Rooms** section, or **Split with a divider** in a room's panel) turns on the divider tool: click where the divider starts and where it ends, right in the 3D view (easiest in the Top view). Ends snap to wall corners and onto walls, so the divider joins them and closes the room; hold Shift for a line straight across or down the plan, from the corner of one wall to the wall opposite. Add as many as you like; Esc drops one you've started, and Esc again (or **Done adding dividers**) stops.
+- Select a wall beside an opening and click **Close with a divider** under its gap label: a divider across the gap in one click.
+- Switch Draw walls to **Room divider** and draw dividers on the floor plan. A divider can be moved, stretched by its end handles and removed like a wall, and shows as a dashed line in the plan.
+
+Drag a label to move it: a name belongs to whichever room its label stands in, so it stays with its room when you move walls. **Add room** names its new room "Room N", ready for a type. Selecting a named room opens the matching furniture under **Add** (kitchen furniture for a kitchen, and so on), and **Placed** groups your furniture by the room it stands in. **Remove name** (or Delete) takes a name off. Wall groups, which move walls together, are a separate thing, listed under **Walls**.
 
 ## Measuring from the inside
 

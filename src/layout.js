@@ -37,7 +37,7 @@ export function containsPoint(item, x, z) {
 export function hitsWall(item, walls, items = []) {
   const box = boxOf(item);
   const top = elevationOf(item, items) + dimsOf(item).h;
-  return walls.some((w) => w.gap < top && boxesOf(w).some((b) => boxesOverlap(box, b)));
+  return walls.some((w) => !w.divider && w.gap < top && boxesOf(w).some((b) => boxesOverlap(box, b)));
 }
 
 const at = (item, x, z) => ({ ...item, x, z });
@@ -172,7 +172,7 @@ const VIEW = { x: 0.51, z: 0.86 };
 // Straight, full-height walls around the main floor, each with the direction pointing into the room.
 function roomWalls(walls, floor, centre) {
   return walls
-    .filter((w) => !w.curve && !w.gap)
+    .filter((w) => !w.curve && !w.gap && !w.divider)
     .map((w) => {
       const mid = midpointOf(w);
       const len = Math.hypot(w.x2 - w.x1, w.z2 - w.z1);
