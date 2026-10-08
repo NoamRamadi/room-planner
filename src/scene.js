@@ -466,6 +466,7 @@ export function createScene(container) {
   function syncRoomLabels(state, ui) {
     const floors = floorsOf(state.walls);
     const selected = ui.sel?.type === 'room' ? ui.sel.id : null;
+    roomLabels.visible = ui.roomNames;
     const key = JSON.stringify([floors, state.walls.map((w) => w.thickness), state.rooms, selected, ui.locked]);
     if (key === roomLabelKey) return;
     roomLabelKey = key;

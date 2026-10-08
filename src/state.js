@@ -85,6 +85,7 @@ let ui = {
   several: false,
   cutaway: view.cutaway ?? true,
   roomColors: view.roomColors ?? true,
+  roomNames: view.roomNames ?? true,
   locked: view.locked ?? false,
   drawing: false,
   measuring: false,
@@ -185,11 +186,18 @@ function loadView() {
 
 function saveView() {
   try {
-    const { cutaway, locked, leftOpen, rightOpen, roomColors } = ui;
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway, locked, leftOpen, rightOpen, roomColors }));
+    const { cutaway, locked, leftOpen, rightOpen, roomColors, roomNames } = ui;
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway, locked, leftOpen, rightOpen, roomColors, roomNames }));
   } catch {
     // Not remembered for next time, but it still applies now.
   }
+}
+
+// The named rooms' labels on the floor (and the "Name this room" tags), shown or hidden.
+export function setRoomNames(on) {
+  ui = { ...ui, roomNames: on };
+  saveView();
+  emit();
 }
 
 // Named rooms' floors tinted by their type in the plan.
@@ -1125,8 +1133,10 @@ export function resetDesign() {
 // Older designs are converted: a width × length room (v1) or a room outline with openings (v2)
 // becomes a group of walls.
 function sanitize(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const num = (v, [lo, hi], fallback) =>
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  // Any other JSON file isn't a design: a design has walls, a room or furniture.
+  if (!Array.isArray(raw.walls) && !(raw.room && typeof raw.room === 'object') && !Array.isArray(raw.items)) return null;
+  const num =(v, [lo, hi], fallback) =>
     v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Number(v))) : fallback;
   const hex = (v, fallback) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : fallback);
   const coord = (v) => num(v, [-10000, 10000], NaN);

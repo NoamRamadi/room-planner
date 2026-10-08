@@ -79,6 +79,7 @@ const ICONS = {
   window: '<rect x="8" y="4" width="32" height="22"/><path d="M24 4v22"/><path d="M5 28h38"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   measure: '<path d="M3 15.5L15.5 3l5.5 5.5L8.5 21z"/><path d="M7 11.5l2 2M10 8.5l2 2M13 5.5l2 2"/>',
+  layers: '<path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/>',
   unlock: '<rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>',
 };
 
@@ -1070,6 +1071,41 @@ export function initUI(view) {
     clearMeasures.hidden = !measuring;
   });
 
+  // Layers: what's drawn over the plan, each shown or hidden (remembered for next time).
+  const layerBox = (label, get, set) => {
+    const box = h('input', { type: 'checkbox' });
+    box.addEventListener('change', () => set(box.checked));
+    syncers.push(() => {
+      box.checked = get();
+    });
+    return h('label', { class: 'check' }, box, label);
+  };
+  const layersMenu = h(
+    'div',
+    { class: 'layers-menu', role: 'group', 'aria-label': 'Layers', hidden: true },
+    layerBox('Room names', () => store.getUI().roomNames, (on) => store.setRoomNames(on)),
+    layerBox('Room colors', () => store.getUI().roomColors, (on) => store.setRoomColors(on)),
+  );
+  const layersButton = h('button', {
+    type: 'button',
+    class: 'tool',
+    'data-always': '',
+    'aria-expanded': 'false',
+    title: 'Show or hide room names and colors',
+    html: `${icon('layers')}<span>Layers</span>`,
+    onclick: () => {
+      layersMenu.hidden = !layersMenu.hidden;
+      layersButton.setAttribute('aria-expanded', String(!layersMenu.hidden));
+    },
+  });
+  const layers = h('div', { class: 'layers', 'data-always': '' }, layersButton, layersMenu);
+  document.addEventListener('pointerdown', (e) => {
+    if (!layersMenu.hidden && !layers.contains(e.target)) {
+      layersMenu.hidden = true;
+      layersButton.setAttribute('aria-expanded', 'false');
+    }
+  });
+
   // Undo and redo: every change to the design, one drag or one run of typing at a time.
   const mac = /Mac|iPhone|iPad/.test(navigator.platform);
   const undoBtn = h('button', { type: 'button', 'aria-label': 'Undo', title: `Undo (${mac ? '⌘Z' : 'Ctrl+Z'})`, html: icon('undo'), onclick: () => store.undo() });
@@ -1089,6 +1125,7 @@ export function initUI(view) {
       h('button', { type: 'button', onclick: () => view.setView('eye') }, 'Eye level'),
     ),
     seeThrough,
+    layers,
     lock,
     measure,
     clearMeasures,

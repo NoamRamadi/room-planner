@@ -21,6 +21,7 @@ Plan a room of your apartment in 3D, right in the browser.
 - See each piece's size and its distance to every wall while it's selected
 - Switch between 3D view, top view (floor plan) and eye level, and save a photo of the view
 - Turn **See-through walls** on to cut away walls that stand between you and the room, or off to keep every wall standing
+- **Layers:** show or hide the room names on the floor, and the room colors (for a clean photo, say)
 - **Lock** the design when you're done, so you can look around and check measurements without moving anything by accident
 - **Measure** anything: select a wall to see the gap at its free ends, or use the Measure tool to measure between any two points
 - **Undo and redo** any change: the arrows at the start of the bar above the view, or Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z
@@ -69,7 +70,7 @@ git push
 
 ## Named rooms
 
-Every floor area the walls enclose can be named. An unnamed one shows **+ Name this room** on its floor; click it, then pick the room's type in the panel on the right: living room, kitchen, bedroom, bathroom, work room, kids' room, dining room, hallway, laundry, storage, balcony or other. The room takes its type's name until you type a name of your own. Its label on the floor shows the name and the floor area inside the walls (the panel also shows the inside width and length of a rectangular room); in the Top view the plan reads like an architect's floor plan. Named rooms are lightly colored by their type (turn that off under **Style**), and a room can have **a floor of its own** (tiles in the kitchen and bathroom, say) instead of the home's floor.
+Every floor area the walls enclose can be named. An unnamed one shows **+ Name this room** on its floor; click it, then pick the room's type in the panel on the right: living room, kitchen, bedroom, bathroom, work room, kids' room, dining room, hallway, laundry, storage, balcony or other. The room takes its type's name until you type a name of your own. Its label on the floor shows the name and the floor area inside the walls (the panel also shows the inside width and length of a rectangular room); in the Top view the plan reads like an architect's floor plan. Named rooms are lightly colored by their type. **Layers** in the bar above the view hides the names or the colors (the colors can also be turned off under **Style**), and a room can have **a floor of its own** (tiles in the kitchen and bathroom, say) instead of the home's floor.
 
 **Open rooms** (a kitchen open to the hall, a living room with an open passage) need a **room divider**: a dashed line across the opening that closes the room for its floor, name and area without building a wall. You walk through it, furniture goes through it, and it can't take a door or a window. There are three ways to add one:
 
