@@ -767,8 +767,9 @@ export const CATALOG = {
     room: 'kitchen',
     place: 'wall',
     surface: true, // the worktop of a base cabinet
-    defaults: { style: 'base', w: 60, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9', mount: 145 },
-    limits: { w: [30, 300], d: [15, 70], h: [20, 240], mount: [40, 220] },
+    // `doors`: a wall cabinet's doors, 0 for as many as fit at about 45 cm each.
+    defaults: { style: 'base', w: 60, d: 60, h: 90, color: '#f2f1ec', color2: '#efeee9', mount: 145, doors: 0 },
+    limits: { w: [30, 300], d: [15, 70], h: [20, 240], mount: [40, 220], doors: [0, 8] },
     colors: [
       { key: 'color', label: 'Fronts', palette: FRONTS },
       { key: 'color2', label: 'Countertop', palette: WORKTOPS },
@@ -806,6 +807,8 @@ export const CATALOG = {
         over: ['kitchen', 'sinkunit', 'dishwasher', 'counter'], // hung above a base unit with nothing above it yet
         defaults: { w: 60, d: 35, h: 70 },
         limits: { d: [25, 40], h: [30, 100] },
+        // Only as many doors as are at least MIN_DOOR wide.
+        options: [{ key: 'doors', label: 'Doors', values: [0, 1, 2, 3, 4, 5, 6, 7, 8], zero: 'Auto', stack: true, fits: (item, n) => item.w / n >= MIN_DOOR }],
         colors: [{ key: 'color', label: 'Fronts', palette: FRONTS }],
         presets: [
           { name: '40 cm', w: 40, d: 35, h: 70 },
@@ -842,6 +845,11 @@ export const CATALOG = {
         ],
       },
     ],
+    // A door count that no longer fits a narrower cabinet comes down to the most that do.
+    fit(item) {
+      item.doors = Math.round(item.doors ?? 0);
+      if (item.doors) item.doors = Math.min(item.doors, Math.max(1, Math.floor(item.w / MIN_DOOR)));
+    },
     build: buildKitchenCabinet,
   },
   counter: {
@@ -1892,11 +1900,15 @@ export const CATALOG = {
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+const MIN_DOOR = 20; // cm, the narrowest cabinet door
+
 export const styleOf = (item) => CATALOG[item.type].styles.find((s) => s.id === item.style) ?? CATALOG[item.type].styles[0];
 export const limitsOf = (item) => ({ ...CATALOG[item.type].limits, ...styleOf(item).limits });
 export const presetsOf = (item) => styleOf(item).presets ?? CATALOG[item.type].presets;
 // The colors that can be set: a design can have fewer (a hood has no countertop).
 export const colorsOf = (item) => styleOf(item).colors ?? CATALOG[item.type].colors;
+// Choices set as a row of buttons each (a counter's drawers, a wall cabinet's doors).
+export const optionsOf = (item) => styleOf(item).options ?? CATALOG[item.type].options ?? [];
 // Hangs on a wall (a wall-mounted TV) rather than standing on the floor or on furniture.
 export const isOnWall = (item) => Boolean(styleOf(item).onWall);
 export const isStackable = (item) => Boolean(styleOf(item).stackable ?? CATALOG[item.type].stackable) && !isOnWall(item);
@@ -2995,9 +3007,10 @@ function buildKitchenCabinet({ w, d, h }, item) {
   }
 
   if (style === 'wall') {
-    // A box on the wall with doors about 45 cm wide, the handles along their bottom edge.
+    // A box on the wall with its doors (as many as fit at about 45 cm each, unless set), the
+    // handles along their bottom edge.
     g.add(block(w, h, d, body, { r: 0.004 }));
-    const cols = Math.max(1, Math.round(w / 0.45));
+    const cols = item.doors || Math.max(1, Math.round(w / 0.45));
     grooves(g, line, { w, y0: 0, bodyH: h, z: d / 2, cols });
     for (let i = 0; i < cols; i++) barHandle(g, handle, { x: -w / 2 + (w / cols) * (i + 0.5), y: 0.04, z: d / 2, length: Math.min(0.14, (w / cols) * 0.5) });
     return g;

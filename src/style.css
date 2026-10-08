@@ -1404,6 +1404,13 @@ h3 {
   font-size: 12.5px;
 }
 
+/* A long row of numbers (a wall cabinet's doors): every choice fits across the panel. */
+.field-row--choice.field-row--stack .segmented button {
+  flex: 1 0 auto;
+  min-width: 0;
+  padding: 4px 5px;
+}
+
 .turn {
   display: flex;
   align-items: center;

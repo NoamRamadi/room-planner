@@ -1,5 +1,5 @@
 // Side panel, inspector (selected furniture, wall, group or several walls), camera bar and keyboard shortcuts.
-import { CATALOG, FLOOR_FINISHES, FLOOR_PATTERNS, WALL_PAINTS, colorsOf, dimsOf, isFlat, isOnWall, limitsOf, presetsOf, styleOf, tvScreen } from './catalog.js';
+import { CATALOG, FLOOR_FINISHES, FLOOR_PATTERNS, WALL_PAINTS, colorsOf, dimsOf, isFlat, isOnWall, limitsOf, optionsOf, presetsOf, styleOf, tvScreen } from './catalog.js';
 import { OPENINGS, openingLimitsOf, openingStyleOf } from './openings.js';
 import { h, measureField } from './dom.js';
 import { createDrawMode } from './draw.js';
@@ -1843,17 +1843,19 @@ function buildItemInspector(root, item) {
     flip = h('label', { class: 'check' }, box, style.flip);
   }
 
-  // Layout: how many drawers and cupboards (each a row of choices), and where the sink sits.
-  const layoutRows = (def.options ?? []).map((opt) => {
+  // Layout: how many drawers and cupboards, or doors (each a row of choices), and where the sink sits.
+  const layoutRows = optionsOf(item).map((opt) => {
     const choice = segmented({
       label: opt.label,
-      options: opt.values.map((v) => ({ id: v, label: v === 0 ? 'None' : String(v) })),
+      options: opt.values.map((v) => ({ id: v, label: v === 0 ? (opt.zero ?? 'None') : String(v) })),
       get: () => current()[opt.key],
       set: (v) => update({ [opt.key]: v }),
     });
-    const row = h('div', { class: 'field-row field-row--choice' }, h('span', { class: 'field-row__label' }, opt.label), choice.el);
+    const row = h('div', { class: `field-row field-row--choice${opt.stack ? ' field-row--stack' : ''}` }, h('span', { class: 'field-row__label' }, opt.label), choice.el);
     syncers.push(choice.sync, () => {
       row.hidden = opt.when ? !opt.when(current()) : false;
+      // Choices that don't fit the piece's size are left out (more doors than its width takes).
+      if (opt.fits) [...choice.el.children].forEach((b, i) => (b.hidden = Boolean(opt.values[i]) && !opt.fits(current(), opt.values[i])));
     });
     return row;
   });
@@ -1900,7 +1902,7 @@ function buildItemInspector(root, item) {
     panelHead(name, null, () => store.clearSelection()),
     h('div', { class: 'inspector__group' }, h('h3', {}, 'Design'), designs),
     h('div', { class: 'inspector__group' }, h('h3', {}, 'Size'), h('div', { class: 'presets' }, presetButtons), sizeFields, flip),
-    layout,
+    ...(layout ? [layout] : []), // native append would print a missing one as "null"
     h('div', { class: 'inspector__group' }, colorPickers),
     h(
       'div',
