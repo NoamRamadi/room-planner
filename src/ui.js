@@ -31,6 +31,7 @@ const ICONS = {
   dresser: '<rect x="14" y="3" width="20" height="24" rx="1"/><path d="M14 9h20M14 15h20M14 21h20M22 6h4M22 12h4M22 18h4M22 24h4M16 27v3M32 27v3"/>',
   desk: '<path d="M4 10h40v3H4z"/><path d="M8 13v16M40 13v16"/><path d="M16 13v4h16v-4M22 15h4"/>',
   chair: '<path d="M15 3h18M15 8h18M15 3v27M33 3v27M14 17h20v2H14z"/><path d="M15 25h18"/>',
+  cubes: '<rect x="8" y="3" width="32" height="26"/><path d="M16 3v26M24 3v26M32 3v26M8 11.7h32M8 20.3h32"/>',
   bookcase: '<rect x="13" y="2" width="22" height="27"/><path d="M13 11h22M13 20h22"/><path d="M16 11V5M18 11V6M20 11V4M25 20v-6M27 20v-5M16 29v-6M18 29v-5M21 29v-6"/>',
   lamp: '<path d="M17 4h14l4 10H13z"/><path d="M24 14v4"/><path d="M20 18h8c2 3 2 7-1 10h-6c-3-3-3-7-1-10z"/>',
   crib: '<path d="M6 4v25M42 4v25M6 7h36M6 21h36"/><path d="M11 7v14M16 7v14M21 7v14M26 7v14M31 7v14M36 7v14"/><path d="M6 25h36"/>',
@@ -191,6 +192,9 @@ Object.assign(DESIGN_ICONS, {
   'lamp:arc': '<path d="M8 29h8M12 29V14a12 12 0 0 1 24 0v2"/><path d="M30 22a6 6 0 0 1 12 0z"/>',
   'crib:cot': ICONS.crib,
   'crib:bassinet': '<path d="M8 8h32l-3 9H11z"/><path d="M14 17l20 12M34 17L14 29"/>',
+  'cubes:open': `${ICONS.cubes}<path d="M10 11.7V6M12 11.7V7M14 11.7V5.5M26 20.3v-6M28 20.3v-5M19 29v-5M21 29v-6"/>`,
+  'cubes:baskets': `${ICONS.cubes}<path d="M10 11.7V6M12 11.7V7M26 20.3v-6M28 20.3v-5"/><path d="M9.5 21.8h5v5.7h-5zM17.5 21.8h5v5.7h-5zM25.5 21.8h5v5.7h-5zM33.5 21.8h5v5.7h-5z"/><path d="M11 23.5h2M19 23.5h2M27 23.5h2M35 23.5h2"/>`,
+  'cubes:doors': `${ICONS.cubes}<path d="M10 11.7V6M12 11.7V7M26 20.3v-6M28 20.3v-5"/><path d="M14 24.6h.01M18 24.6h.01M30 24.6h.01M34 24.6h.01"/>`,
   'ac:split': ICONS.ac,
   'ac:floor': '<rect x="16" y="2" width="16" height="28" rx="2"/><path d="M19 6h10M19 9h10M19 12h10M22 18h4"/>',
   'ac:portable': '<rect x="12" y="6" width="20" height="21" rx="3"/><path d="M16 10h12M16 13h12M15 27v2M29 27v2"/><path d="M32 12c6 0 9 3 9 8v9"/>',
@@ -1803,7 +1807,8 @@ function buildItemInspector(root, item) {
   } else {
     // Round pieces have one size across, their diameter; a carpet has no height worth setting.
     const flat = isFlat(item);
-    const keys = [
+    // A type can set other sizes instead (a cube storage unit: the size of one cube).
+    const keys = def.sizes ?? [
       ...(style.round ? [['w', 'Diameter']] : [['w', 'Width'], ['d', flat ? 'Length' : 'Depth']]),
       ...(flat ? [] : [['h', 'Height']]),
     ];
@@ -1818,6 +1823,13 @@ function buildItemInspector(root, item) {
     );
     syncers.push(...fields.map((f) => f.sync));
     sizeFields = [h('div', { class: keys.length === 3 ? 'measures' : 'measures measures--two' }, fields.map((f) => f.el))];
+    if (def.readout) {
+      const readout = h('p', { class: 'readout' });
+      syncers.push(() => {
+        readout.textContent = def.readout(current());
+      });
+      sizeFields.push(readout);
+    }
     // Wall-mounted pieces (a mirror cabinet, a shower head) also have their height above the floor.
     if (isOnWall(item)) {
       const mount = measureField({

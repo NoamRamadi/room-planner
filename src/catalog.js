@@ -1740,6 +1740,61 @@ export const CATALOG = {
 
   // ---- Any room ----
 
+  cubes: {
+    label: 'Cube storage unit',
+    room: 'any',
+    place: 'wall',
+    surface: true, // a low unit takes a lamp or a plant on top
+    // A grid of equal cubes, `cols` across and `rows` high, each `cw` × `ch` inside, with boards
+    // CUBE_BOARD thick around and between them; its outer width and height follow (see `fit`).
+    defaults: { style: 'open', cols: 4, rows: 4, cw: 33, ch: 33, d: 39, w: 142, h: 142, color: '#ecebe6', color2: '#cfc6b4', color3: '#f2f1ec' },
+    limits: { w: [20, 700], d: [25, 60], h: [20, 600], cols: [1, 8], rows: [1, 6], cw: [20, 80], ch: [20, 80] },
+    // Set in the panel instead of the outer width and height.
+    sizes: [
+      ['cw', 'Cube width'],
+      ['ch', 'Cube height'],
+      ['d', 'Depth'],
+    ],
+    readout: (item) => `Overall ${item.w} × ${item.h} cm, ${item.d} cm deep`,
+    options: [
+      { key: 'cols', label: 'Columns', values: [1, 2, 3, 4, 5, 6, 7, 8], stack: true },
+      { key: 'rows', label: 'Rows', values: [1, 2, 3, 4, 5, 6], stack: true },
+    ],
+    presets: [
+      { name: '2 × 2', cols: 2, rows: 2, cw: 33, ch: 33, d: 39 },
+      { name: '4 × 2', cols: 4, rows: 2, cw: 33, ch: 33, d: 39 },
+      { name: '4 × 4', cols: 4, rows: 4, cw: 33, ch: 33, d: 39 },
+      { name: '5 × 5', cols: 5, rows: 5, cw: 33, ch: 33, d: 39 },
+    ],
+    styles: [
+      { id: 'open', label: 'Open cubes', name: 'Cube storage', colors: [{ key: 'color', label: 'Frame', palette: PAINTED }] },
+      {
+        id: 'baskets',
+        label: 'With baskets',
+        name: 'Cube storage',
+        colors: [
+          { key: 'color', label: 'Frame', palette: PAINTED },
+          { key: 'color2', label: 'Baskets', palette: FABRICS },
+        ],
+      },
+      {
+        id: 'doors',
+        label: 'With doors',
+        name: 'Cube storage',
+        colors: [
+          { key: 'color', label: 'Frame', palette: PAINTED },
+          { key: 'color3', label: 'Doors', palette: FRONTS },
+        ],
+      },
+    ],
+    fit(item) {
+      item.cols = Math.round(item.cols);
+      item.rows = Math.round(item.rows);
+      item.w = item.cols * item.cw + (item.cols + 1) * CUBE_BOARD;
+      item.h = item.rows * item.ch + (item.rows + 1) * CUBE_BOARD;
+    },
+    build: buildCubes,
+  },
   ac: {
     label: 'Air conditioner',
     room: 'any',
@@ -1901,6 +1956,7 @@ export const CATALOG = {
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 const MIN_DOOR = 20; // cm, the narrowest cabinet door
+const CUBE_BOARD = 2; // cm, the boards of a cube storage unit
 
 export const styleOf = (item) => CATALOG[item.type].styles.find((s) => s.id === item.style) ?? CATALOG[item.type].styles[0];
 export const limitsOf = (item) => ({ ...CATALOG[item.type].limits, ...styleOf(item).limits });
@@ -3839,6 +3895,52 @@ function buildBookcase({ w, d, h }, item) {
     const end = x0 + 0.01 + (inner - 0.02) * (0.45 + rnd() * 0.55);
     books(g, rnd, mats, { x0: x0 + 0.01, x1: end, y, z: -0.02, depth: d - 0.06, room: gap - t });
     if (k === n - 1 && end < x0 + inner - 0.2) plant(g, { x: (end + x0 + inner) / 2, y, z: 0, size: Math.min(0.09, (gap - t) / 3) });
+  }
+  return g;
+}
+
+// A cube storage unit: a frame of boards around a grid of equal cubes. The lower rows hold baskets
+// or doors in those designs; the open cubes have books, a plant or a box in some of them.
+function buildCubes({ w, d, h }, item) {
+  const g = new THREE.Group();
+  const body = wood(item.color);
+  const t = CUBE_BOARD / 100;
+  const { cols, rows } = item;
+  const cw = (w - (cols + 1) * t) / cols;
+  const ch = (h - (rows + 1) * t) / rows;
+  for (let i = 0; i <= cols; i++) g.add(block(t, h, d, body, { x: -w / 2 + t / 2 + i * (cw + t) }));
+  for (let j = 0; j <= rows; j++) g.add(block(w - 2 * t, t, d, body, { y: j * (ch + t) }));
+  g.add(block(w - 2 * t, h - 2 * t, 0.006, shade(item.color, 0.86), { y: t, z: -d / 2 + 0.003 }));
+
+  const rnd = seeded(cols * 1000 + rows * 100 + Math.round(cw * 100));
+  const mats = {};
+  const filled = item.style === 'open' ? 0 : Math.max(1, Math.floor(rows / 2)); // rows from the bottom
+  const basket = fabric(item.color2);
+  const door = painted(item.color3);
+  const knob = steel();
+  const box = shade(item.color2, 0.8);
+  let planted = false;
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < rows; j++) {
+      const x = -w / 2 + t + i * (cw + t) + cw / 2;
+      const y = t + j * (ch + t);
+      if (j < filled && item.style === 'baskets') {
+        g.add(block(cw - 0.02, ch - 0.015, d - 0.04, basket, { x, y, z: 0.01, r: 0.01 }));
+        g.add(block(Math.min(0.1, cw * 0.4), 0.025, 0.004, shade(item.color2, 0.4), { x, y: y + ch - 0.07, z: d / 2 - 0.009 }));
+      } else if (j < filled) {
+        // An inset door hinged on alternate sides, its knob at the free edge.
+        g.add(block(cw - 0.004, ch - 0.004, 0.016, door, { x, y: y + 0.002, z: d / 2 - 0.02 }));
+        const side = i % 2 ? -1 : 1;
+        g.add(block(0.012, 0.012, 0.018, knob, { x: x + side * (cw / 2 - 0.035), y: y + ch / 2 - 0.006, z: d / 2 - 0.009, r: 0.004 }));
+      } else {
+        const pick = rnd();
+        if (pick < 0.55) books(g, rnd, mats, { x0: x - cw / 2 + 0.01, x1: x - cw / 2 + 0.01 + (cw - 0.02) * (0.5 + rnd() * 0.5), y, depth: d - 0.06, room: ch });
+        else if (pick < 0.7 && !planted && ch > 0.2) {
+          plant(g, { x, y, z: 0, size: Math.min(0.07, ch / 4, cw / 4) });
+          planted = true; // one plant per unit
+        } else if (pick < 0.85) g.add(block(cw * 0.6, Math.min(ch * 0.5, 0.18), d * 0.6, box, { x, y, r: 0.008 }));
+      }
+    }
   }
   return g;
 }
