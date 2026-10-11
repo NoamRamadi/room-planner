@@ -3,6 +3,7 @@
 Plan a room of your apartment in 3D, right in the browser.
 
 - **Draw walls** on a flat floor plan with a grid: click the corners of a room or a whole apartment
+- **Type walls** straight from a floor plan's measurements: a direction and a length for each wall, opening and door, for the whole home
 - Or build the layout wall by wall: set each wall's length, then connect walls by dragging their ends together
 - Group walls to move, turn and copy them as one unit (a room, a kitchen divider)
 - Give any wall its own thickness, height, curve, color, or a gap below it (a beam over an opening)
@@ -32,7 +33,7 @@ Your design is saved automatically in the browser. Use **Save design file** / **
 
 A rail down the side panel's edge switches between four sections, one at a time (the panel remembers the last one; on phones the rail is a row of tabs):
 
-- **Rooms:** **Draw walls**, add a room by its inside size, add a single wall (folded away under **Add a single wall**), your **named rooms** with their floor area (click one to bring it into view), and the list of walls and wall groups.
+- **Rooms:** **Draw walls**, **Type walls**, add a room by its inside size, add a single wall (folded away under **Add a single wall**), your **named rooms** with their floor area (click one to bring it into view), and the list of walls and wall groups.
 - **Add:** search every design by name (for example "lamp", "sink" or "window") and click one to add it, or pick a category (Living, Kitchen, Bedroom, Bath, Doors & windows, Any room), then a type, then a design.
 - **Placed:** everything in your plan, grouped by the named room it stands in (or, before you name any rooms, by the kind of room it's for), with counts. Filter by group, fold groups away, and click a piece to select it.
 - **Style:** wall height, floor pattern and color, wall color, and whether named rooms are colored by their type.
@@ -98,6 +99,21 @@ Click **Draw walls** at the top of the **Rooms** section to swap the 3D view for
 - **Move around:** drag to pan, scroll or pinch to zoom. **Undo** or Backspace removes the last wall.
 - **Done** adds the new walls and takes you back to the 3D view with them selected, ready to group. **Cancel** throws them away.
 
+## Typing walls
+
+**Type walls** (in the **Rooms** section, under Draw walls) builds walls from the measurements on a floor plan, for a room or the whole home, without drawing. Each **line** is a walk along the inside of the walls, and each piece of it is a direction, a kind and a length:
+
+- **Direction:** the arrow keys (or the arrows above the plan) for right, down, left and up as on your plan; press two arrows together for a diagonal.
+- **Kind:** **Wall**, **Opening** (no wall, like an open passage) or **Door** (keys W, O and D). A door's length is its whole width; it comes with a 5 cm frame on each side, and you can set the part that opens and the frame in the list.
+- **Length:** type it and press Enter; the plan draws it straight away. A recess, like the one around a shaft, is just more pieces: right 380, down 37, right 83, up 37, right 350.
+- **Closing a room:** go round it clockwise. Real rooms are rarely perfectly square, so the lengths on a plan seldom meet exactly. When a line comes back near where it started (within 3% of its length, up to 40 cm), it closes by itself: every wall keeps the length you typed, and the corners bend as little as they can, usually a degree or less, so the walls meet. The first wall keeps its direction, and a wall with a door or an opening in it stays straight. The list says how much the corners bent, and the plan shows each corner by letter (A where the line starts) with the angle of any corner that bent. Corners bending more than 3° usually mean a typo, and the list says so. A line that ends further off shows the gap in red, with **Close it** to close it anyway; **Leave it open** keeps a line open.
+- **Diagonals (optional):** lengths alone can't fix a room's corners; a diagonal can. Measure across the room from corner to corner (A to C, say), click **+ Add a diagonal** under the line and type it: the corners then come out exactly, even in a room that really isn't square. A room with four corners needs one diagonal, five corners two, and so on. If the diagonals and lengths don't agree, the list says which diagonal is off and by how much.
+- **Openings:** an opening in a line that goes round a room gets a room divider across it, so the room still gets its floor, name and area.
+- **Inside walls:** **+ Line from a wall**, then click the wall it starts on: the new line starts where you click, measured from the nearer end of that wall (change the distance and the end in the list), heading into the room. A line that ends on a wall, or just short of it or just past it, joins it: its last piece is made that much longer or shorter (the list says by how much). **+ Line from a point** starts a free line anywhere.
+- **The list** in the side panel shows every line and piece; change any direction, kind or length there and the plan follows. **Thickness** above the plan is the thickness of the line you're typing (say 20 cm for the outside walls, 10 cm for inside ones).
+- **Replace the walls already built** swaps everything built so far (with its doors, windows and room names) for what you typed, to start a home from scratch.
+- **Done** builds it all, with the doors in place, as one step you can undo.
+
 ## Building walls
 
 - **Add wall:** set the inside length and click **Add wall**. With a wall selected, the new wall continues from that wall's end, turned 90°, so four walls in a row make a closed room with exactly the inside sizes you typed. With nothing selected, it appears in the middle of the view.
@@ -112,7 +128,7 @@ Furniture can't pass through walls when you drag it: it stops at a wall and slid
 
 ## Doors and windows
 
-Under **Add → Doors & windows**, click **Door** or **Window** and pick a design. It goes in the selected wall, or in a wall with room for it. Drag it along its wall or onto another wall; while it's selected, the view shows its size and its distance from each inside corner of the wall. In its panel you can set the width, height, how high a window starts above the floor, its distance from the inside corner, which side a door's hinges are on and which way it opens, and the colors. Doors show their swing on the floor. Doors and windows go in straight walls that stand on the floor (not curved walls or beams), and they move, turn, copy and disappear with their wall.
+Under **Add → Doors & windows**, click **Door** or **Window** and pick a design. It goes in the selected wall, or in a wall with room for it. Drag it along its wall or onto another wall; while it's selected, the view shows its size and its distance from each inside corner of the wall. In its panel you can set the width, height, how high a window starts above the floor, a door's **whole width**, the **door** (the part that opens) and the **frame** on each side (whole width = door + frame on both sides; a new frame keeps the whole width, a new door changes it), its distance from the inside corner, which side a door's hinges are on and which way it opens, and the colors. Doors show their swing on the floor. Doors and windows go in straight walls that stand on the floor (not curved walls or beams), and they move, turn, copy and disappear with their wall.
 
 ## Lock
 

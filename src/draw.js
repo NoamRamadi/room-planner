@@ -1,16 +1,10 @@
 // Draw walls: a flat floor plan on a grid of squares. Click to start a wall and again at every
 // corner; each click ends one wall and starts the next. Done adds the drawn walls to the design.
-import { clamp, h, measureField } from './dom.js';
+import { h, measureField } from './dom.js';
+import { GRID_MAJOR, NEW_WALL, PAPER, createPlan } from './plan.js';
 import * as store from './state.js';
-import { LIMITS, dist, endsOf, footprintOf, jointsOf, boundsOf, openingSpan, pointToSegment, takesOpenings } from './walls.js';
+import { LIMITS, dist, endsOf, footprintOf, jointsOf, pointToSegment } from './walls.js';
 
-const PAPER = '#f7f7f3';
-const GRID_MINOR = '#e6e8e2';
-const GRID_MAJOR = '#ccd0c8';
-const OLD_WALL = '#b3b6b9';
-const NEW_WALL = '#26292d';
-const DIVIDER = '#b07a16'; // room dividers already in the plan
-const TAPE = '#f4c21b';
 const SNAP_PX = 14; // how close (screen pixels) the pointer must come to a wall end to connect to it
 
 const round = (v) => Math.round(v * 10) / 10;
@@ -22,8 +16,6 @@ export function createDrawMode(stage, { onClose }) {
   let chain = null; // the line being drawn: its first corner, its last corner, and how many walls it has
   let cursor = null; // the pointer on the plan (cm), after snapping: { x, z, kind }
   let typed = ''; // a length typed while drawing
-  let view = { x: 0, z: 0, scale: 0.6 }; // the plan point at the middle of the screen (cm), and pixels per cm
-  let size = { w: 1, h: 1 };
 
   // ---- Toolbar ----
 
@@ -68,7 +60,6 @@ export function createDrawMode(stage, { onClose }) {
   const count = h('span', { class: 'draw__count', 'aria-live': 'polite' });
   const legend = h('p', { class: 'draw__legend' });
   const canvas = h('canvas', { class: 'draw__canvas', 'aria-label': 'Floor plan. Click to place wall corners.' });
-  const g = canvas.getContext('2d');
 
   const bar = h(
     'div',
@@ -111,20 +102,20 @@ export function createDrawMode(stage, { onClose }) {
     render();
   };
 
-  // ---- Plan coordinates ----
-
-  const toScreen = (p) => ({ x: (p.x - view.x) * view.scale + size.w / 2, y: (p.z - view.z) * view.scale + size.h / 2 });
-  const toPlan = (sx, sy) => ({ x: (sx - size.w / 2) / view.scale + view.x, z: (sy - size.h / 2) / view.scale + view.z });
-
-  // Start with everything already built in view (or a 10 × 8 m area on an empty plan), in the space
-  // below the toolbar.
-  function fit() {
-    const { walls } = store.getState();
-    const b = walls.length ? boundsOf(walls) : { cx: 0, cz: 0, width: 1000, length: 800 };
-    const top = bar.offsetHeight + 24;
-    const scale = clamp(Math.min(size.w / (b.width + 400), (size.h - top) / (b.length + 400)), 0.05, 4);
-    view = { x: b.cx, z: b.cz - top / 2 / scale, scale };
-  }
+  const plan = createPlan({
+    root,
+    canvas,
+    legend,
+    render: () => render(),
+    hover: (p, e) => {
+      cursor = snap(p, e.altKey);
+    },
+    click: () => act(() => place(cursor)),
+    leave: () => {
+      cursor = null;
+    },
+  });
+  const { g, toScreen } = plan;
 
   // ---- Snapping ----
 
@@ -132,7 +123,7 @@ export function createDrawMode(stage, { onClose }) {
   // corner (with the length rounded to whole centimetres), or onto the 10 cm grid.
   function snap(raw, free) {
     if (free) return { x: raw.x, z: raw.z, kind: null };
-    const tol = SNAP_PX / view.scale;
+    const tol = SNAP_PX / plan.scale;
     const { walls } = store.getState();
     let best = null;
     for (const e of [...walls.flatMap(endsOf), ...segments.flatMap(endsOf), ...(chain ? [chain.start] : [])]) {
@@ -181,11 +172,6 @@ export function createDrawMode(stage, { onClose }) {
       return { x: from.x + Math.cos(angle) * l, z: from.z + Math.sin(angle) * l, kind: null };
     }
     return { x: Math.round(raw.x / 10) * 10, z: Math.round(raw.z / 10) * 10, kind: 'grid' };
-  }
-
-  function pointerAt(e) {
-    const r = canvas.getBoundingClientRect();
-    cursor = snap(toPlan(e.clientX - r.left, e.clientY - r.top), e.altKey);
   }
 
   // ---- Drawing ----
@@ -246,100 +232,11 @@ export function createDrawMode(stage, { onClose }) {
 
   // ---- Drawing the plan ----
 
-  function polygon(points, fill, stroke) {
-    g.beginPath();
-    points.forEach((p, i) => {
-      const s = toScreen(p);
-      if (i) g.lineTo(s.x, s.y);
-      else g.moveTo(s.x, s.y);
-    });
-    g.closePath();
-    g.fillStyle = fill;
-    g.fill();
-    if (stroke) {
-      g.strokeStyle = stroke;
-      g.lineWidth = 1.2;
-      g.stroke();
-    }
-  }
-
-  function label(text, at, { fill = TAPE, ink = NEW_WALL, edge = NEW_WALL } = {}) {
-    g.font = '600 12px Archivo, system-ui, sans-serif';
-    if ('fontStretch' in g) g.fontStretch = 'condensed';
-    const w = g.measureText(text).width + 12;
-    g.fillStyle = fill;
-    g.strokeStyle = edge;
-    g.lineWidth = 1;
-    g.beginPath();
-    g.roundRect(at.x - w / 2, at.y - 10, w, 20, 3);
-    g.fill();
-    g.stroke();
-    g.fillStyle = ink;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(text, at.x, at.y + 0.5);
-  }
-
-  // A wall's length beside it, on its left side (pushed past the wall's thickness).
-  function lengthLabel(w, text, style) {
-    const len = Math.hypot(w.x2 - w.x1, w.z2 - w.z1) || 1;
-    const n = { x: -(w.z2 - w.z1) / len, z: (w.x2 - w.x1) / len };
-    const off = w.thickness / 2 + 16 / view.scale;
-    label(text, toScreen({ x: (w.x1 + w.x2) / 2 + n.x * off, z: (w.z1 + w.z2) / 2 + n.z * off }), style);
-  }
-
-  function grid() {
-    const minor = [10, 50, 100, 500].find((s) => s * view.scale >= 10) ?? 1000;
-    const major = minor * (minor === 50 ? 2 : 5);
-    legend.textContent = `Each small square is ${minor >= 100 ? `${minor / 100} m` : `${minor} cm`}`;
-    const a = toPlan(0, 0);
-    const b = toPlan(size.w, size.h);
-    for (const [step, color] of [
-      [minor, GRID_MINOR],
-      [major, GRID_MAJOR],
-    ]) {
-      g.strokeStyle = color;
-      g.lineWidth = 1;
-      g.beginPath();
-      for (let x = Math.floor(a.x / step) * step; x <= b.x; x += step) {
-        const sx = Math.round(toScreen({ x, z: 0 }).x) + 0.5;
-        g.moveTo(sx, 0);
-        g.lineTo(sx, size.h);
-      }
-      for (let z = Math.floor(a.z / step) * step; z <= b.z; z += step) {
-        const sy = Math.round(toScreen({ x: 0, z }).y) + 0.5;
-        g.moveTo(0, sy);
-        g.lineTo(size.w, sy);
-      }
-      g.stroke();
-    }
-  }
-
-  // A room divider: a dashed line along it.
-  function dashed(w, color) {
-    const a = toScreen({ x: w.x1, z: w.z1 });
-    const b = toScreen({ x: w.x2, z: w.z2 });
-    g.save();
-    g.setLineDash([9, 6]);
-    g.lineWidth = 3;
-    g.lineCap = 'round';
-    g.strokeStyle = color;
-    g.beginPath();
-    g.moveTo(a.x, a.y);
-    g.lineTo(b.x, b.y);
-    g.stroke();
-    g.restore();
-  }
-
   function render() {
     if (root.hidden) return;
-    g.fillStyle = PAPER;
-    g.fillRect(0, 0, size.w, size.h);
-    grid();
-
     // Existing walls in grey, new ones in graphite, the one being drawn in tape yellow, all joined
     // with mitred corners where they meet.
-    const { walls, openings } = store.getState();
+    const { walls } = store.getState();
     const drawn = segments.map((s, i) => ({ ...s, id: `new${i}`, gap: 0, curve: 0 }));
     const live =
       chain && cursor && dist(cursor, chain.last) >= 1
@@ -347,35 +244,20 @@ export function createDrawMode(stage, { onClose }) {
         : null;
     const all = [...walls, ...drawn, ...(live ? [live] : [])];
     const joins = jointsOf(all.filter((w) => !w.divider)); // room dividers aren't built, so they don't join
-    for (const w of walls) {
-      if (w.divider) dashed(w, DIVIDER);
-      else polygon(footprintOf(w, joins), w.gap ? '#d7d9d6' : OLD_WALL);
-    }
-    // Gaps for doors; a thin line across windows.
-    for (const o of openings) {
-      const w = walls.find((x) => x.id === o.wall);
-      if (!takesOpenings(w)) continue;
-      const span = openingSpan(o, w);
-      const len = Math.hypot(w.x2 - w.x1, w.z2 - w.z1);
-      const u = { x: (w.x2 - w.x1) / len, z: (w.z2 - w.z1) / len };
-      const n = { x: -u.z, z: u.x };
-      const t = w.thickness / 2 + 0.5;
-      const at = (s, k) => ({ x: w.x1 + u.x * s + n.x * k, z: w.z1 + u.z * s + n.z * k });
-      polygon([at(span.a, t), at(span.b, t), at(span.b, -t), at(span.a, -t)], PAPER, o.kind === 'window' ? OLD_WALL : null);
-    }
+    plan.background(joins);
     for (const w of drawn) {
-      if (w.divider) dashed(w, NEW_WALL);
-      else polygon(footprintOf(w, joins), NEW_WALL);
+      if (w.divider) plan.dashed(w, NEW_WALL);
+      else plan.polygon(footprintOf(w, joins), NEW_WALL);
     }
-    if (live?.divider) dashed(live, '#c9940a');
-    else if (live) polygon(footprintOf(live, joins), 'rgba(244,194,27,0.85)', NEW_WALL);
+    if (live?.divider) plan.dashed(live, '#c9940a');
+    else if (live) plan.polygon(footprintOf(live, joins), 'rgba(244,194,27,0.85)', NEW_WALL);
 
-    for (const w of drawn) lengthLabel(w, `${Math.round(Math.hypot(w.x2 - w.x1, w.z2 - w.z1))}`, { fill: PAPER, ink: NEW_WALL, edge: GRID_MAJOR });
+    for (const w of drawn) plan.lengthLabel(w, `${Math.round(Math.hypot(w.x2 - w.x1, w.z2 - w.z1))}`, { fill: PAPER, ink: NEW_WALL, edge: GRID_MAJOR });
 
     // A guide along the 45° direction the wall has snapped to.
     if (chain && cursor?.kind === 'angle') {
       const s = toScreen(chain.last);
-      const far = Math.max(size.w, size.h) * 2;
+      const far = Math.max(plan.size.w, plan.size.h) * 2;
       g.save();
       g.setLineDash([4, 5]);
       g.strokeStyle = 'rgba(38,41,45,0.35)';
@@ -386,7 +268,7 @@ export function createDrawMode(stage, { onClose }) {
       g.restore();
     }
 
-    if (live) lengthLabel(live, typed ? `${typed}▏cm` : `${Math.round(dist(cursor, chain.last))} cm`);
+    if (live) plan.lengthLabel(live, typed ? `${typed}▏cm` : `${Math.round(dist(cursor, chain.last))} cm`);
     if (chain) {
       for (const p of [chain.start, chain.last]) {
         const s = toScreen(p);
@@ -420,98 +302,6 @@ export function createDrawMode(stage, { onClose }) {
       g.stroke();
     }
   }
-
-  function resize() {
-    const r = root.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    const dpr = Math.min(window.devicePixelRatio, 2);
-    size = { w: r.width, h: r.height };
-    canvas.width = Math.round(r.width * dpr);
-    canvas.height = Math.round(r.height * dpr);
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    render();
-  }
-  new ResizeObserver(resize).observe(root);
-
-  // ---- Pointer: click to place a corner, drag to move around, pinch or scroll to zoom ----
-
-  const pointers = new Map();
-  let press = null; // { moved } for a single press: a click unless it moves
-
-  canvas.addEventListener('pointerdown', (e) => {
-    canvas.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    press = pointers.size === 1 ? { x: e.clientX, y: e.clientY, moved: e.button !== 0 } : null;
-    if (pointers.size === 1) pointerAt(e);
-    render();
-  });
-
-  canvas.addEventListener('pointermove', (e) => {
-    const p = pointers.get(e.pointerId);
-    if (!p) {
-      pointerAt(e);
-      render();
-      return;
-    }
-    if (pointers.size === 2) {
-      // Pinch: zoom by the change in distance between the two fingers, about their midpoint.
-      const [a, b] = [...pointers.values()];
-      const before = Math.hypot(a.x - b.x, a.y - b.y);
-      p.x = e.clientX;
-      p.y = e.clientY;
-      const after = Math.hypot(a.x - b.x, a.y - b.y);
-      const r = canvas.getBoundingClientRect();
-      zoomAt((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top, after / (before || 1));
-      return;
-    }
-    const dx = e.clientX - p.x;
-    const dy = e.clientY - p.y;
-    p.x = e.clientX;
-    p.y = e.clientY;
-    if (press && !press.moved && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6) press.moved = true;
-    if (press?.moved) {
-      view.x -= dx / view.scale;
-      view.z -= dy / view.scale;
-    } else {
-      pointerAt(e);
-    }
-    render();
-  });
-
-  const release = (e) => {
-    if (pointers.size === 1 && press && !press.moved && e.type === 'pointerup') {
-      pointerAt(e);
-      act(() => place(cursor));
-    }
-    pointers.delete(e.pointerId);
-    if (!pointers.size) press = null;
-  };
-  canvas.addEventListener('pointerup', release);
-  canvas.addEventListener('pointercancel', release);
-  canvas.addEventListener('pointerleave', () => {
-    if (pointers.size) return;
-    cursor = null;
-    render();
-  });
-
-  function zoomAt(sx, sy, factor) {
-    const before = toPlan(sx, sy);
-    view.scale = clamp(view.scale * factor, 0.05, 6);
-    const after = toPlan(sx, sy);
-    view.x += before.x - after.x;
-    view.z += before.z - after.z;
-    render();
-  }
-
-  canvas.addEventListener(
-    'wheel',
-    (e) => {
-      e.preventDefault();
-      const r = canvas.getBoundingClientRect();
-      zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015));
-    },
-    { passive: false },
-  );
 
   // ---- Keys: type a length, Enter to place it or end the line, Backspace or Ctrl/Cmd+Z to undo ----
 
@@ -549,10 +339,8 @@ export function createDrawMode(stage, { onClose }) {
     typed = '';
     root.hidden = false;
     store.setDrawing(true);
-    const r = root.getBoundingClientRect();
-    size = { w: r.width || 1, h: r.height || 1 };
-    fit();
-    resize();
+    plan.fit({ top: bar.offsetHeight + 24 });
+    plan.resize();
     sync();
     window.addEventListener('keydown', onKey);
     canvas.focus?.();
@@ -561,7 +349,7 @@ export function createDrawMode(stage, { onClose }) {
   function close(added) {
     root.hidden = true;
     window.removeEventListener('keydown', onKey);
-    pointers.clear();
+    plan.clearPointers();
     if (!added) store.setDrawing(false);
     onClose(added);
   }

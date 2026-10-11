@@ -481,12 +481,16 @@ function closeCorner(walls, wall) {
   });
 }
 
-// Walls drawn with the drawing tool ({ x1, z1, x2, z2, thickness, height } each), added in one go and
-// selected together, ready to group.
-export function addDrawnWalls(segments) {
+// Walls drawn with the drawing tool or typed in ({ x1, z1, x2, z2, thickness, height } each), added in
+// one go and selected together, ready to group. `doors`: doors in them ({ segment, centre, width,
+// frame }), each where its middle was. `replace`: they take the place of all the walls built so far
+// (with their doors, windows and room names).
+export function addDrawnWalls(segments, { doors = [], replace = false } = {}) {
   if (ui.locked) return null;
+  if (replace) state = { ...state, walls: [], groups: [], rooms: [], openings: [] };
   let walls = [...state.walls];
   const ids = [];
+  const sides = new Map(); // which side of a wall its room is on, when the segment says
   for (const s of segments) {
     const { x1, z1, x2, z2, thickness, height, divider } = s;
     const wall = divider
@@ -494,8 +498,19 @@ export function addDrawnWalls(segments) {
       : newWall({ x1, z1, x2, z2 }, state.room, { name: nextName(walls, 'Wall'), thickness, height });
     walls = [...walls, wall];
     ids.push(wall.id);
+    if (s.inside) sides.set(wall.id, s.inside);
   }
-  walls = drawnInside(walls, ids, state.walls);
+  walls = drawnInside(walls, ids, state.walls, sides);
+  const openings = [...state.openings];
+  for (const d of doors) {
+    const w = walls.find((x) => x.id === ids[d.segment]);
+    if (!w) continue;
+    const u = unitOf(w);
+    const offset = round((d.centre.x - w.x1) * u.x + (d.centre.z - w.z1) * u.z);
+    const door = newOpeningOf('door', 'single');
+    openings.push(normalizeOpening({ ...door, id: newId(), wall: w.id, offset, width: d.width, frame: d.frame ?? door.frame, name: uniqueIn(openings, door.name) }));
+  }
+  state = { ...state, openings };
   ui = { ...ui, drawing: false, sel: ids.length > 1 ? { type: 'walls', ids } : ids.length ? { type: 'wall', id: ids[0] } : null };
   commitWalls(walls);
 }
@@ -503,17 +518,22 @@ export function addDrawnWalls(segments) {
 // The drawing tool draws the inside faces of walls. Once the drawn walls are in, each one with a room
 // on one side moves out by half its thickness, away from the room, and the corners between them are
 // re-cut, so the room keeps the size that was drawn. Walls meeting walls built before stay as drawn.
-function drawnInside(walls, ids, existing) {
+// `sides`: the room's side of a wall where it's known (typed walls going round a room), instead of
+// looking for enclosed floor beside it.
+function drawnInside(walls, ids, existing, sides = new Map()) {
   const drawn = walls.filter((w) => ids.includes(w.id));
   const key = (p) => `${Math.round(p.x * 10)},${Math.round(p.z * 10)}`;
   const onWall = (o, p) => pointToSegment(p, { x: o.x1, z: o.z1 }, { x: o.x2, z: o.z2 }).d <= JOIN + 0.5;
   const corners = new Map();
   for (const w of drawn) endsOf(w).forEach((p, end) => corners.set(key(p), [...(corners.get(key(p)) ?? []), { w, end, p }]));
-  const pinned = new Set([...corners].filter(([, list]) => list.length > 2 || existing.some((o) => onWall(o, list[0].p))).map(([k]) => k));
+  // Room dividers follow the walls they meet: only walls decide where a corner goes.
+  const walled = (list) => list.filter((e) => !e.w.divider);
+  const pinned = new Set([...corners].filter(([, list]) => walled(list).length > 2 || existing.some((o) => !o.divider && onWall(o, list[0].p))).map(([k]) => k));
   const shift = new Map();
   for (const w of drawn) {
     if (w.divider || endsOf(w).some((p) => pinned.has(key(p)))) continue;
-    const { side, nl } = facesOf(w, walls);
+    const { side: found, nl } = facesOf(w, walls);
+    const side = sides.get(w.id) ?? found;
     if (side) shift.set(w.id, { x: (-side * nl.x * w.thickness) / 2, z: (-side * nl.z * w.thickness) / 2 });
   }
   const none = { x: 0, z: 0 };
@@ -524,10 +544,11 @@ function drawnInside(walls, ids, existing) {
   const moved = new Map();
   for (const [k, list] of corners) {
     if (pinned.has(k)) continue;
-    const { p, w } = list[0];
+    const solid = walled(list);
+    const { p, w } = solid[0] ?? list[0];
     // The walls meeting here: a corner, or a drawn wall this end butts into.
-    const host = list.length === 1 ? drawn.find((o) => o.id !== w.id && !endsOf(o).some((q) => dist(q, p) <= JOIN) && onWall(o, p)) : null;
-    const meeting = [...list.map((e) => e.w), ...(host ? [host] : [])];
+    const host = solid.length === 1 ? drawn.find((o) => !o.divider && o.id !== w.id && !endsOf(o).some((q) => dist(q, p) <= JOIN) && onWall(o, p)) : null;
+    const meeting = [...solid.map((e) => e.w), ...(host ? [host] : [])];
     if (meeting.length === 2) {
       const [[p1, u1], [p2, u2]] = meeting.map(lineOf);
       const hit = intersectLines(p1, u1, p2, u2);

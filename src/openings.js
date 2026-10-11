@@ -21,12 +21,13 @@ const DOORS = [
 ];
 
 // `sill` is how far above the floor a window starts. Doors: `flip` puts the hinges on the right,
-// `swap` makes the door open toward the other side of the wall.
+// `swap` makes the door open toward the other side of the wall, and `frame` is the width of the frame
+// on each side: `width` is the whole door, the part that opens plus the frame on both sides.
 export const OPENINGS = {
   door: {
     label: 'Door',
-    defaults: { style: 'single', width: 90, height: 210, sill: 0, color: '#f4f3ef', color2: '#f4f3ef', flip: false, swap: false },
-    limits: { width: [60, 300], height: [180, 280] },
+    defaults: { style: 'single', width: 90, height: 210, sill: 0, color: '#f4f3ef', color2: '#f4f3ef', flip: false, swap: false, frame: 5 },
+    limits: { width: [60, 300], height: [180, 280], frame: [2, 20] },
     colors: [
       { key: 'color', label: 'Frame', palette: FRAMES },
       { key: 'color2', label: 'Door', palette: DOORS },
@@ -53,6 +54,10 @@ export const OPENINGS = {
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const MIN_LEAF = 40; // cm, the narrowest door that opens
+
+// The part of a door that opens: its whole width less the frame on both sides (cm).
+export const leafOf = (o) => o.width - 2 * (o.frame ?? 5);
 
 export const openingStyleOf = (o) => OPENINGS[o.kind].styles.find((s) => s.id === o.style) ?? OPENINGS[o.kind].styles[0];
 export const openingLimitsOf = (o) => ({ ...OPENINGS[o.kind].limits, ...openingStyleOf(o).limits });
@@ -68,13 +73,17 @@ export function normalizeOpening(o) {
   for (const [key, [lo, hi]] of Object.entries(openingLimitsOf(o))) {
     if (typeof next[key] === 'number') next[key] = clamp(next[key], lo, hi);
   }
-  if (next.kind === 'door') next.sill = 0;
+  if (next.kind === 'door') {
+    next.sill = 0;
+    next.frame = Math.min(next.frame ?? 5, Math.floor((next.width - MIN_LEAF) / 2)); // room for the door between
+  }
   return next;
 }
 
 // ---- Models ----
 
-const FRAME_W = 0.05; // m
+const FRAME_W = 0.05; // m, a window's frame
+const frameOf = (o) => (o.frame ?? 5) / 100; // m, a door's frame on each side
 
 function box(w, h, d, material, x, y, z) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
@@ -134,13 +143,14 @@ function windowModel(g, o, w, h, t, frame) {
 }
 
 function doorModel(g, o, w, h, t, frame) {
-  const fw = FRAME_W;
+  const fw = frameOf(o);
+  const head = Math.min(fw, 0.08); // the frame across the top
   const depth = t + 0.02;
   g.add(box(fw, h, depth, frame, -w / 2 + fw / 2, 0, 0));
   g.add(box(fw, h, depth, frame, w / 2 - fw / 2, 0, 0));
-  g.add(box(w, fw, depth, frame, 0, h - fw, 0));
+  g.add(box(w, head, depth, frame, 0, h - head, 0));
   const inner = w - 2 * fw;
-  const leafH = h - fw - 0.01;
+  const leafH = h - head - 0.01;
   const side = o.swap ? -1 : 1; // the face the door is flush with, and swings toward
   if (o.style === 'doorway') return;
 
@@ -184,7 +194,7 @@ export function buildSwing(o, { width: w }) {
   const g = new THREE.Group();
   if (o.kind !== 'door' || o.style === 'doorway' || o.style === 'sliding') return g;
   const material = new THREE.MeshBasicMaterial({ color: '#26292d', transparent: true, opacity: 0.55, depthWrite: false });
-  const inner = w - 2 * FRAME_W;
+  const inner = w - 2 * frameOf(o);
   const side = o.swap ? -1 : 1;
   const leaves = o.style === 'double' ? [[-inner / 2, 1, inner / 2], [inner / 2, -1, inner / 2]] : [[o.flip ? inner / 2 : -inner / 2, o.flip ? -1 : 1, inner]];
   for (const [x0, dir, r] of leaves) {

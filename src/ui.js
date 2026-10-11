@@ -1,8 +1,9 @@
 // Side panel, inspector (selected furniture, wall, group or several walls), camera bar and keyboard shortcuts.
 import { CATALOG, FLOOR_FINISHES, FLOOR_PATTERNS, WALL_PAINTS, colorsOf, dimsOf, isFlat, isOnWall, limitsOf, optionsOf, presetsOf, styleOf, tvScreen } from './catalog.js';
-import { OPENINGS, openingLimitsOf, openingStyleOf } from './openings.js';
+import { OPENINGS, leafOf, openingLimitsOf, openingStyleOf } from './openings.js';
 import { h, measureField } from './dom.js';
 import { createDrawMode } from './draw.js';
+import { createTypeMode } from './type.js';
 import * as store from './state.js';
 import { ROOM_TYPES, floorOfRoom, formatArea, roomAt, roomSize, roomTypeOf } from './rooms.js';
 import { LIMITS, angleOf, facesOf, floorsOf, insideLengthOf, maxCurve, openingSpan, takesOpenings } from './walls.js';
@@ -59,6 +60,7 @@ const ICONS = {
   panePlaced: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke-width="3"/>',
   paneStyle: '<path d="M5 4h12v5H5z"/><path d="M17 6.5h2v5h-7v3"/><path d="M11 14.5h2V20h-2z"/>',
   pencil: '<path d="M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="M14 7l3 3"/>',
+  keyboard: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/>',
   divider: '<path d="M4 4v16M20 4v16"/><path d="M4 12h2.5M9.5 12h5M17.5 12H20" stroke-width="2.4"/>',
   room_living: '<path d="M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M3 12a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v5H3z"/><path d="M5 17v2M19 17v2"/>',
   room_kitchen: '<path d="M5 10h14v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/><path d="M3 10h18M9 7c0-1.2 1.3-2 3-2s3 .8 3 2"/>',
@@ -421,6 +423,8 @@ function applyLock(root, locked) {
   }
 }
 
+let typeMode = null; // Type walls, made when the UI starts
+
 // Shift, Cmd or Ctrl, or the "Select several" toggle, make a click add to the selection.
 const adding = (e) => e.shiftKey || e.metaKey || e.ctrlKey || store.getUI().several;
 
@@ -434,6 +438,12 @@ export function initUI(view) {
 
   // Drawing walls on a floor plan; Done brings you back to the 3D view with the new walls.
   const draw = createDrawMode(document.getElementById('stage'), {
+    onClose: (added) => {
+      if (added) view.setView('overview');
+    },
+  });
+  // Typing walls in from a floor plan's measurements; its list shows in the side panel.
+  typeMode = createTypeMode(document.getElementById('stage'), {
     onClose: (added) => {
       if (added) view.setView('overview');
     },
@@ -932,6 +942,8 @@ export function initUI(view) {
       h('div', { class: 'pane__head' }, h('h2', {}, 'Rooms'), wallCount),
       h('button', { type: 'button', class: 'btn btn--tape btn--wide', onclick: () => draw.open() }, h('span', { html: icon('pencil') }), 'Draw walls'),
       h('p', { class: 'help' }, 'Draw the inside of a room, corner by corner, on a floor plan.'),
+      h('button', { type: 'button', class: 'btn btn--wide type-entry', onclick: () => typeMode.open() }, h('span', { html: icon('keyboard') }), 'Type walls'),
+      h('p', { class: 'help' }, 'Type the lengths from your floor plan, wall by wall, with openings and doors.'),
       h('h3', { class: 'pane__label' }, 'Or add a room by its inside size'),
       h(
         'div',
@@ -1221,7 +1233,7 @@ export function initUI(view) {
 
 // The inspector is rebuilt only when what it shows changes; values in between update in place.
 function inspectorKeyFor(state, ui) {
-  if (ui.drawing) return 'drawing';
+  if (ui.drawing) return `drawing:${ui.drawing}`;
   const sel = ui.sel;
   if (!sel) return 'none';
   if (sel.type === 'item') {
@@ -1243,6 +1255,10 @@ function inspectorKeyFor(state, ui) {
 
 function buildInspector(root, state, ui) {
   root.replaceChildren();
+  if (ui.drawing === 'type') {
+    root.append(typeMode.panel);
+    return [];
+  }
   if (ui.drawing) return buildDrawHelp(root);
   const sel = ui.sel;
   if (sel?.type === 'item') {
@@ -1595,10 +1611,36 @@ function buildOpeningInspector(root, id) {
     ),
   );
 
+  const isDoor = o0.kind === 'door';
   const size = [
-    measureField({ label: 'Width', min: limit('width', 0), max: limit('width', 1), get: () => current().width, set: (v) => update({ width: v }) }),
+    measureField({ label: isDoor ? 'Whole width' : 'Width', min: limit('width', 0), max: limit('width', 1), get: () => current().width, set: (v) => update({ width: v }) }),
     measureField({ label: 'Height', min: limit('height', 0), max: limit('height', 1), get: () => current().height, set: (v) => update({ height: v }) }),
   ];
+  // A door's whole width is the part that opens plus the frame on both sides. Changing the door
+  // changes the whole width; changing the frame keeps the whole width (the hole in the wall).
+  let doorParts = null;
+  if (isDoor) {
+    const frame = () => current().frame;
+    const parts = [
+      ...(style.id === 'doorway'
+        ? []
+        : [
+            measureField({
+              label: 'Door',
+              min: () => limit('width', 0)() - 2 * frame(),
+              max: () => limit('width', 1)() - 2 * frame(),
+              get: () => leafOf(current()),
+              set: (v) => update({ width: v + 2 * frame() }),
+            }),
+          ]),
+      measureField({ label: 'Frame', min: limit('frame', 0), max: () => Math.min(limit('frame', 1)(), Math.floor((current().width - 40) / 2)), get: frame, set: (v) => update({ frame: v }) }),
+    ];
+    syncers.push(...parts.map((f) => f.sync));
+    doorParts = [
+      h('div', { class: 'measures measures--gap' }, parts.map((f) => f.el)),
+      h('p', { class: 'help' }, style.id === 'doorway' ? 'The frame is on each side, inside the whole width.' : 'Whole width = the door plus the frame on each side.'),
+    ];
+  }
   if (o0.kind === 'window') {
     size.push(measureField({ label: 'Above floor', min: limit('sill', 0), max: limit('sill', 1), get: () => current().sill, set: (v) => update({ sill: v }) }));
   }
@@ -1649,6 +1691,7 @@ function buildOpeningInspector(root, id) {
       { class: 'inspector__group' },
       h('h3', {}, 'Size and position'),
       h('div', { class: 'measures' }, size.map((f) => f.el), o0.kind === 'door' ? fromCorner.el : null),
+      doorParts,
       o0.kind === 'window' ? h('div', { class: 'measures measures--gap' }, fromCorner.el) : null,
       toggles,
       h('p', { class: 'help' }, 'Drag it along the wall, or onto another wall. The view shows how far it is from each end of the wall.'),
