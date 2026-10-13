@@ -228,6 +228,22 @@ export function facesOf(w, walls) {
 
 export const insideLengthOf = (w, walls) => facesOf(w, walls).inside.length;
 
+// A saved point on a wall: on its face on one side (`side`: 1 its left, -1 its right), `offset` cm
+// from that face's start (`from` 0) or end (`from` 1), the way a room measures it. Where it is on the
+// floor at the face (`at`) and on the wall's centre line (`centre`), the wall's direction `u`, the way
+// into the room `n`, how far along the centre line it is (`s`), and the face's ends along it.
+export function markOf(m, walls) {
+  const w = walls.find((x) => x.id === m.wall);
+  if (!w || w.divider || Math.abs(w.curve || 0) >= 0.5) return null;
+  const f = facesOf(w, walls);
+  const [s0, s1] = m.side === 1 ? f.left : f.right;
+  const s = Math.min(s1, Math.max(s0, m.from ? s1 - m.offset : s0 + m.offset));
+  const n = { x: f.nl.x * m.side, z: f.nl.z * m.side };
+  const centre = { x: w.x1 + f.u.x * s, z: w.z1 + f.u.z * s };
+  const at = { x: centre.x + (n.x * w.thickness) / 2, z: centre.z + (n.z * w.thickness) / 2 };
+  return { wall: w, at, centre, u: f.u, n, s, face: [s0, s1] };
+}
+
 // The overall outside size of what's built: the bounds of the walls' outlines.
 export function outsideBoundsOf(walls) {
   const joins = jointsFor(walls);
@@ -428,7 +444,7 @@ export function pointToSegment(p, a, b) {
 
 // Where a dragged end at p should connect: another wall's end (kind 'end'), or else a point along
 // another straight wall (kind 'wall', a T-junction). `skip` holds the ids of walls that are moving.
-export function snapTarget(p, walls, skip) {
+export function snapTarget(p, walls, skip, points = []) {
   let best = null;
   for (const w of walls) {
     if (skip.has(w.id)) continue;
@@ -436,6 +452,13 @@ export function snapTarget(p, walls, skip) {
       const d = dist(p, e);
       if (d < SNAP && (!best || d < best.d)) best = { x: e.x, z: e.z, d, kind: 'end' };
     }
+  }
+  // Saved points (from markOf) count like wall ends: near the dot at the foot of the wall, the end
+  // goes onto the middle of that wall, so the two join.
+  for (const pt of points) {
+    if (skip.has(pt.wall.id)) continue;
+    const d = Math.min(dist(p, pt.at), dist(p, pt.centre));
+    if (d < SNAP && (!best || d < best.d)) best = { x: pt.centre.x, z: pt.centre.z, d, kind: 'end' };
   }
   if (best) return best;
   for (const w of walls) {

@@ -3,7 +3,7 @@
 import { h, measureField } from './dom.js';
 import { GRID_MAJOR, NEW_WALL, PAPER, createPlan } from './plan.js';
 import * as store from './state.js';
-import { LIMITS, dist, endsOf, footprintOf, jointsOf, pointToSegment } from './walls.js';
+import { LIMITS, dist, endsOf, footprintOf, jointsOf, markOf, pointToSegment } from './walls.js';
 
 const SNAP_PX = 14; // how close (screen pixels) the pointer must come to a wall end to connect to it
 
@@ -124,8 +124,14 @@ export function createDrawMode(stage, { onClose }) {
   function snap(raw, free) {
     if (free) return { x: raw.x, z: raw.z, kind: null };
     const tol = SNAP_PX / plan.scale;
-    const { walls } = store.getState();
+    const { walls, marks } = store.getState();
     let best = null;
+    // A saved point first: a wall from it starts on the middle of the wall the point is on, so the
+    // two join.
+    for (const m of marks) {
+      const pos = markOf(m, walls);
+      if (pos && dist(pos.at, raw) < tol) return { x: pos.centre.x, z: pos.centre.z, kind: 'end' };
+    }
     for (const e of [...walls.flatMap(endsOf), ...segments.flatMap(endsOf), ...(chain ? [chain.start] : [])]) {
       const d = dist(e, raw);
       if (d < tol && (!best || d < best.d)) best = { x: e.x, z: e.z, d, kind: 'end' };
@@ -245,6 +251,7 @@ export function createDrawMode(stage, { onClose }) {
     const all = [...walls, ...drawn, ...(live ? [live] : [])];
     const joins = jointsOf(all.filter((w) => !w.divider)); // room dividers aren't built, so they don't join
     plan.background(joins);
+    plan.marks();
     for (const w of drawn) {
       if (w.divider) plan.dashed(w, NEW_WALL);
       else plan.polygon(footprintOf(w, joins), NEW_WALL);

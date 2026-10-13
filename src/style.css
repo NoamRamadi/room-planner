@@ -2490,3 +2490,48 @@ h3 {
   margin-top: 8px;
   font-size: 12.5px;
 }
+
+/* ---- Saved points on walls: a yellow dot at the foot of the wall, and Save point while measuring ---- */
+
+.wall-mark {
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid var(--graphite);
+  border-radius: 50%;
+  background: var(--tape);
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85);
+  pointer-events: auto; /* the label layer lets clicks through unless asked */
+  cursor: pointer;
+}
+
+.wall-mark:hover {
+  transform: scale(1.15);
+}
+
+.wall-mark.is-selected {
+  box-shadow: 0 0 0 3px var(--graphite), 0 0 0 5px var(--tape);
+}
+
+.stage.is-measuring .wall-mark {
+  pointer-events: none; /* a click measures from it */
+}
+
+.mark-save {
+  z-index: 5;
+  margin-top: 26px;
+  padding: 3px 8px;
+  border: 1px solid var(--graphite);
+  border-radius: 3px;
+  background: var(--tape);
+  font: 600 12px var(--font);
+  color: var(--graphite);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.mark-save:hover {
+  background: #f8d34a;
+}

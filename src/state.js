@@ -18,6 +18,7 @@ import {
   intersectLines,
   jointsOf,
   lengthOf,
+  markOf,
   midpointOf,
   openingSpan,
   pointToSegment,
@@ -66,7 +67,7 @@ function fresh() {
     { ...newOpeningOf('door', 'single'), id: newId(), wall: walls[3].id, offset: 90 + t / 2 },
   ];
   const rooms = [{ id: newId(), x: 0, z: 0, type: 'living', name: 'Living room', floor: null }];
-  return { room, walls, groups: [group], rooms, items: [], openings };
+  return { room, walls, groups: [group], rooms, items: [], openings, marks: [] };
 }
 
 let state = loadSaved() ?? fresh();
@@ -86,6 +87,7 @@ let ui = {
   cutaway: view.cutaway ?? true,
   roomColors: view.roomColors ?? true,
   roomNames: view.roomNames ?? true,
+  points: view.points ?? true, // saved points on walls shown in the view
   locked: view.locked ?? false,
   drawing: false,
   measuring: false,
@@ -132,11 +134,11 @@ function record() {
 
 // Drags call these around their moves, so the whole drag undoes in one step.
 export function beginGesture() {
-  gesture = { open: true, recorded: false };
+  gesture = { open: true, recorded: false, points: null };
 }
 
 export function endGesture() {
-  gesture = { open: false, recorded: false };
+  gesture = { open: false, recorded: false, points: null };
   last = { key: null, time: 0 };
 }
 
@@ -152,6 +154,7 @@ function stillThere(sel) {
   if (sel.type === 'group') return has(state.groups, sel.id) ? sel : null;
   if (sel.type === 'opening') return has(state.openings, sel.id) ? sel : null;
   if (sel.type === 'room') return has(state.rooms, sel.id) ? sel : null;
+  if (sel.type === 'mark') return has(state.marks, sel.id) ? sel : null;
   const ids = sel.ids.filter((id) => has(state.walls, id));
   return ids.length > 1 ? { type: 'walls', ids } : ids.length ? { type: 'wall', id: ids[0] } : null;
 }
@@ -186,8 +189,8 @@ function loadView() {
 
 function saveView() {
   try {
-    const { cutaway, locked, leftOpen, rightOpen, roomColors, roomNames } = ui;
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway, locked, leftOpen, rightOpen, roomColors, roomNames }));
+    const { cutaway, locked, leftOpen, rightOpen, roomColors, roomNames, points } = ui;
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ cutaway, locked, leftOpen, rightOpen, roomColors, roomNames, points }));
   } catch {
     // Not remembered for next time, but it still applies now.
   }
@@ -196,6 +199,12 @@ function saveView() {
 // The named rooms' labels on the floor (and the "Name this room" tags), shown or hidden.
 export function setRoomNames(on) {
   ui = { ...ui, roomNames: on };
+  saveView();
+  emit();
+}
+
+export function setPoints(on) {
+  ui = { ...ui, points: on };
   saveView();
   emit();
 }
@@ -364,7 +373,8 @@ export function updateRoom(patch) {
 // they are in the room rather than moving with the corner.
 function commitWalls(walls, { live = false, keepOpenings = false } = {}) {
   const openings = keepOpenings ? openingsKept(state.walls, walls) : state.openings;
-  state = { ...state, walls, openings, items: live ? state.items : state.items.map((i) => settle(i, walls, state.items)) };
+  const marks = state.marks.filter((m) => walls.some((w) => w.id === m.wall)); // points go with their wall
+  state = { ...state, walls, openings, marks, items: live ? state.items : state.items.map((i) => settle(i, walls, state.items)) };
   emit();
 }
 
@@ -487,7 +497,7 @@ function closeCorner(walls, wall) {
 // (with their doors, windows and room names).
 export function addDrawnWalls(segments, { doors = [], replace = false } = {}) {
   if (ui.locked) return null;
-  if (replace) state = { ...state, walls: [], groups: [], rooms: [], openings: [] };
+  if (replace) state = { ...state, walls: [], groups: [], rooms: [], openings: [], marks: [] };
   let walls = [...state.walls];
   const ids = [];
   const sides = new Map(); // which side of a wall its room is on, when the segment says
@@ -643,6 +653,95 @@ export function moveRoomLabel(id, x, z) {
   emit();
 }
 
+// ---- Saved points on walls: a spot measured along a wall, kept to start a wall from later ----
+
+export const markById = (id) => state.marks.find((m) => m.id === id);
+export const selectMark = (id) => setSel({ type: 'mark', id });
+
+// A point on a wall's face (`side`: 1 its left, -1 its right), `offset` cm from the face's start
+// (`from` 0) or end (`from` 1). Selected once saved.
+export function addMark(wall, side, from, offset) {
+  if (ui.locked || !state.walls.some((w) => w.id === wall)) return null;
+  const mark = { id: newId(), name: nextName(state.marks, 'Point'), wall, side: side === -1 ? -1 : 1, from: from ? 1 : 0, offset: Math.max(0, round(offset)) };
+  state = { ...state, marks: [...state.marks, mark] };
+  ui = { ...ui, sel: { type: 'mark', id: mark.id } };
+  emit();
+  return mark.id;
+}
+
+export function updateMark(id, patch) {
+  if (ui.locked) return null;
+  nextKey = `mark:${id}:${Object.keys(patch).sort()}`;
+  state = { ...state, marks: state.marks.map((m) => (m.id === id ? { ...m, ...patch, offset: Math.max(0, round(patch.offset ?? m.offset)) } : m)) };
+  emit();
+}
+
+export function removeMark(id) {
+  if (ui.locked) return null;
+  state = { ...state, marks: state.marks.filter((m) => m.id !== id) };
+  if (ui.sel?.type === 'mark' && ui.sel.id === id) ui = { ...ui, sel: null };
+  emit();
+}
+
+// Where a wall from a saved point starts (on the middle of the wall the point is on), the way it goes
+// (into the room), and the point's place.
+function crossStart(id, thickness, centred) {
+  const m = markById(id);
+  const pos = m && markOf(m, state.walls);
+  if (!pos) return null;
+  const away = m.from ? -1 : 1; // along the wall, away from the corner the point is measured from
+  const shift = centred ? 0 : (away * thickness) / 2;
+  return { a: { x: pos.centre.x + pos.u.x * shift, z: pos.centre.z + pos.u.z * shift }, n: pos.n, pos };
+}
+
+// The first wall straight ahead of point `a` going `n` (skipping `host`): `t` cm to its middle, and
+// `length`: from the face of `host` to the face of that wall, the inside length of a wall between them.
+function facing(a, n, host) {
+  let best = null;
+  for (const w of state.walls) {
+    if (w.id === host.id || w.divider || Math.abs(w.curve || 0) >= 0.5) continue;
+    const v = { x: w.x2 - w.x1, z: w.z2 - w.z1 };
+    const den = n.x * v.z - n.z * v.x;
+    if (Math.abs(den) < 1e-9) continue;
+    const d = { x: w.x1 - a.x, z: w.z1 - a.z };
+    const t = (d.x * v.z - d.z * v.x) / den;
+    const s = (d.x * n.z - d.z * n.x) / den;
+    if (t <= host.thickness / 2 || s < 0 || s > 1) continue;
+    const sin = Math.abs(den) / Math.hypot(v.x, v.z);
+    const length = t - host.thickness / 2 - w.thickness / 2 / sin;
+    if (!best || t < best.t) best = { t, length, wall: w };
+  }
+  return best;
+}
+
+// The inside length of a wall from a saved point to the wall opposite, if there is one.
+export function crossLength(id, { thickness = WALL_THICKNESS, centred = false } = {}) {
+  const from = crossStart(id, thickness, centred);
+  const opposite = from && facing(from.a, from.n, from.pos.wall);
+  return opposite ? Math.round(opposite.length * 10) / 10 : null;
+}
+
+// A wall from a saved point straight into the room, `length` cm from the face it starts on to its far
+// end, `thickness` thick. `centred`: the point is the middle of the new wall; otherwise the new wall's
+// face is on the point and the wall stands beyond it, so the distance measured to the point stays clear.
+export function addWallFromMark(id, { length, thickness = WALL_THICKNESS, centred = false }) {
+  if (ui.locked) return null;
+  const from = crossStart(id, thickness, centred);
+  if (!from) return null;
+  const { a, n, pos } = from;
+  // Reaching the face of a wall opposite (within 2 cm), it goes on to that wall's middle and joins it.
+  const opposite = facing(a, n, pos.wall);
+  const reach = opposite && Math.abs(opposite.length - length) <= 2 ? opposite.t : pos.wall.thickness / 2 + length;
+  const wall = newWall(
+    { x1: round(a.x), z1: round(a.z), x2: round(a.x + n.x * reach), z2: round(a.z + n.z * reach) },
+    state.room,
+    { name: nextName(state.walls, 'Wall'), thickness },
+  );
+  ui = { ...ui, sel: { type: 'wall', id: wall.id } };
+  commitWalls([...state.walls, wall]);
+  return wall.id;
+}
+
 export function removeRoomLabel(id) {
   if (ui.locked) return null;
   state = { ...state, rooms: state.rooms.filter((r) => r.id !== id) };
@@ -707,6 +806,15 @@ function withEndsAt(ends, x, z, walls = state.walls) {
   });
 }
 
+// Where the saved points are, for wall ends to snap to: worked out once per drag (finding a point
+// means finding its wall's faces, too slow to repeat on every move).
+function pointSpots() {
+  if (gesture.open && gesture.points) return gesture.points;
+  const spots = state.marks.map((m) => markOf(m, state.walls)).filter(Boolean);
+  if (gesture.open) gesture.points = spots;
+  return spots;
+}
+
 // The corner at a wall's end: that end plus every other wall end joined to it.
 export function cornerAt(id, end) {
   return endsAt(state.walls, endsOf(wallById(id))[end]);
@@ -717,7 +825,7 @@ export function cornerAt(id, end) {
 export function dragCorner(corner, anchor, x, z) {
   if (ui.locked) return null;
   const skip = new Set(corner.map((e) => e.id));
-  const target = snapTarget({ x, z }, state.walls, skip);
+  const target = snapTarget({ x, z }, state.walls, skip, pointSpots());
   let p = target;
   if (!p) {
     const wall = wallById(anchor.id);
@@ -777,11 +885,12 @@ export function dragWalls(originals, dx, dz) {
   if (ui.locked) return null;
   const ids = new Set(originals.map((w) => w.id));
   const others = state.walls.filter((w) => !ids.has(w.id));
+  const points = pointSpots().filter((pt) => !ids.has(pt.wall.id));
   let best = null;
   for (const w of originals) {
     for (const e of endsOf(w)) {
       const moved = { x: e.x + dx, z: e.z + dz };
-      const t = snapTarget(moved, others, new Set());
+      const t = snapTarget(moved, others, new Set(), points);
       if (t && betterSnap(t, best)) best = { ...t, ax: t.x - moved.x, az: t.z - moved.z };
     }
   }
@@ -1279,7 +1388,24 @@ function sanitize(raw) {
       return { id, x: num(r.x, [-10000, 10000], 0), z: num(r.z, [-10000, 10000], 0), type, name, floor };
     });
 
-  return { room, walls, groups, rooms, items, openings };
+  const markIds = new Set();
+  const marks = (Array.isArray(raw.marks) ? raw.marks : [])
+    .slice(0, 500)
+    .filter((m) => m && typeof m === 'object' && wallIds.has(m.wall))
+    .map((m) => {
+      const id = typeof m.id === 'string' && !markIds.has(m.id) ? m.id : newId();
+      markIds.add(id);
+      return {
+        id,
+        name: typeof m.name === 'string' && m.name.trim() ? m.name.slice(0, 40) : 'Point',
+        wall: m.wall,
+        side: m.side === -1 ? -1 : 1,
+        from: m.from === 1 ? 1 : 0,
+        offset: num(m.offset, [0, 10000], 0),
+      };
+    });
+
+  return { room, walls, groups, rooms, items, openings, marks };
 }
 
 // Walls from an older design: a room outline (v2) with curved walls, openings and open sides, or a

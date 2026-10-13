@@ -22,7 +22,7 @@ Plan a room of your apartment in 3D, right in the browser.
 - See each piece's size and its distance to every wall while it's selected
 - Switch between 3D view, top view (floor plan) and eye level, and save a photo of the view
 - Turn **See-through walls** on to cut away walls that stand between you and the room, or off to keep every wall standing
-- **Layers:** show or hide the room names on the floor, and the room colors (for a clean photo, say)
+- **Layers:** show or hide the room names on the floor, the room colors and saved points (for a clean photo, say)
 - **Lock** the design when you're done, so you can look around and check measurements without moving anything by accident
 - **Measure** anything: select a wall to see the gap at its free ends, or use the Measure tool to measure between any two points
 - **Undo and redo** any change: the arrows at the start of the bar above the view, or Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z
@@ -139,6 +139,8 @@ Under **Add → Doors & windows**, click **Door** or **Window** and pick a desig
 **Gaps between walls:** select a wall (or a whole group) and every free end shows a yellow **Gap** label: the clear distance from the end of the wall straight on to the face of the next wall, such as the opening left between two walls. Beams don't close a gap, as you can walk under them.
 
 **Measure tool:** click **Measure** above the view (or press M), then click two points to see the distance between them, on the floor plan. Points snap to the corners and faces of walls, the edges of door and window openings, and the corners and edges of furniture; hold Shift for a line straight across or down the plan. Click again to start another measurement. Backspace removes the last one, **Clear** removes them all, and Esc (or Measure again) stops measuring. Measuring changes nothing, so it also works while the design is locked. Measurements aren't saved with the design.
+
+**Saved points:** after measuring to a spot along a wall (say 40 cm from its corner), click **Save point** beside the end of the measurement to keep that spot as a yellow point at the foot of the wall. A point can also be added from the wall's panel under **Points**, at a typed distance from its inside corner. A point stays on its wall: it moves with the wall and goes when the wall goes. Click it to select it: the view shows its distance from each inside corner, and its panel lets you change that distance (or **Measure from the other corner**) and **Start a wall here**: a wall straight into the room, with its length measured from the wall's face, its thickness, and whether it stands **beside the point** (its face on the point, so the 40 cm stay clear) or **centred** on it. **To the wall opposite** fills in the length that reaches the next wall, and a wall that reaches another one joins it, splitting the room. Points are also handy elsewhere: drag a wall's end (or a whole wall) near a point and it snaps onto it and joins that wall, just like snapping to another wall's end; the Measure tool snaps to them, Draw walls starts a wall on a point when you click it, and in Type walls **+ Line from a wall** starts a line exactly at a point. Delete removes a selected point.
 
 ## Furniture designs
 

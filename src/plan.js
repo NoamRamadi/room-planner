@@ -2,7 +2,7 @@
 // scroll or pinch to zoom), the grid, the walls already built, and labels and dashed lines on top.
 import { clamp } from './dom.js';
 import * as store from './state.js';
-import { boundsOf, footprintOf, openingSpan, takesOpenings } from './walls.js';
+import { boundsOf, footprintOf, markOf, openingSpan, takesOpenings } from './walls.js';
 
 export const PAPER = '#f7f7f3';
 export const GRID_MINOR = '#e6e8e2';
@@ -150,6 +150,23 @@ export function createPlan({ root, canvas, legend, render, hover, click, leave }
     g.restore();
   }
 
+  // Saved points on the built walls, as yellow dots at the foot of the wall's face.
+  function marks() {
+    const { walls, marks: list } = store.getState();
+    for (const m of list) {
+      const pos = markOf(m, walls);
+      if (!pos) continue;
+      const s = toScreen(pos.at);
+      g.fillStyle = TAPE;
+      g.strokeStyle = NEW_WALL;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(s.x, s.y, 6, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+    }
+  }
+
   // Keep all these points in view, `margin` pixels inside the edges and below `top`: nothing changes
   // while they are; otherwise the plan centres on them, zooming out if they don't fit.
   function keepInView(points, { margin = 70, top = 0 } = {}) {
@@ -278,6 +295,7 @@ export function createPlan({ root, canvas, legend, render, hover, click, leave }
     lengthLabel,
     dashed,
     background,
+    marks,
     clearPointers: () => pointers.clear(),
   };
 }

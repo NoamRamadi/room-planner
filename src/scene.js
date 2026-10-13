@@ -22,6 +22,7 @@ import {
   intersectLines,
   jointsOf,
   lengthOf,
+  markOf,
   midpointOf,
   openingSpan,
   outsideBoundsOf,
@@ -512,6 +513,59 @@ export function createScene(container) {
     }
   }
 
+  // ---- Saved points on walls: a yellow dot at the foot of the wall's face; while one is selected,
+  // its distance from each inside corner along the wall ----
+
+  const markGroup = new THREE.Group();
+  scene.add(markGroup);
+  const markSel = new THREE.Group();
+  const markDims = [new Dim('sel'), new Dim('sel')];
+  markSel.add(...markDims);
+  scene.add(markSel);
+  let markKey = '';
+  let spotsCache = { walls: null, marks: null, spots: [] };
+
+  // Where each saved point is (worked out once per change of walls or points).
+  function markSpots() {
+    const { walls, marks } = store.getState();
+    if (spotsCache.walls !== walls || spotsCache.marks !== marks) {
+      spotsCache = { walls, marks, spots: marks.map((m) => ({ m, pos: markOf(m, walls) })).filter((x) => x.pos) };
+    }
+    return spotsCache.spots;
+  }
+
+  function syncMarks(state, ui) {
+    const selected = ui.sel?.type === 'mark' ? ui.sel.id : null;
+    markGroup.visible = ui.points;
+    const spots = markSpots();
+    const key = JSON.stringify([spots.map(({ m, pos }) => [m.id, m.name, pos.at, pos.wall.name, m.offset]), selected, ui.locked]);
+    if (key !== markKey) {
+      markKey = key;
+      markGroup.clear(); // a CSS2D element leaves the page when it leaves the scene
+      for (const { m, pos } of spots) {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = `wall-mark${m.id === selected ? ' is-selected' : ''}`;
+        el.dataset.mark = m.id;
+        el.title = `${m.name}: ${fmt(m.offset)} from the corner, on ${pos.wall.name}`;
+        el.setAttribute('aria-label', el.title);
+        const dot = new CSS2DObject(el);
+        dot.position.set(pos.at.x * CM, 0.03, pos.at.z * CM);
+        markGroup.add(dot);
+      }
+    }
+    const pos = spots.find(({ m }) => m.id === selected)?.pos;
+    markSel.visible = Boolean(pos) && ui.points;
+    if (pos) {
+      const { wall: w, u, n, face } = pos;
+      const off = w.thickness / 2 + 20; // just into the room
+      const at = (s) => v3((w.x1 + u.x * s + n.x * off) * CM, 0.03, (w.z1 + u.z * s + n.z * off) * CM);
+      const across = v3(n.x, 0, n.z);
+      markDims[0].measure(at(face[0]), at(pos.s), fmt(pos.s - face[0]), across);
+      markDims[1].measure(at(pos.s), at(face[1]), fmt(face[1] - pos.s), across);
+    }
+  }
+
   // Bring a named room into view: centred, filling most of the view, from the current direction.
   function frameRoom(id) {
     const { walls, rooms } = store.getState();
@@ -881,6 +935,7 @@ export function createScene(container) {
   let measureHover = null; // the point under the pointer
   const measureDims = [];
   const measureDots = [];
+  const saveButtons = []; // "Save point" beside a measured end that's on a wall
 
   function drawMeasures() {
     const on = store.getUI().measuring;
@@ -916,6 +971,47 @@ export function createScene(container) {
       dot.visible = Boolean(p);
       if (p) dot.position.set(p.x * CM, 0.03, p.z * CM);
     });
+    // The last measurement's ends that lie along a wall can be saved as points on it.
+    const spots = measureStart ? [] : (measures.at(-1)?.spots ?? []);
+    while (saveButtons.length < spots.length) {
+      const b = handle('mark-save');
+      b.element.textContent = 'Save point';
+      b.element.title = 'Keep this point on the wall, to start a wall from later';
+      saveButtons.push(b);
+      measureGroup.add(b);
+    }
+    saveButtons.forEach((b, k) => {
+      const s = spots[k];
+      b.visible = Boolean(s);
+      if (!s) return;
+      b.position.set(s.p.x * CM, 0.03, s.p.z * CM);
+      b.element.dataset.spot = String(k);
+    });
+  }
+
+  // A measured point that lies along a wall's face (not at its corners): which wall, which face, and
+  // how far from the corner the measurement started at (or the nearer corner). Null if a point is
+  // already saved there.
+  function wallSpot(p, other) {
+    const { walls, marks } = store.getState();
+    for (const w of walls) {
+      if (w.divider || Math.abs(w.curve || 0) >= 0.5) continue;
+      const f = facesOf(w, walls);
+      for (const side of [1, -1]) {
+        const [s0, s1] = side === 1 ? f.left : f.right;
+        const off = (side * w.thickness) / 2;
+        const A = { x: w.x1 + f.u.x * s0 + f.nl.x * off, z: w.z1 + f.u.z * s0 + f.nl.z * off };
+        const B = { x: w.x1 + f.u.x * s1 + f.nl.x * off, z: w.z1 + f.u.z * s1 + f.nl.z * off };
+        const hit = pointToSegment(p, A, B);
+        const len = s1 - s0;
+        const along = hit.t * len;
+        if (hit.d > 1 || along < 1 || along > len - 1) continue;
+        const from = other && dist(other, B) < 2 ? 1 : other && dist(other, A) < 2 ? 0 : along > len / 2 ? 1 : 0;
+        const taken = marks.some((m) => m.wall === w.id && m.side === side && Math.abs((m.from ? len - m.offset : m.offset) - along) < 1);
+        return taken ? null : { p: { x: hit.x, z: hit.z }, wall: w.id, side, from, offset: from ? len - along : along };
+      }
+    }
+    return null;
   }
 
   // A piece of furniture's footprint corners on the floor plan.
@@ -947,7 +1043,7 @@ export function createScene(container) {
     });
     let p = null;
     let best = reach;
-    for (const c of [...outlines.flat(), ...jambs]) {
+    for (const c of [...markSpots().map((x) => x.pos.at), ...outlines.flat(), ...jambs]) {
       const d = dist(c, raw);
       if (d < best) [p, best] = [{ x: c.x, z: c.z }, d];
     }
@@ -973,7 +1069,8 @@ export function createScene(container) {
     if (!p) return;
     if (!measureStart) measureStart = p;
     else {
-      measures.push({ a: measureStart, b: p });
+      const spots = [wallSpot(p, measureStart), wallSpot(measureStart, p)].filter(Boolean);
+      measures.push({ a: measureStart, b: p, spots });
       measureStart = null;
     }
     measureHover = p;
@@ -1155,6 +1252,28 @@ export function createScene(container) {
         e.preventDefault();
         const d = closeEl.dataset;
         store.addDivider({ x: Number(d.ax), z: Number(d.az) }, { x: Number(d.bx), z: Number(d.bz) });
+        return;
+      }
+      // "Save point" beside a measured end along a wall: keep it as a point on that wall.
+      const saveEl = e.target.closest?.('.mark-save');
+      if (saveEl) {
+        e.stopPropagation();
+        e.preventDefault();
+        const last = measures.at(-1);
+        const spot = last?.spots[Number(saveEl.dataset.spot)];
+        if (spot && !store.getUI().locked) {
+          store.addMark(spot.wall, spot.side, spot.from, spot.offset);
+          last.spots = last.spots.filter((x) => x !== spot);
+          drawMeasures();
+        }
+        return;
+      }
+      // A saved point: select it (while measuring, a click on it measures from it instead).
+      const markEl = e.target.closest?.('[data-mark]');
+      if (markEl && !store.getUI().measuring && !store.getUI().dividing) {
+        e.stopPropagation();
+        e.preventDefault();
+        store.selectMark(markEl.dataset.mark);
         return;
       }
       // A room's label: select it, and drag it to move it. A "Name this room" tag names the room.
@@ -1469,6 +1588,7 @@ export function createScene(container) {
     updateWallSelection(state, ui);
     updateOpeningSelection(state, ui);
     syncRoomLabels(state, ui);
+    syncMarks(state, ui);
     container.classList.toggle('is-locked', ui.locked);
     container.classList.toggle('is-measuring', ui.measuring || ui.dividing);
     if (!ui.dividing) dividerStart = dividerHover = null;

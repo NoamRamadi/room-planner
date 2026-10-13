@@ -6,7 +6,7 @@ import { createDrawMode } from './draw.js';
 import { createTypeMode } from './type.js';
 import * as store from './state.js';
 import { ROOM_TYPES, floorOfRoom, formatArea, roomAt, roomSize, roomTypeOf } from './rooms.js';
-import { LIMITS, angleOf, facesOf, floorsOf, insideLengthOf, maxCurve, openingSpan, takesOpenings } from './walls.js';
+import { LIMITS, angleOf, facesOf, floorsOf, insideLengthOf, markOf, maxCurve, openingSpan, takesOpenings } from './walls.js';
 
 const ICONS = {
   sofa: '<path d="M9 15V9a2 2 0 0 1 2-2h26a2 2 0 0 1 2 2v6"/><path d="M5 16a2.5 2.5 0 0 1 5 0v4h28v-4a2.5 2.5 0 0 1 5 0v8H5z"/><path d="M8 24v3M40 24v3"/>',
@@ -1101,13 +1101,14 @@ export function initUI(view) {
     { class: 'layers-menu', role: 'group', 'aria-label': 'Layers', hidden: true },
     layerBox('Room names', () => store.getUI().roomNames, (on) => store.setRoomNames(on)),
     layerBox('Room colors', () => store.getUI().roomColors, (on) => store.setRoomColors(on)),
+    layerBox('Saved points', () => store.getUI().points, (on) => store.setPoints(on)),
   );
   const layersButton = h('button', {
     type: 'button',
     class: 'tool',
     'data-always': '',
     'aria-expanded': 'false',
-    title: 'Show or hide room names and colors',
+    title: 'Show or hide room names, room colors and saved points',
     html: `${icon('layers')}<span>Layers</span>`,
     onclick: () => {
       layersMenu.hidden = !layersMenu.hidden;
@@ -1242,10 +1243,11 @@ function inspectorKeyFor(state, ui) {
   }
   if (sel.type === 'wall') {
     const w = store.wallById(sel.id);
-    return w ? `wall:${w.id}:${w.group}` : 'none';
+    return w ? `wall:${w.id}:${w.group}:${state.marks.filter((m) => m.wall === w.id).map((m) => m.id)}` : 'none';
   }
   if (sel.type === 'group') return `group:${sel.id}:${store.selectedWallIds(sel).join()}`;
   if (sel.type === 'room') return state.rooms.some((r) => r.id === sel.id) ? `room:${sel.id}` : 'none';
+  if (sel.type === 'mark') return store.markById(sel.id) ? `mark:${sel.id}` : 'none';
   if (sel.type === 'opening') {
     const o = store.openingById(sel.id);
     return o ? `opening:${o.id}:${o.style}:${o.wall}` : 'none';
@@ -1270,6 +1272,7 @@ function buildInspector(root, state, ui) {
   if (sel?.type === 'walls') return buildWallsInspector(root, sel.ids);
   if (sel?.type === 'opening' && store.openingById(sel.id)) return buildOpeningInspector(root, sel.id);
   if (sel?.type === 'room' && store.roomLabelById(sel.id)) return buildRoomInspector(root, sel.id);
+  if (sel?.type === 'mark' && store.markById(sel.id)) return buildMarkInspector(root, sel.id);
   return buildHelp(root);
 }
 
@@ -1561,6 +1564,7 @@ function buildWallInspector(root, id) {
     ),
     h('div', { class: 'inspector__group' }, color.el),
     h('div', { class: 'inspector__group' }, h('h3', {}, 'Doors and windows'), wallOpenings(w0)),
+    h('div', { class: 'inspector__group' }, h('h3', {}, 'Points'), wallMarks(w0, syncers)),
     h('div', { class: 'inspector__group' }, h('h3', {}, 'Turn'), turnButtons((deg) => store.rotateWalls([id], deg))),
     h(
       'div',
@@ -1586,6 +1590,139 @@ function wallOpenings(w) {
       : null,
     h('p', { class: 'help help--first' }, list.length ? 'Pick one to change it.' : 'None yet. While this wall is selected, Door or Window under Add → Doors & windows adds one here.'),
   ];
+}
+
+// Saved points on a wall, as buttons that select them, and a way to add one at a typed distance from
+// the wall's inside corner (on the room's side).
+const nextMark = { offset: 100 };
+function wallMarks(w, syncers) {
+  if (!takesOpenings(w) && !w.gap) return h('p', { class: 'help help--first' }, 'Curved walls can’t have points.');
+  const list = store.getState().marks.filter((m) => m.wall === w.id);
+  const offset = measureField({ label: 'From the corner', min: 0, max: () => Math.floor(insideLengthOf(store.wallById(w.id), store.getState().walls)), get: () => nextMark.offset, set: (v) => (nextMark.offset = v) });
+  syncers.push(offset.sync);
+  const add = () => {
+    const { side } = facesOf(store.wallById(w.id), store.getState().walls);
+    store.addMark(w.id, side || 1, 0, nextMark.offset);
+  };
+  return [
+    list.length
+      ? h('div', { class: 'presets' }, list.map((m) => h('button', { type: 'button', class: 'preset', 'data-always': '', onclick: () => store.selectMark(m.id) }, `${m.name}, ${Math.round(m.offset)} cm`)))
+      : null,
+    h('div', { class: 'adder' }, offset.el, h('button', { type: 'button', class: 'btn', onclick: add }, 'Add a point')),
+    h('p', { class: 'help' }, 'A point marks a spot along the wall, measured from its inside corner, to start a wall from later. You can also save one with Measure.'),
+  ];
+}
+
+// A saved point on a wall: how far it is from the corner, and a wall to start from it.
+const nextCross = { length: 300, thickness: 10, centred: false };
+function buildMarkInspector(root, id) {
+  const syncers = [];
+  const current = () => store.markById(id);
+  const host = () => store.wallById(current().wall);
+  const pos = () => markOf(current(), store.getState().walls);
+  const faceLength = () => {
+    const p = pos();
+    return p ? p.face[1] - p.face[0] : 0;
+  };
+
+  const name = h('input', { class: 'inspector__name', 'aria-label': 'Name', maxlength: 40, autocomplete: 'off' });
+  name.addEventListener('input', () => store.updateMark(id, { name: name.value }));
+  name.addEventListener('change', () => {
+    if (!name.value.trim()) store.updateMark(id, { name: 'Point' });
+  });
+  syncers.push(() => {
+    if (document.activeElement !== name) name.value = current().name;
+  });
+
+  const offset = measureField({
+    label: 'From the corner',
+    min: 0,
+    max: () => Math.floor(faceLength()),
+    live: false,
+    get: () => current().offset,
+    set: (v) => store.updateMark(id, { offset: v }),
+  });
+  syncers.push(offset.sync);
+  // The same spot, measured from the wall's other inside corner.
+  const flip = () => {
+    const m = current();
+    store.updateMark(id, { from: m.from ? 0 : 1, offset: faceLength() - m.offset });
+  };
+
+  const length = measureField({ label: 'Length', min: LIMITS.length[0], max: LIMITS.length[1], get: () => nextCross.length, set: (v) => (nextCross.length = v) });
+  const thickness = measureField({ label: 'Thickness', min: LIMITS.thickness[0], max: LIMITS.thickness[1], get: () => nextCross.thickness, set: (v) => (nextCross.thickness = v) });
+  const placing = segmented({
+    label: 'The new wall',
+    options: [
+      { id: false, label: 'Beside the point' },
+      { id: true, label: 'Centred on it' },
+    ],
+    get: () => nextCross.centred,
+    set: (v) => {
+      nextCross.centred = v;
+      placing.sync();
+      placeHelp.textContent = placeText();
+    },
+  });
+  const placeText = () =>
+    nextCross.centred
+      ? 'The middle of the new wall is on the point.'
+      : `The new wall’s face is on the point and the wall stands beyond it, so the ${Math.round(current().offset)} cm from the corner stay clear.`;
+  const placeHelp = h('p', { class: 'help' }, placeText());
+  // The length that reaches the wall opposite, face to face, so the new wall joins it.
+  const opposite = h('button', {
+    type: 'button',
+    class: 'typer__link',
+    onclick: () => {
+      const v = store.crossLength(id, nextCross);
+      if (v == null) return;
+      nextCross.length = v;
+      length.sync();
+    },
+  });
+  syncers.push(length.sync, thickness.sync, placing.sync, () => (placeHelp.textContent = placeText()), () => {
+    const v = store.crossLength(id, nextCross);
+    opposite.hidden = v == null;
+    opposite.textContent = v == null ? '' : `To the wall opposite: ${Math.round(v)} cm`;
+  });
+
+  root.append(
+    panelHead(name, `On ${host().name}`, () => store.clearSelection()),
+    h(
+      'div',
+      { class: 'inspector__group' },
+      h('div', { class: 'presets' }, h('button', { type: 'button', class: 'preset', 'data-always': '', onclick: () => store.selectWall(host().id) }, `Select ${host().name}`)),
+    ),
+    h(
+      'div',
+      { class: 'inspector__group' },
+      h('h3', {}, 'Where it is'),
+      h('div', { class: 'measures measures--two' }, offset.el),
+      h('button', { type: 'button', class: 'typer__link', onclick: flip }, 'Measure from the other corner'),
+      h('p', { class: 'help' }, 'Along the wall, from its inside corner. The view shows how far it is from each corner.'),
+    ),
+    h(
+      'div',
+      { class: 'inspector__group' },
+      h('h3', {}, 'Start a wall here'),
+      h('div', { class: 'measures measures--two' }, length.el, thickness.el),
+      opposite,
+      h('div', { class: 'field-row field-row--stack' }, h('span', { class: 'field-row__label' }, 'The new wall'), placing.el),
+      placeHelp,
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn--tape btn--wide',
+          onclick: () => store.addWallFromMark(id, { ...nextCross }),
+        },
+        'Start a wall here',
+      ),
+      h('p', { class: 'help' }, 'A wall straight into the room, its length measured from this wall’s face. It joins this wall, so the room is split where it reaches another wall.'),
+    ),
+    h('div', { class: 'inspector__actions' }, h('button', { type: 'button', class: 'btn btn--danger', onclick: () => store.removeMark(id) }, 'Remove point')),
+  );
+  return syncers;
 }
 
 function buildOpeningInspector(root, id) {
@@ -2048,6 +2185,13 @@ function bindShortcuts(view) {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
       e.preventDefault();
       store.removeRoomLabel(sel.id);
+      return;
+    }
+
+    if (sel?.type === 'mark') {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      e.preventDefault();
+      store.removeMark(sel.id);
       return;
     }
 

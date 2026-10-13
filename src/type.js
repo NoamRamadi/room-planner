@@ -7,7 +7,7 @@ import { OPENINGS } from './openings.js';
 import { fitHeadings, wrap } from './fit.js';
 import { GRID_MAJOR, NEW_WALL, PAPER, TAPE, createPlan } from './plan.js';
 import * as store from './state.js';
-import { LIMITS, boundsOf, dist, facesOf, footprintOf, jointsOf, pointToSegment, signedArea } from './walls.js';
+import { LIMITS, boundsOf, dist, facesOf, footprintOf, jointsOf, markOf, pointToSegment, signedArea } from './walls.js';
 
 const OPENING = '#b07a16';
 const WARN = '#c2410c';
@@ -474,6 +474,12 @@ export function createTypeMode(stage, { onClose }) {
     const tol = PICK_PX / plan.scale;
     const walls = builtWalls();
     const faces = facesFor(walls);
+    // A saved point on a built wall: the line starts exactly there.
+    for (const m of settings.replace ? [] : store.getState().marks) {
+      const pos = markOf(m, walls);
+      const seg = pos && faces(m.wall, m.side);
+      if (seg && dist(pos.at, p) <= tol) return { wall: m.wall, side: m.side, from: m.from, offset: m.offset, n: seg.n, seg, at: pos.at, d: 0, name: pos.wall.name };
+    }
     let best = null;
     const consider = (seg, reach, what) => {
       const hit = pointToSegment(p, seg.a, seg.b);
@@ -529,6 +535,7 @@ export function createTypeMode(stage, { onClose }) {
     const typed = layout.flatMap((l) => l.pieces.filter((q) => solid(q.kind)).map((q) => pieceWall(q, thicknessOf(l.id))));
     const joins = jointsOf([...built.filter((w) => !w.divider), ...typed]);
     plan.background(joins, { faded: settings.replace });
+    if (!settings.replace) plan.marks();
 
     const focusId = focus?.step;
     for (const l of layout) {
