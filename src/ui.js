@@ -1166,7 +1166,7 @@ export function initUI(view) {
     hint.textContent = dividing
       ? 'Room divider: click where it starts, then where it ends. It snaps to wall corners and onto walls; hold Shift for a straight line. Esc stops.'
       : measuring
-      ? 'Measuring: click two points to see the distance between them. Points snap to the corners and faces of walls, doors, windows and furniture; hold Shift for a straight line. Backspace removes the last one, Esc stops.'
+      ? 'Measuring: click two points to see the distance between them. Points snap to the corners and faces of walls, doors, windows and furniture; hold Shift for a straight line. Hover the end of one along a wall to save it as a point. Backspace removes the last one, Esc stops.'
       : locked
         ? 'Locked: look around and click things to see their measurements. Nothing can be moved or changed.'
         : `Drag walls, doors, windows and furniture to move them; hold Ctrl (or ${mac ? '⌥' : 'Alt'}) while dragging furniture to take it through walls. Drag empty space to look around. Scroll or pinch to zoom.`;

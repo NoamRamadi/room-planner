@@ -935,7 +935,7 @@ export function createScene(container) {
   let measureHover = null; // the point under the pointer
   const measureDims = [];
   const measureDots = [];
-  const saveButtons = []; // "Save point" beside a measured end that's on a wall
+  const saveButtons = []; // "Save point" on a measured end that's on a wall, shown while it's hovered
 
   function drawMeasures() {
     const on = store.getUI().measuring;
@@ -974,9 +974,18 @@ export function createScene(container) {
     // The last measurement's ends that lie along a wall can be saved as points on it.
     const spots = measureStart ? [] : (measures.at(-1)?.spots ?? []);
     while (saveButtons.length < spots.length) {
-      const b = handle('mark-save');
-      b.element.textContent = 'Save point';
-      b.element.title = 'Keep this point on the wall, to start a wall from later';
+      // A hover area over the end's dot, with the button just under it.
+      const el = document.createElement('div');
+      el.className = 'mark-spot';
+      const ring = document.createElement('span');
+      ring.className = 'mark-spot__ring';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'mark-save';
+      button.textContent = 'Save point';
+      button.title = 'Keep this point on the wall, to start a wall from later';
+      el.append(ring, button);
+      const b = new CSS2DObject(el);
       saveButtons.push(b);
       measureGroup.add(b);
     }
@@ -985,7 +994,7 @@ export function createScene(container) {
       b.visible = Boolean(s);
       if (!s) return;
       b.position.set(s.p.x * CM, 0.03, s.p.z * CM);
-      b.element.dataset.spot = String(k);
+      b.element.querySelector('.mark-save').dataset.spot = String(k);
     });
   }
 

@@ -2518,9 +2518,32 @@ h3 {
   pointer-events: none; /* a click measures from it */
 }
 
-.mark-save {
+/* The end of a measurement along a wall: hovering its dot shows Save point just under it (always shown
+   where there's no hover, on touch screens). */
+.mark-spot {
+  position: relative;
   z-index: 5;
-  margin-top: 26px;
+  width: 26px;
+  height: 26px;
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.mark-spot__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.mark-spot:hover .mark-spot__ring {
+  box-shadow: inset 0 0 0 2px rgb(38 41 45 / 0.35);
+}
+
+.mark-save {
+  position: absolute;
+  top: 100%; /* touching the hover area, so the pointer can move onto it */
+  left: 50%;
+  transform: translateX(-50%);
   padding: 3px 8px;
   border: 1px solid var(--graphite);
   border-radius: 3px;
@@ -2528,8 +2551,23 @@ h3 {
   font: 600 12px var(--font);
   color: var(--graphite);
   white-space: nowrap;
-  pointer-events: auto;
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+
+.mark-spot:hover .mark-save,
+.mark-spot:focus-within .mark-save {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .mark-spot .mark-save {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .mark-save:hover {
