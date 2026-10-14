@@ -27,7 +27,7 @@ Plan a room of your apartment in 3D, right in the browser.
 - **Measure** anything: select a wall to see the gap at its free ends, or use the Measure tool to measure between any two points
 - **Undo and redo** any change: the arrows at the start of the bar above the view, or Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z
 
-Your design is saved automatically in the browser. Use **Save design file** / **Open design file** (in the **⋯** menu at the top of the side panel) to move it to another computer or share it.
+Work on several homes side by side as **projects** (your home and a relative's, say): each one is saved automatically in the browser. Use **Save as a file** / **Open a design file** to move a project to another computer or share it.
 
 ## The side panel
 
@@ -38,7 +38,17 @@ A rail down the side panel's edge switches between four sections, one at a time 
 - **Placed:** everything in your plan, grouped by the named room it stands in (or, before you name any rooms, by the kind of room it's for), with counts. Filter by group, fold groups away, and click a piece to select it.
 - **Style:** wall height, floor pattern and color, wall color, and whether named rooms are colored by their type.
 
-The **⋯** menu next to the title has **Save design file**, **Open design file** and **Start over**.
+The **⋯** menu next to the project's name has **Save as a file**, **Open a design file** and **Start over**.
+
+## Projects
+
+The top of the side panel shows the project that's open, under the app's name. Click its name for the list of your projects, newest first: each with a small sketch of its walls, when it was last edited and how many rooms it has. Click one to open it; the one open now is saved first, and undo starts afresh in the project you open (Layers, See-through walls and the panels stay as they are).
+
+- **New project:** give it a name and start with an empty plan (for drawing or typing the walls), the usual 400 × 500 room, or a copy of the project open now.
+- **Open a design file:** the file opens as a new project, named after the file, so nothing is replaced.
+- **⋯ beside a project:** **Rename** it, **Make a copy** (to try another layout without touching the original), **Save as a file** (named after the project), or **Delete** it. Deleting can't be undone, so it asks first and offers **Save a file first**. Deleting the project that's open opens the one you edited most recently; deleting the last one starts a new "My home".
+
+Projects are kept in this browser; save a project as a file to take it to another computer. The design you had before projects existed becomes your first project, "My home".
 
 ## Run it
 

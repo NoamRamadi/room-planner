@@ -14,6 +14,7 @@ import {
   endsAt,
   endsOf,
   facesOf,
+  floorsOf,
   insideLengthOf,
   intersectLines,
   jointsOf,
@@ -21,6 +22,7 @@ import {
   markOf,
   midpointOf,
   openingSpan,
+  pathOf,
   pointToSegment,
   rectangleWalls,
   rotatePoint,
@@ -28,8 +30,10 @@ import {
   takesOpenings,
 } from './walls.js';
 
-const STORAGE_KEY = 'room-planner:v1';
+const STORAGE_KEY = 'room-planner:v1'; // the one design, from before there were projects
 const VIEW_KEY = 'room-planner:view';
+const PROJECTS_KEY = 'room-planner:projects'; // { current, list: [{ id, name, updated, rooms, plan }] }
+const projectKey = (id) => `room-planner:project:${id}`;
 
 export const ROOM_LIMITS = { width: [50, 3000], length: [50, 3000], height: LIMITS.height };
 
@@ -70,7 +74,10 @@ function fresh() {
   return { room, walls, groups: [group], rooms, items: [], openings, marks: [] };
 }
 
-let state = loadSaved() ?? fresh();
+// Projects: designs kept side by side in this browser, one open at a time. The design from before
+// there were projects becomes the first one, "My home".
+let projects = loadProjects();
+let state = loadProject(projects.current) ?? fresh();
 // sel: null, { type: 'item' | 'wall' | 'group', id }, or { type: 'walls', ids } for several walls.
 // several: clicks add to the selection instead of replacing it (for touch screens without Shift).
 // cutaway: walls between the camera and the room are cut down so you can see in.
@@ -171,12 +178,185 @@ function travel(from, to) {
 export const undo = () => travel(past, future);
 export const redo = () => travel(future, past);
 
+let savedState = null; // the design as last written, so a save without changes leaves it be
+
 function save() {
+  if (state === savedState) return;
+  savedState = state;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(projectKey(projects.current), JSON.stringify(state));
+    projects = { ...projects, list: projects.list.map((p) => (p.id === projects.current ? { ...p, ...summaryOf(state), updated: Date.now() } : p)) };
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
   } catch {
     // Storage can be full or disabled (private browsing); the design still works for this visit.
   }
+}
+
+// ---- Projects ----
+
+// How many rooms a design has (enclosed floors), and a sketch of its walls for the project list: an SVG
+// path in a 44 × 32 box.
+function summaryOf(design) {
+  const walls = design.walls.filter((w) => !w.divider);
+  if (!walls.length) return { rooms: 0, plan: '' };
+  const pts = walls.flatMap(pathOf);
+  const xs = pts.map((p) => p.x);
+  const zs = pts.map((p) => p.z);
+  const [x0, z0] = [Math.min(...xs), Math.min(...zs)];
+  const k = Math.min(38 / Math.max(1, Math.max(...xs) - x0), 26 / Math.max(1, Math.max(...zs) - z0));
+  const ox = 22 - ((Math.max(...xs) - x0) * k) / 2;
+  const oz = 16 - ((Math.max(...zs) - z0) * k) / 2;
+  const at = (p) => `${Math.round((ox + (p.x - x0) * k) * 10) / 10} ${Math.round((oz + (p.z - z0) * k) * 10) / 10}`;
+  const plan = walls.map((w) => pathOf(w).map((p, i) => `${i ? 'L' : 'M'}${at(p)}`).join('')).join('');
+  return { rooms: floorsOf(design.walls).length, plan };
+}
+
+function loadProjects() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PROJECTS_KEY));
+    if (saved && Array.isArray(saved.list) && saved.list.length) {
+      const list = saved.list.filter((p) => p && typeof p.id === 'string').map((p) => ({ id: p.id, name: typeof p.name === 'string' && p.name.trim() ? p.name : 'Project', updated: Number(p.updated) || 0, rooms: Number(p.rooms) || 0, plan: typeof p.plan === 'string' ? p.plan : '' }));
+      if (list.length) return { current: list.some((p) => p.id === saved.current) ? saved.current : list[0].id, list };
+    }
+  } catch {
+    // start a list below
+  }
+  // The first time: the design so far (or the starting room) becomes "My home".
+  const design = loadSaved() ?? fresh();
+  const first = { id: newId(), name: 'My home', updated: Date.now(), ...summaryOf(design) };
+  const made = { current: first.id, list: [first] };
+  try {
+    localStorage.setItem(projectKey(first.id), JSON.stringify(design));
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(made));
+  } catch {
+    // no storage: one project for this visit
+  }
+  return made;
+}
+
+function loadProject(id) {
+  try {
+    return sanitize(JSON.parse(localStorage.getItem(projectKey(id))));
+  } catch {
+    return null;
+  }
+}
+
+function writeProjects() {
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  } catch {
+    // as in save()
+  }
+}
+
+export const projectList = () => projects.list;
+export const currentProject = () => projects.list.find((p) => p.id === projects.current);
+
+// Open another project: the one open now is saved first, and undo starts afresh.
+export function openProject(id) {
+  if (ui.drawing || !projects.list.some((p) => p.id === id)) return null;
+  clearTimeout(saveTimer);
+  save();
+  projects = { ...projects, current: id };
+  writeProjects();
+  state = loadProject(id) ?? fresh();
+  savedState = state;
+  committed = state;
+  past.length = 0;
+  future.length = 0;
+  last = { key: null, time: 0 };
+  ui = { ...ui, sel: null, several: false, measuring: false, dividing: false };
+  emit();
+  return true;
+}
+
+// A new project, opened: an empty plan, the starting room, or a copy of the design open now.
+export function createProject(name, start = 'empty') {
+  const design =
+    start === 'copy' ? state : start === 'room' ? fresh() : { room: { ...DEFAULT_LOOK }, walls: [], groups: [], rooms: [], items: [], openings: [], marks: [] };
+  return addProject(name, design);
+}
+
+function addProject(name, design) {
+  const project = { id: newId(), name: uniqueIn(projects.list, name.trim() || 'Project').slice(0, 60), updated: Date.now(), ...summaryOf(design) };
+  try {
+    clearTimeout(saveTimer);
+    save();
+    localStorage.setItem(projectKey(project.id), JSON.stringify(design));
+  } catch {
+    // as in save()
+  }
+  projects = { ...projects, list: [...projects.list, project] };
+  writeProjects();
+  openProject(project.id);
+  return project.id;
+}
+
+export const nextProjectName = () => uniqueIn(projects.list, `Project ${projects.list.length + 1}`);
+
+export function renameProject(id, name) {
+  const clean = name.trim().slice(0, 60);
+  if (!clean) return;
+  projects = { ...projects, list: projects.list.map((p) => (p.id === id ? { ...p, name: clean } : p)) };
+  writeProjects();
+  emit();
+}
+
+// A copy of a project, opened.
+export function copyProject(id) {
+  const source = projects.list.find((p) => p.id === id);
+  if (!source) return null;
+  if (id === projects.current) {
+    clearTimeout(saveTimer);
+    save();
+  }
+  const design = id === projects.current ? state : (loadProject(id) ?? fresh());
+  return addProject(`${source.name} copy`, design);
+}
+
+// Delete a project for good. Deleting the one open opens the most recently edited of the others, or
+// a new "My home" when it was the last.
+export function deleteProject(id) {
+  if (ui.drawing) return null;
+  try {
+    localStorage.removeItem(projectKey(id));
+  } catch {
+    // nothing to remove
+  }
+  const list = projects.list.filter((p) => p.id !== id);
+  if (!list.length) {
+    projects = { current: null, list: [] };
+    addProject('My home', fresh());
+    return true;
+  }
+  projects = { ...projects, list };
+  writeProjects();
+  if (id === projects.current) {
+    savedState = state; // gone: don't write it back
+    openProject([...list].sort((a, b) => b.updated - a.updated)[0].id);
+  } else {
+    emit();
+  }
+  return true;
+}
+
+// A project as a design file (the open one as it is now).
+export function projectFile(id) {
+  const design = id === projects.current ? state : loadProject(id);
+  return design ? JSON.stringify({ app: 'room-planner', version: 3, ...design }, null, 2) : null;
+}
+
+// A design file opened as a new project, named `name`. Throws if it isn't a design.
+export function openFileAsProject(text, name) {
+  let design = null;
+  try {
+    design = sanitize(JSON.parse(text));
+  } catch {
+    // below
+  }
+  if (!design) throw new Error('not a design');
+  return addProject(name, design);
 }
 
 function loadView() {
@@ -253,6 +433,7 @@ export function setLocked(on) {
   emit();
 }
 
+// The one design kept before there were projects.
 function loadSaved() {
   try {
     return sanitize(JSON.parse(localStorage.getItem(STORAGE_KEY)));

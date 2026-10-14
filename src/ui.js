@@ -75,6 +75,10 @@ const ICONS = {
   room_balcony: '<path d="M4 20h16M4 14h16M6 14v6M10 14v6M14 14v6M18 14v6"/><circle cx="12" cy="7" r="3"/>',
   room_other: '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 12h8v8"/>',
   dots: '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.4"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="1.5"/><path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
+  trash: '<path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/>',
   save: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19h14"/>',
   open: '<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M5 19h14"/>',
   restart: '<path d="M5 12a7 7 0 1 0 2.1-5"/><path d="M5 4v4h4"/>',
@@ -855,27 +859,33 @@ export function initUI(view) {
 
   // ---- Design file: a menu at the top of the panel ----
 
+  // A design file opens as a new project, named after the file.
   const fileInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true });
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files[0];
     fileInput.value = '';
     if (!file) return;
     try {
-      store.importDesign(await file.text());
+      store.openFileAsProject(await file.text(), file.name.replace(/\.json$/i, ''));
       view.setView('overview');
-      say(`Opened ${file.name}`);
+      say(`Opened ${file.name} as a new project`);
     } catch {
       say(`${file.name} isn't a room design. Choose a .json file saved from Room planner.`);
     }
   });
-  const saveDesign = () => {
-    const url = URL.createObjectURL(new Blob([store.exportDesign()], { type: 'application/json' }));
-    download(url, 'room-design.json');
+  // A project as a design file, named after it.
+  const saveProjectFile = (id) => {
+    const project = store.projectList().find((p) => p.id === id);
+    const text = store.projectFile(id);
+    if (!project || !text) return;
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    download(url, `${project.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'room-design'}.json`);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    say('Design file saved');
+    say(`Saved ${project.name} as a file`);
   };
+  const saveDesign = () => saveProjectFile(store.currentProject().id);
   const startOver = () => {
-    if (!confirm('Start over with an empty room? All walls you built and all furniture will be removed.')) return;
+    if (!confirm(`Start ${store.currentProject().name} over with an empty room? All walls you built and all furniture in it will be removed.`)) return;
     store.resetDesign();
     view.setView('overview');
   };
@@ -884,10 +894,10 @@ export function initUI(view) {
   const fileMenu = h(
     'div',
     { class: 'file-menu', role: 'menu', 'aria-label': 'Design file', hidden: true },
-    menuItem('Save design file', 'save', saveDesign, { 'data-always': '' }),
-    menuItem('Open design file', 'open', () => fileInput.click()),
+    menuItem('Save as a file', 'save', saveDesign, { 'data-always': '' }),
+    menuItem('Open a design file', 'open', () => fileInput.click(), { 'data-always': '' }),
     menuItem('Start over', 'restart', startOver, { class: 'is-danger' }),
-    h('p', { class: 'note' }, 'Your design is also saved automatically in this browser.'),
+    h('p', { class: 'note' }, 'Your projects are saved automatically in this browser. A design file opens as a new project.'),
   );
   const fileButton = h('button', {
     type: 'button',
@@ -901,6 +911,7 @@ export function initUI(view) {
     onclick: () => (fileMenu.hidden ? openFileMenu() : closeFileMenu()),
   });
   function openFileMenu() {
+    closeProjects();
     fileMenu.hidden = false;
     fileButton.setAttribute('aria-expanded', 'true');
     fileMenu.querySelector('button:not(:disabled)')?.focus();
@@ -918,6 +929,243 @@ export function initUI(view) {
     closeFileMenu();
     fileButton.focus();
   });
+
+  // ---- Projects: the open project's name tops the panel; it opens the list of projects ----
+
+  const projectName = h('span', { class: 'project__name' });
+  const projectMenu = h('div', { class: 'project-menu', role: 'dialog', 'aria-label': 'Projects', hidden: true, 'data-always': '' });
+  const projectButton = h(
+    'button',
+    {
+      type: 'button',
+      class: 'project__button',
+      'aria-haspopup': 'dialog',
+      'aria-expanded': 'false',
+      'data-always': '',
+      title: 'Switch to another project, or start a new one',
+      onclick: () => (projectMenu.hidden ? openProjects() : closeProjects()),
+    },
+    projectName,
+    h('span', { class: 'project__chevron', html: icon('chevronDown') }),
+  );
+  syncers.push(() => {
+    const p = store.currentProject();
+    projectName.textContent = p?.name ?? 'My home';
+    document.title = p ? `${p.name} · Room planner` : 'Room planner';
+  });
+  let rowMenu = null; // the project whose menu is open in the list
+  let renaming = null; // the project being renamed
+
+  function openProjects() {
+    if (store.getUI().drawing) return;
+    closeFileMenu();
+    rowMenu = renaming = null;
+    renderProjects();
+    projectMenu.hidden = false;
+    projectButton.setAttribute('aria-expanded', 'true');
+    projectMenu.querySelector('.is-current .project-row__open')?.focus();
+  }
+  function closeProjects() {
+    projectMenu.hidden = true;
+    projectButton.setAttribute('aria-expanded', 'false');
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (!projectMenu.hidden && !projectMenu.contains(e.target) && !projectButton.contains(e.target) && !e.target.closest?.('dialog')) closeProjects();
+  });
+  projectMenu.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || renaming) return;
+    e.stopPropagation();
+    closeProjects();
+    projectButton.focus();
+  });
+
+  const edited = (t) => {
+    const minutes = (Date.now() - t) / 60000;
+    if (minutes < 1) return 'Edited just now';
+    if (minutes < 60) return `Edited ${Math.round(minutes)} min ago`;
+    if (minutes < 24 * 60) return `Edited ${Math.round(minutes / 60)} h ago`;
+    const days = Math.floor(minutes / (24 * 60));
+    if (days === 1) return 'Edited yesterday';
+    if (days < 7) return `Edited ${days} days ago`;
+    return `Edited ${new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+  };
+
+  function renderProjects() {
+    const current = store.currentProject()?.id;
+    const list = [...store.projectList()].sort((a, b) => (a.id === current ? -1 : b.id === current ? 1 : b.updated - a.updated));
+    projectMenu.replaceChildren(
+      h('ul', { class: 'project-list' }, list.map((p) => projectRow(p, p.id === current))),
+      h(
+        'div',
+        { class: 'project-menu__foot' },
+        h('button', { type: 'button', class: 'project-menu__action', onclick: newProject }, h('span', { html: icon('plus') }), 'New project'),
+        h('button', { type: 'button', class: 'project-menu__action', onclick: () => (closeProjects(), fileInput.click()) }, h('span', { html: icon('open') }), 'Open a design file'),
+        h('p', { class: 'note' }, 'Projects are kept in this browser. Save one as a file to take it to another computer.'),
+      ),
+    );
+  }
+
+  function projectRow(p, isCurrent) {
+    const plan = `<svg viewBox="0 0 44 32" aria-hidden="true"><rect x="0.5" y="0.5" width="43" height="31" rx="3"/>${p.plan ? `<path d="${p.plan}"/>` : ''}</svg>`;
+    const meta = `${edited(p.updated)} · ${p.rooms === 1 ? '1 room' : `${p.rooms} rooms`}`;
+    let main;
+    if (renaming === p.id) {
+      const input = h('input', { class: 'project-row__rename', value: p.name, maxlength: 60, 'aria-label': 'Project name', autocomplete: 'off' });
+      const done = (keep) => {
+        if (renaming !== p.id) return;
+        renaming = null;
+        if (keep && input.value.trim()) store.renameProject(p.id, input.value);
+        renderProjects();
+      };
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') done(true);
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          done(false);
+        }
+      });
+      input.addEventListener('blur', () => done(true));
+      requestAnimationFrame(() => (input.focus(), input.select()));
+      main = h('div', { class: 'project-row__open' }, h('span', { class: 'project-row__plan', html: plan }), input);
+    } else {
+      main = h(
+        'button',
+        { type: 'button', class: 'project-row__open', onclick: () => (isCurrent ? closeProjects() : switchTo(p)) },
+        h('span', { class: 'project-row__plan', html: plan }),
+        h('span', { class: 'project-row__text' }, h('span', { class: 'project-row__name' }, p.name), h('span', { class: 'project-row__meta' }, meta)),
+        isCurrent ? h('span', { class: 'project-row__check', html: icon('check'), 'aria-label': 'Open now' }) : null,
+      );
+    }
+    const more = h('button', {
+      type: 'button',
+      class: 'icon-btn icon-btn--small project-row__more',
+      'aria-label': `More for ${p.name}`,
+      'aria-expanded': String(rowMenu === p.id),
+      html: icon('dots'),
+      onclick: () => {
+        rowMenu = rowMenu === p.id ? null : p.id;
+        renderProjects();
+      },
+    });
+    const item = (label, iconName, onclick, cls = '') =>
+      h('button', { type: 'button', class: `project-row__action ${cls}`, onclick }, h('span', { html: icon(iconName) }), label);
+    const menu =
+      rowMenu === p.id
+        ? h(
+            'div',
+            { class: 'project-row__menu' },
+            item('Rename', 'pencil', () => {
+              rowMenu = null;
+              renaming = p.id;
+              renderProjects();
+            }),
+            item('Make a copy', 'copy', () => {
+              closeProjects();
+              store.copyProject(p.id);
+              view.setView('overview');
+              say(`Opened a copy of ${p.name}`);
+            }),
+            item('Save as a file', 'save', () => {
+              rowMenu = null;
+              saveProjectFile(p.id);
+              renderProjects();
+            }),
+            item('Delete', 'trash', () => confirmDelete(p), 'is-danger'),
+          )
+        : null;
+    return h('li', { class: `project-row${isCurrent ? ' is-current' : ''}` }, main, more, menu);
+  }
+
+  function switchTo(p) {
+    closeProjects();
+    store.openProject(p.id);
+    view.setView('overview');
+    say(`Opened ${p.name}`);
+  }
+
+  // A dialog in the middle of the page: `body` and buttons; resolves with the button's value.
+  function dialog(title, body, buttons) {
+    const el = h('dialog', { class: 'dialog' }, h('h2', { class: 'dialog__title' }, title), body, h('div', { class: 'dialog__actions' }, buttons));
+    document.body.append(el);
+    el.addEventListener('close', () => el.remove());
+    el.showModal();
+    return el;
+  }
+
+  function newProject() {
+    closeProjects();
+    const name = h('input', { class: 'dialog__input', value: store.nextProjectName(), maxlength: 60, 'aria-label': 'Name', autocomplete: 'off' });
+    const current = store.currentProject()?.name ?? 'this project';
+    const starts = [
+      ['empty', 'An empty plan', 'Draw or type the walls yourself.'],
+      ['room', 'A 400 × 500 room', 'The usual starting room.'],
+      ['copy', `A copy of ${current}`, 'Everything in it, to change freely.'],
+    ];
+    const radios = starts.map(([value, label, help], i) => {
+      const radio = h('input', { type: 'radio', name: 'start', value });
+      radio.checked = i === 0;
+      return h('label', { class: 'dialog__choice' }, radio, h('span', {}, h('span', { class: 'dialog__choice-label' }, label), h('span', { class: 'dialog__choice-help' }, help)));
+    });
+    const create = () => {
+      const start = el.querySelector('input[name="start"]:checked')?.value ?? 'empty';
+      const title = name.value.trim() || store.nextProjectName();
+      el.close();
+      store.createProject(title, start);
+      view.setView('overview');
+      say(`Created ${title}`);
+    };
+    name.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), create()));
+    const el = dialog(
+      'New project',
+      h('div', { class: 'dialog__body' }, h('label', { class: 'dialog__label' }, 'Name', name), h('fieldset', { class: 'dialog__choices' }, h('legend', { class: 'dialog__label' }, 'Start with'), radios)),
+      [
+        h('button', { type: 'button', class: 'btn', onclick: () => el.close() }, 'Cancel'),
+        h('button', { type: 'button', class: 'btn btn--tape', onclick: create }, 'Create'),
+      ],
+    );
+    requestAnimationFrame(() => (name.focus(), name.select()));
+  }
+
+  // Deleting can't be undone, so the dialog offers to save a file first.
+  function confirmDelete(p) {
+    closeProjects();
+    const saveFirst = h(
+      'button',
+      {
+        type: 'button',
+        class: 'btn',
+        onclick: () => {
+          saveProjectFile(p.id);
+          saveFirst.textContent = 'Saved as a file';
+        },
+      },
+      'Save a file first',
+    );
+    const el = dialog(
+      `Delete ${p.name}?`,
+      h('p', { class: 'dialog__text' }, 'It’s kept only in this browser, so once it’s deleted it can’t be brought back. Save it as a file first to keep a copy you can open again.'),
+      [
+        saveFirst,
+        h('span', { class: 'dialog__spacer' }),
+        h('button', { type: 'button', class: 'btn', onclick: () => el.close() }, 'Cancel'),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'btn btn--danger',
+            onclick: () => {
+              const wasOpen = p.id === store.currentProject()?.id;
+              el.close();
+              store.deleteProject(p.id);
+              if (wasOpen) view.setView('overview');
+              say(`Deleted ${p.name}`);
+            },
+          },
+          'Delete',
+        ),
+      ],
+    );
+  }
 
   // ---- The panel: a rail of sections down its edge, one section shown at a time ----
 
@@ -1026,7 +1274,7 @@ export function initUI(view) {
     h(
       'div',
       { class: 'panel__body' },
-      h('header', { class: 'brand panel__head' }, h('h1', {}, 'Room planner'), fileButton, fileMenu),
+      h('header', { class: 'brand panel__head' }, h('div', { class: 'project' }, h('h1', { class: 'project__app' }, 'Room planner'), projectButton), fileButton, fileMenu, projectMenu),
       Object.values(panes),
       fileInput,
     ),
