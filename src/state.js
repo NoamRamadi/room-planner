@@ -37,7 +37,8 @@ const projectKey = (id) => `room-planner:project:${id}`;
 
 export const ROOM_LIMITS = { width: [50, 3000], length: [50, 3000], height: LIMITS.height };
 
-const DEFAULT_LOOK = { height: 270, floorPattern: 'planks', floorColor: '#c09a6b', wallColor: '#f1f0ea' };
+// `north`: which way north is on the plan, degrees clockwise from the top of the plan (null: not set).
+const DEFAULT_LOOK = { height: 270, floorPattern: 'planks', floorColor: '#c09a6b', wallColor: '#f1f0ea', north: null };
 const WALL_THICKNESS = 12;
 const DIVIDER_THICKNESS = 4; // only for picking it in the view: a room divider isn't built
 
@@ -99,6 +100,9 @@ let ui = {
   drawing: false,
   measuring: false,
   dividing: false,
+  // sunlight: the view lit by the real sun; sun: which day and when in it (t: 0 at sunrise, 1 at sunset).
+  sunlight: false,
+  sun: { day: 'today', t: null },
   leftOpen: view.leftOpen ?? true,
   rightOpen: view.rightOpen ?? true,
 };
@@ -380,6 +384,32 @@ function saveView() {
 export function setRoomNames(on) {
   ui = { ...ui, roomNames: on };
   saveView();
+  emit();
+}
+
+// ---- Sunlight ----
+
+export function setSunlight(on) {
+  ui = { ...ui, sunlight: on, measuring: on ? false : ui.measuring, dividing: on ? false : ui.dividing };
+  emit();
+}
+
+// The day (`day`) and the moment in it (`t`: 0 at sunrise, 1 at sunset) the sun is shown for. Moving
+// through the day only tells what shows the sun (`onSun`), not the whole app, so playing a day stays
+// smooth.
+const sunListeners = new Set();
+export const onSun = (fn) => sunListeners.add(fn);
+export function setSun(patch) {
+  ui = { ...ui, sun: { ...ui.sun, ...patch } };
+  if (Object.keys(patch).every((k) => k === 't')) for (const fn of sunListeners) fn(state, ui);
+  else emit();
+}
+
+// Which way north is on the plan: degrees clockwise from the top of the plan. A drag is one step to undo.
+export function setNorth(deg) {
+  if (ui.locked) return null;
+  nextKey = 'north';
+  state = { ...state, room: { ...state.room, north: Math.round((((deg % 360) + 360) % 360) * 10) / 10 } };
   emit();
 }
 
@@ -1458,6 +1488,7 @@ function sanitize(raw) {
     floorPattern: FLOOR_PATTERNS.some((p) => p.id === r.floorPattern) ? r.floorPattern : DEFAULT_LOOK.floorPattern,
     floorColor: hex(r.floorColor, DEFAULT_LOOK.floorColor),
     wallColor: hex(r.wallColor, DEFAULT_LOOK.wallColor),
+    north: r.north == null || r.north === '' ? null : num(r.north, [0, 360], null),
   };
 
   let groups = [];

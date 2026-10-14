@@ -3,6 +3,7 @@ import { CATALOG, FLOOR_FINISHES, FLOOR_PATTERNS, WALL_PAINTS, colorsOf, dimsOf,
 import { OPENINGS, leafOf, openingLimitsOf, openingStyleOf } from './openings.js';
 import { h, measureField } from './dom.js';
 import { createDrawMode } from './draw.js';
+import { ROSH_HAAYIN, SUN_DAYS, clockText, dateOf, sunAt, sunDay, zoneOffset } from './sun.js';
 import { createTypeMode } from './type.js';
 import * as store from './state.js';
 import { ROOM_TYPES, floorOfRoom, formatArea, roomAt, roomSize, roomTypeOf } from './rooms.js';
@@ -76,6 +77,9 @@ const ICONS = {
   room_other: '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 12h8v8"/>',
   dots: '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.4"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+  play: '<path d="M8 5.5v13l10.5-6.5z"/>',
+  pause: '<path d="M8.5 5.5v13M15.5 5.5v13"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="1.5"/><path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
   trash: '<path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/>',
@@ -1335,6 +1339,132 @@ export function initUI(view) {
     clearMeasures.hidden = !measuring;
   });
 
+  // Sunlight: the view lit by the real sun through a day, over Rosh HaAyin. It changes nothing (north
+  // aside), so it works while locked too. North not set yet: start from above, with the compass.
+  const sunlightBtn = h('button', {
+    type: 'button',
+    class: 'tool',
+    'data-always': '',
+    title: 'See the sunlight in the home through the day',
+    html: `${icon('sun')}<span>Sunlight</span>`,
+    onclick: () => toggleSunlight(),
+  });
+  function toggleSunlight(on = !store.getUI().sunlight) {
+    furniture.close();
+    if (on && store.getUI().sun.t == null) store.setSun({ t: timeNow() });
+    store.setSunlight(on);
+    if (on && store.getState().room.north == null) view.setView('top');
+  }
+  // Where we are in today's daylight now (0 at sunrise, 1 at sunset); midday at night.
+  const timeNow = () => {
+    const now = new Date();
+    const minutes = (((now.getUTCHours() * 60 + now.getUTCMinutes() + zoneOffset(now, ROSH_HAAYIN.timeZone)) % 1440) + 1440) % 1440;
+    const day = sunDay(dateOf('today', now));
+    const t = (minutes - day.sunrise) / (day.sunset - day.sunrise);
+    return t >= 0 && t <= 1 ? t : 0.5;
+  };
+  const WINDS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+  const wind = (bearing) => WINDS[Math.round((((bearing % 360) + 360) % 360) / 45) % 8];
+
+  const dayButtons = SUN_DAYS.map((d) => h('button', { type: 'button', onclick: () => store.setSun({ day: d.id }) }, d.label));
+  const sunClock = h('span', { class: 'sunbar__clock' });
+  let playing = 0;
+  const playBtn = h('button', { type: 'button', class: 'icon-btn sunbar__play', 'aria-label': 'Play the day', title: 'Play the day', html: icon('play'), onclick: () => (playing ? stopPlay() : startPlay()) });
+  function startPlay() {
+    let last = performance.now();
+    const step = (now) => {
+      let t = (store.getUI().sun.t ?? 0) + (now - last) / 12000; // a whole day in 12 seconds
+      last = now;
+      if (t > 1) t = 0;
+      store.setSun({ t });
+      playing = requestAnimationFrame(step);
+    };
+    playing = requestAnimationFrame(step);
+    playBtn.innerHTML = icon('pause');
+    playBtn.setAttribute('aria-label', 'Pause');
+  }
+  function stopPlay() {
+    cancelAnimationFrame(playing);
+    playing = 0;
+    playBtn.innerHTML = icon('play');
+    playBtn.setAttribute('aria-label', 'Play the day');
+  }
+  // The day as an arc: the sun's height from sunrise to sunset (midsummer's noon at the top), with the
+  // sun on it; drag along it, or the slider under it, to move through the day.
+  const arc = h('div', {
+    class: 'sunbar__arc',
+    html: '<svg viewBox="0 0 400 62" aria-hidden="true"><line x1="8" y1="56" x2="392" y2="56"/><path class="sunbar__path"/><circle class="sunbar__sun" r="8"/></svg>',
+  });
+  const arcAt = (e) => {
+    const r = arc.getBoundingClientRect();
+    stopPlay();
+    store.setSun({ t: Math.min(1, Math.max(0, ((e.clientX - r.left) / r.width) * (400 / 384) - 8 / 384)) });
+  };
+  arc.addEventListener('pointerdown', (e) => {
+    arc.setPointerCapture(e.pointerId);
+    arcAt(e);
+  });
+  arc.addEventListener('pointermove', (e) => e.buttons && arcAt(e));
+  const sunTime = h('input', { type: 'range', class: 'sunbar__time', min: 0, max: 1000, step: 1, 'aria-label': 'Time of day' });
+  sunTime.addEventListener('input', () => {
+    stopPlay();
+    store.setSun({ t: Number(sunTime.value) / 1000 });
+  });
+  const sunRise = h('span');
+  const sunHigh = h('span', { class: 'sunbar__high' });
+  const sunSet = h('span');
+  const northField = measureField({ label: 'North', unit: '°', min: 0, max: 359, live: false, get: () => Math.round(store.getState().room.north ?? 0), set: (v) => store.setNorth(v) });
+  const northNote = h('p', { class: 'sunbar__note' }, 'Which way is north? Drag the N on the compass round the house, or select an outside wall and choose which way it faces.');
+  const sunbar = h(
+    'div',
+    { class: 'sunbar', hidden: true, 'data-always': '', role: 'group', 'aria-label': 'Sunlight' },
+    h(
+      'div',
+      { class: 'sunbar__top' },
+      h('div', { class: 'segmented sunbar__days', role: 'group', 'aria-label': 'Day' }, dayButtons),
+      sunClock,
+      playBtn,
+      h('button', { type: 'button', class: 'icon-btn icon-btn--small', 'aria-label': 'Leave Sunlight', title: 'Leave Sunlight (Esc)', html: icon('close'), onclick: () => toggleSunlight(false) }),
+    ),
+    arc,
+    sunTime,
+    h('div', { class: 'sunbar__times' }, sunRise, sunHigh, sunSet),
+    h('div', { class: 'sunbar__north' }, northField.el, h('span', { class: 'sunbar__place' }, `${ROSH_HAAYIN.name}, Israel`)),
+    northNote,
+  );
+  document.querySelector('.app').append(sunbar);
+  function syncSunbar() {
+    const { sunlight, sun } = store.getUI();
+    sunlightBtn.setAttribute('aria-pressed', String(sunlight));
+    sunbar.hidden = !sunlight;
+    if (!sunlight) {
+      if (playing) stopPlay();
+      return;
+    }
+    const date = dateOf(sun.day);
+    const day = sunDay(date);
+    const t = sun.t ?? 0.5;
+    const at = (u) => sunAt(date, day.sunrise + (day.sunset - day.sunrise) * u);
+    const now = at(t);
+    const y = (alt) => 56 - (46 * Math.max(0, alt)) / 82;
+    dayButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(SUN_DAYS[i].id === sun.day)));
+    sunClock.textContent = clockText(day.sunrise + (day.sunset - day.sunrise) * t);
+    if (document.activeElement !== sunTime) sunTime.value = String(Math.round(t * 1000));
+    sunRise.textContent = `Sunrise ${clockText(day.sunrise)}`;
+    sunSet.textContent = `Sunset ${clockText(day.sunset)}`;
+    sunHigh.textContent = `Sun ${Math.round(Math.max(0, now.altitude))}° high, in the ${wind(now.azimuth)}`;
+    const path = [];
+    for (let i = 0; i <= 48; i++) path.push(`${i ? 'L' : 'M'}${(8 + 384 * (i / 48)).toFixed(1)} ${y(at(i / 48).altitude).toFixed(1)}`);
+    arc.querySelector('.sunbar__path').setAttribute('d', path.join(''));
+    const knob = arc.querySelector('.sunbar__sun');
+    knob.setAttribute('cx', (8 + 384 * t).toFixed(1));
+    knob.setAttribute('cy', y(now.altitude).toFixed(1));
+    northField.sync();
+    northNote.hidden = store.getState().room.north != null;
+  }
+  syncers.push(syncSunbar);
+  store.onSun(syncSunbar);
+
   // Layers: what's drawn over the plan, each shown or hidden (remembered for next time).
   const layerBox = (label, get, set) => {
     const box = h('input', { type: 'checkbox' });
@@ -1393,6 +1523,7 @@ export function initUI(view) {
     layers,
     lock,
     measure,
+    sunlightBtn,
     clearMeasures,
     doneDividing,
     h(
@@ -1410,8 +1541,10 @@ export function initUI(view) {
   );
   const hint = document.querySelector('.hint');
   syncers.push(() => {
-    const { locked, measuring, dividing } = store.getUI();
-    hint.textContent = dividing
+    const { locked, measuring, dividing, sunlight } = store.getUI();
+    hint.textContent = sunlight
+      ? 'Sunlight: slide the sun through the day, pick a date, or press Play. Drag the N on the compass to turn north. Esc leaves Sunlight.'
+      : dividing
       ? 'Room divider: click where it starts, then where it ends. It snaps to wall corners and onto walls; hold Shift for a straight line. Esc stops.'
       : measuring
       ? 'Measuring: click two points to see the distance between them. Points snap to the corners and faces of walls, doors, windows and furniture; hold Shift for a straight line. Hover the end of one along a wall to save it as a point. Backspace removes the last one, Esc stops.'
@@ -1491,7 +1624,7 @@ function inspectorKeyFor(state, ui) {
   }
   if (sel.type === 'wall') {
     const w = store.wallById(sel.id);
-    return w ? `wall:${w.id}:${w.group}:${state.marks.filter((m) => m.wall === w.id).map((m) => m.id)}` : 'none';
+    return w ? `wall:${w.id}:${w.group}:${state.marks.filter((m) => m.wall === w.id).map((m) => m.id)}:${ui.sunlight}` : 'none';
   }
   if (sel.type === 'group') return `group:${sel.id}:${store.selectedWallIds(sel).join()}`;
   if (sel.type === 'room') return state.rooms.some((r) => r.id === sel.id) ? `room:${sel.id}` : 'none';
@@ -1810,6 +1943,7 @@ function buildWallInspector(root, id) {
         'Length moves the wall’s end; a wall joined there moves along with it, so a room stays square. Thickness grows away from the room. Angle turns the wall about its start. A gap below turns the wall into a beam over an opening. Bulge curves the wall; a negative number curves it the other way.',
       ),
     ),
+    store.getUI().sunlight ? wallFacing(id, syncers) : null,
     h('div', { class: 'inspector__group' }, color.el),
     h('div', { class: 'inspector__group' }, h('h3', {}, 'Doors and windows'), wallOpenings(w0)),
     h('div', { class: 'inspector__group' }, h('h3', {}, 'Points'), wallMarks(w0, syncers)),
@@ -1838,6 +1972,44 @@ function wallOpenings(w) {
       : null,
     h('p', { class: 'help help--first' }, list.length ? 'Pick one to change it.' : 'None yet. While this wall is selected, Door or Window under Add → Doors & windows adds one here.'),
   ];
+}
+
+// In Sunlight: which way the outside of a wall faces. Picking the way it really faces turns north to
+// match, the easy way to set north when you know where a window looks out.
+const FACINGS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const FACING_NAMES = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+function wallFacing(id, syncers) {
+  // The way out of the room through this wall, on the plan: degrees clockwise from the plan's top.
+  const outward = () => {
+    const f = facesOf(store.wallById(id), store.getState().walls);
+    if (!f.side) return null;
+    return (Math.atan2(-f.nl.x * f.side, f.nl.z * f.side) * 180) / Math.PI;
+  };
+  const buttons = FACINGS.map((label, i) =>
+    h(
+      'button',
+      {
+        type: 'button',
+        title: `Faces ${FACING_NAMES[i]}`,
+        onclick: () => {
+          const phi = outward();
+          if (phi != null) store.setNorth(phi - i * 45);
+        },
+      },
+      label,
+    ),
+  );
+  const text = h('p', { class: 'help' });
+  syncers.push(() => {
+    const phi = outward();
+    const bearing = phi == null ? null : (((phi - (store.getState().room.north ?? 0)) % 360) + 360) % 360;
+    buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(bearing != null && Math.abs(((bearing - i * 45 + 540) % 360) - 180) < 0.5)));
+    text.textContent =
+      bearing == null
+        ? 'This wall has rooms on both sides, or none: pick an outside wall of the home.'
+        : `Its outside faces ${FACING_NAMES[Math.round(bearing / 45) % 8]} (${Math.round(bearing)}°). Pick the way it really faces and north turns to match.`;
+  });
+  return h('div', { class: 'inspector__group' }, h('h3', {}, 'This wall faces'), h('div', { class: 'segmented compass-pick', role: 'group', 'aria-label': 'This wall faces' }, buttons), text);
 }
 
 // Saved points on a wall, as buttons that select them, and a way to add one at a typed distance from
@@ -2411,6 +2583,7 @@ function bindShortcuts(view) {
     }
     if (e.key === 'Escape') {
       if (several) store.setSeveral(false);
+      if (!sel && store.getUI().sunlight) store.setSunlight(false); // nothing selected: leave Sunlight
       store.clearSelection();
       return;
     }

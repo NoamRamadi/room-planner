@@ -9,6 +9,7 @@ import { buildOpening, buildSwing } from './openings.js';
 import { elevationOf, halfExtents, hitsWall } from './layout.js';
 import { floorOfRoom, formatArea, labelSpot, roomOnFloor, roomSize, roomTypeOf } from './rooms.js';
 import * as store from './state.js';
+import { dateOf, sunAt, sunDay } from './sun.js';
 import { PATTERN_SIZE, floorTexture } from './textures.js';
 import {
   boundsOf,
@@ -173,7 +174,8 @@ export function createScene(container) {
   controls.minDistance = 0.3;
   controls.maxDistance = 60;
 
-  scene.add(new THREE.HemisphereLight('#ffffff', '#b9b3a7', 0.8));
+  const hemi = new THREE.HemisphereLight('#ffffff', '#b9b3a7', 0.8);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff8ee', 1.9);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -254,6 +256,7 @@ export function createScene(container) {
       wallGroup.remove(part);
       part.traverse((o) => o.isMesh && o.geometry.dispose()); // materials are shared by color
     }
+    if (m.caster) casterGroup.remove(m.caster); // its shapes are the wall's own, gone above
   }
 
   // Which side of the wall the floor is on: 1 for its left (looking from start to end), -1 for its
@@ -312,7 +315,17 @@ export function createScene(container) {
           }
         }
         wallGroup.add(full, stub);
-        m = { key, full, stub };
+        // For Sunlight: a full-height copy that only casts shadows, so a wall cut away to see in still
+        // keeps the sun out (its doors and windows let it in).
+        const caster = new THREE.Group();
+        for (const solid of full.children) {
+          const c = new THREE.Mesh(solid.geometry, shadowOnly);
+          c.position.copy(solid.position);
+          c.castShadow = true;
+          caster.add(c);
+        }
+        casterGroup.add(caster);
+        m = { key, full, stub, caster };
         wallMeshes.set(w.id, m);
       }
       m.wall = w;
@@ -362,13 +375,151 @@ export function createScene(container) {
     const bKey = [b.minX, b.maxX, b.minZ, b.maxZ].map(Math.round).join();
     if (bKey !== lightKey) {
       lightKey = bKey;
-      const reach = Math.hypot(b.width, b.length) * CM * 0.5 + 1.5;
-      Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, near: 0.5, far: 60 });
-      sun.shadow.camera.updateProjectionMatrix();
-      sun.target.position.set(b.cx * CM, 0, b.cz * CM);
-      sun.position.set(b.cx * CM + b.width * CM * 0.3 + 2, 8, b.cz * CM + b.length * CM * 0.4 + 3);
+      placeLight(b);
       roomDimsSide = null;
     }
+  }
+
+  // The everyday light: high over one corner, a little behind the usual view.
+  function placeLight(b) {
+    const reach = Math.hypot(b.width, b.length) * CM * 0.5 + 1.5;
+    Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, near: 0.5, far: 60 });
+    sun.shadow.camera.updateProjectionMatrix();
+    sun.target.position.set(b.cx * CM, 0, b.cz * CM);
+    sun.position.set(b.cx * CM + b.width * CM * 0.3 + 2, 8, b.cz * CM + b.length * CM * 0.4 + 3);
+  }
+
+  // ---- Sunlight: the real sun for the day and time chosen, its path over the house, and north ----
+
+  // Invisible, but casting shadows from both sides (a flat roof seen from the sun shows only its top).
+  const shadowOnly = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: THREE.DoubleSide });
+  const casterGroup = new THREE.Group(); // shadow-only copies of the walls, and a roof over each room
+  const roofGroup = new THREE.Group();
+  casterGroup.add(roofGroup);
+  casterGroup.visible = false;
+  const sunlight = new THREE.Group();
+  sunlight.visible = false;
+  scene.add(casterGroup, sunlight);
+  // The ground around the house, showing only the shadows on it.
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.ShadowMaterial({ opacity: 0.2 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.003;
+  ground.receiveShadow = true;
+  const sunBall = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), new THREE.MeshBasicMaterial({ color: '#ffcf4a', fog: false }));
+  const sunPath = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#c9940a', dashSize: 0.22, gapSize: 0.16, fog: false }));
+  const compassRing = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: '#8a8f86' }));
+  const compassTicks = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: '#5d6268' }));
+  const compassLabels = ['N', 'E', 'S', 'W'].map((text) => {
+    const el = document.createElement(text === 'N' ? 'button' : 'span');
+    el.className = text === 'N' ? 'compass-north' : 'compass-dir';
+    el.textContent = text;
+    if (text === 'N') {
+      el.type = 'button';
+      el.dataset.compass = '';
+      el.title = 'Drag to where north is';
+      el.setAttribute('aria-label', 'North: drag to where north is');
+    }
+    return new CSS2DObject(el);
+  });
+  casterGroup.add(ground); // shown with the casters, and kept in a saved photo
+  sunlight.add(sunBall, sunPath, compassRing, compassTicks, ...compassLabels);
+  let roofKey = '';
+  let sunOn = false;
+  const WARM = new THREE.Color('#ff9a4a');
+  const DAY = new THREE.Color('#fff3df');
+  const DUSK = new THREE.Color('#ecd2b4');
+  const stageColor = new THREE.Color(STAGE_COLOR);
+
+  // A compass bearing (degrees clockwise from north) and a height above the horizon (degrees), as a
+  // direction in the scene, with north where the plan says it is.
+  function skyDirection(bearing, height, north) {
+    const th = THREE.MathUtils.degToRad(north + bearing);
+    const a = THREE.MathUtils.degToRad(height);
+    return v3(Math.cos(a) * Math.sin(th), Math.sin(a), -Math.cos(a) * Math.cos(th));
+  }
+
+  function syncSunlight(state, ui) {
+    const on = ui.sunlight;
+    sunlight.visible = casterGroup.visible = on;
+    if (!on) {
+      if (sunOn) {
+        sunOn = false;
+        hemi.intensity = 0.8;
+        scene.environmentIntensity = 0.5;
+        sun.color.set('#fff8ee');
+        sun.intensity = 1.9;
+        scene.background.copy(stageColor);
+        scene.fog.color.copy(stageColor);
+        placeLight(boundsOf(state.walls));
+      }
+      return;
+    }
+    sunOn = true;
+    const b = boundsOf(state.walls);
+    const centre = v3(b.cx * CM, 0, b.cz * CM);
+    const reach = Math.hypot(b.width, b.length) * CM * 0.5 + 1.5;
+    const north = state.room.north ?? 0;
+
+    // A roof over every room, so the sun comes in only through doors and windows.
+    const floors = floorsOf(state.walls);
+    const key = JSON.stringify([floors, state.room.height]);
+    if (key !== roofKey) {
+      roofKey = key;
+      roofGroup.traverse((o) => o.isMesh && o.geometry.dispose());
+      roofGroup.clear();
+      for (const f of floors) {
+        const geometry = new THREE.ShapeGeometry(planShape(f));
+        geometry.rotateX(-Math.PI / 2);
+        const roof = new THREE.Mesh(geometry, shadowOnly);
+        roof.position.y = state.room.height * CM;
+        roof.castShadow = true;
+        roofGroup.add(roof);
+      }
+    }
+
+    // The sun now: lower means dimmer, warmer light and a warmer sky.
+    const date = dateOf(ui.sun.day);
+    const day = sunDay(date);
+    const t = ui.sun.t ?? 0.5;
+    const now = sunAt(date, day.sunrise + (day.sunset - day.sunrise) * t);
+    const dir = skyDirection(now.azimuth, Math.max(0.5, now.altitude), north);
+    const k = Math.min(1, Math.max(0, now.altitude / 25));
+    hemi.intensity = 0.3 + 0.2 * k;
+    scene.environmentIntensity = 0.22 + 0.1 * k;
+    sun.color.copy(WARM).lerp(DAY, k);
+    sun.intensity = 0.9 + 2.3 * Math.sqrt(k);
+    scene.background.copy(stageColor).lerp(DUSK, 0.45 * (1 - k));
+    scene.fog.color.copy(scene.background);
+    sun.target.position.copy(centre);
+    sun.position.copy(centre).addScaledVector(dir, 30);
+    Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, near: 1, far: 30 + reach * 2 });
+    sun.shadow.camera.updateProjectionMatrix();
+
+    // The sun on a dome over the house, and its path across the day.
+    const dome = reach + 3;
+    sunBall.position.copy(centre).addScaledVector(dir, dome);
+    const points = [];
+    for (let m = day.sunrise; m <= day.sunset + 0.1; m += 10) {
+      const p = sunAt(date, Math.min(m, day.sunset));
+      points.push(centre.clone().addScaledVector(skyDirection(p.azimuth, Math.max(0, p.altitude), north), dome));
+    }
+    sunPath.geometry.dispose();
+    sunPath.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    sunPath.computeLineDistances();
+
+    // A compass on the ground around the house: N, E, S and W, and a tick every 45°.
+    const ring = reach + 0.6;
+    const at = (bearing, r, y = 0.01) => centre.clone().addScaledVector(skyDirection(bearing, 0, north), r).setY(y);
+    const circle = [];
+    for (let a = 0; a < 360; a += 5) circle.push(at(a, ring));
+    compassRing.geometry.dispose();
+    compassRing.geometry = new THREE.BufferGeometry().setFromPoints(circle);
+    const ticks = [];
+    for (let a = 0; a < 360; a += 45) ticks.push(at(a, ring - (a % 90 ? 0.12 : 0.25)), at(a, ring + (a % 90 ? 0.12 : 0.25)));
+    compassTicks.geometry.dispose();
+    compassTicks.geometry = new THREE.BufferGeometry().setFromPoints(ticks);
+    compassLabels.forEach((label, i) => label.position.copy(at(i * 90, ring + 0.55, 0.02)));
+    compassLabels[0].element.classList.toggle('is-unset', state.room.north == null);
   }
 
   // With see-through walls on, cut a wall down to a low stub when it's in the way: an outside wall
@@ -1211,6 +1362,7 @@ export function createScene(container) {
   let cornerDrag = null;
   let sinkDrag = null;
   let roomDrag = null;
+  let northDrag = null; // turning the compass's N in Sunlight
   let press = null; // a press on empty space: a click if it doesn't move
 
   // How far along a piece of furniture (cm from its left end, as seen from the front) a floor point is.
@@ -1275,6 +1427,16 @@ export function createScene(container) {
           last.spots = last.spots.filter((x) => x !== spot);
           drawMeasures();
         }
+        return;
+      }
+      // The compass's N in Sunlight: drag it round to where north is.
+      if (e.target.closest?.('[data-compass]')) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (store.getUI().locked) return;
+        northDrag = { pointerId: e.pointerId };
+        store.beginGesture();
+        container.setPointerCapture(e.pointerId);
         return;
       }
       // A saved point: select it (while measuring, a click on it measures from it instead).
@@ -1367,6 +1529,18 @@ export function createScene(container) {
 
   container.addEventListener('pointermove', (e) => {
     if (store.getUI().drawing) return;
+    if (northDrag && e.pointerId === northDrag.pointerId) {
+      // North points from the middle of the house to the pointer, snapping to the 8 main directions.
+      const p = planePoint(e, floorPlane);
+      if (p) {
+        const b = boundsOf(store.getState().walls);
+        let deg = (Math.atan2(p.x - b.cx, -(p.z - b.cz)) * 180) / Math.PI;
+        const snap = Math.round(deg / 45) * 45;
+        if (Math.abs(deg - snap) < 4) deg = snap;
+        store.setNorth(deg);
+      }
+      return;
+    }
     if (store.getUI().measuring) {
       if (e.buttons === 0) {
         measureHover = measurePoint(e);
@@ -1426,7 +1600,7 @@ export function createScene(container) {
   });
 
   function endDrags() {
-    itemDrag = openingDrag = wallDrag = cornerDrag = sinkDrag = roomDrag = null;
+    itemDrag = openingDrag = wallDrag = cornerDrag = sinkDrag = roomDrag = northDrag = null;
     store.endGesture();
     showSnap(null);
     container.classList.remove('is-dragging');
@@ -1434,6 +1608,10 @@ export function createScene(container) {
 
   container.addEventListener('pointerup', (e) => {
     if (store.getUI().drawing) return;
+    if (northDrag && e.pointerId === northDrag.pointerId) {
+      endDrags();
+      return;
+    }
     if (roomDrag && e.pointerId === roomDrag.pointerId) {
       endDrags();
       return;
@@ -1563,7 +1741,7 @@ export function createScene(container) {
 
   // PNG of the current view without measurements or handles.
   function savePhoto() {
-    const overlays = [selection, gaps, roomDims, wallSel, openingSel, snapMark, measureGroup, dividerGroup];
+    const overlays = [selection, gaps, roomDims, wallSel, openingSel, snapMark, measureGroup, dividerGroup, sunlight];
     const shown = overlays.map((o) => o.visible);
     overlays.forEach((o) => (o.visible = false));
     renderer.render(scene, camera);
@@ -1598,6 +1776,7 @@ export function createScene(container) {
     updateOpeningSelection(state, ui);
     syncRoomLabels(state, ui);
     syncMarks(state, ui);
+    syncSunlight(state, ui);
     container.classList.toggle('is-locked', ui.locked);
     container.classList.toggle('is-measuring', ui.measuring || ui.dividing);
     if (!ui.dividing) dividerStart = dividerHover = null;
@@ -1605,6 +1784,7 @@ export function createScene(container) {
     if (!ui.measuring && (measures.length || measureStart)) clearMeasures(); // leaving the tool clears them
     else drawMeasures();
   });
+  store.onSun(syncSunlight);
   new ResizeObserver(resize).observe(container);
   resize();
 

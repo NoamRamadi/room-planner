@@ -2890,3 +2890,174 @@ button.project-row__open:hover {
 .dialog__spacer {
   flex: 1;
 }
+
+/* ---- Sunlight: the time bar over the view, the compass round the house ---- */
+
+.sunbar {
+  grid-area: stage;
+  align-self: end;
+  justify-self: center;
+  z-index: 3;
+  width: min(560px, calc(100% - 32px));
+  margin-bottom: 44px;
+  padding: 10px 14px 12px;
+  border: 1px solid var(--graphite);
+  border-radius: 8px;
+  background: rgb(237 238 234 / 0.96);
+  box-shadow: 0 14px 34px -16px rgb(38 41 45 / 0.5);
+}
+
+.app.is-drawing .sunbar {
+  visibility: hidden;
+}
+
+.sunbar__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sunbar__days button {
+  padding: 4px 9px;
+  font-size: 12.5px;
+}
+
+.sunbar__clock {
+  margin-left: auto;
+  font: 720 22px/1 var(--font);
+  font-stretch: 85%;
+  font-variant-numeric: tabular-nums;
+}
+
+.sunbar__play svg {
+  fill: currentColor;
+}
+
+.sunbar__arc {
+  margin-top: 6px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.sunbar__arc svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sunbar__arc line {
+  stroke: var(--rule);
+  stroke-width: 1.5;
+}
+
+.sunbar__path {
+  fill: none;
+  stroke: #c9940a;
+  stroke-width: 2;
+  stroke-dasharray: 4 5;
+}
+
+.sunbar__sun {
+  fill: #ffcf4a;
+  stroke: #9a6b0d;
+  stroke-width: 2;
+}
+
+.sunbar__time {
+  display: block;
+  width: 100%;
+  margin: 2px 0 0;
+  accent-color: #c9940a;
+}
+
+.sunbar__times {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--pencil);
+}
+
+.sunbar__high {
+  color: var(--graphite);
+  font-weight: 600;
+}
+
+.sunbar__north {
+  display: flex;
+  align-items: end;
+  gap: 14px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+
+.sunbar__north .measure {
+  width: 84px;
+}
+
+.sunbar__place {
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: var(--pencil);
+}
+
+.sunbar__note {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: var(--tape-wash);
+  font-size: 12.5px;
+}
+
+.compass-north,
+.compass-dir {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font: 720 13px var(--font);
+}
+
+.compass-north {
+  z-index: 4;
+  padding: 0;
+  border: 2px solid var(--graphite);
+  background: #d85a30;
+  color: #fff;
+  pointer-events: auto; /* the label layer lets clicks through unless asked */
+  cursor: grab;
+  touch-action: none;
+}
+
+.compass-north.is-unset {
+  animation: compass-hint 1.6s ease-in-out infinite;
+}
+
+@keyframes compass-hint {
+  50% {
+    box-shadow: 0 0 0 7px rgb(216 90 48 / 0.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compass-north.is-unset {
+    animation: none;
+  }
+}
+
+.compass-dir {
+  background: rgb(237 238 234 / 0.85);
+  color: var(--pencil);
+}
+
+.compass-pick {
+  display: flex;
+}
+
+.compass-pick button {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 12px;
+}

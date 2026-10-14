@@ -22,6 +22,7 @@ Plan a room of your apartment in 3D, right in the browser.
 - See each piece's size and its distance to every wall while it's selected
 - Switch between 3D view, top view (floor plan) and eye level, and save a photo of the view
 - Turn **See-through walls** on to cut away walls that stand between you and the room, or off to keep every wall standing
+- **Sunlight:** see the real sun through the home over a day, for any season, with north set the way the home really faces
 - **Layers:** show or hide the room names on the floor, the room colors and saved points (for a clean photo, say)
 - **Lock** the design when you're done, so you can look around and check measurements without moving anything by accident
 - **Measure** anything: select a wall to see the gap at its free ends, or use the Measure tool to measure between any two points
@@ -151,6 +152,15 @@ Under **Add → Doors & windows**, click **Door** or **Window** and pick a desig
 **Measure tool:** click **Measure** above the view (or press M), then click two points to see the distance between them, on the floor plan. Points snap to the corners and faces of walls, the edges of door and window openings, and the corners and edges of furniture; hold Shift for a line straight across or down the plan. Click again to start another measurement. Backspace removes the last one, **Clear** removes them all, and Esc (or Measure again) stops measuring. Measuring changes nothing, so it also works while the design is locked. Measurements aren't saved with the design.
 
 **Saved points:** after measuring to a spot along a wall (say 40 cm from its corner), point at the end of the measurement and click **Save point** under it (on a touch screen it's always shown) to keep that spot as a yellow point at the foot of the wall. A point can also be added from the wall's panel under **Points**, at a typed distance from its inside corner. A point stays on its wall: it moves with the wall and goes when the wall goes. Click it to select it: the view shows its distance from each inside corner, and its panel lets you change that distance (or **Measure from the other corner**) and **Start a wall here**: a wall straight into the room, with its length measured from the wall's face, its thickness, and whether it stands **beside the point** (its face on the point, so the 40 cm stay clear) or **centred** on it. **To the wall opposite** fills in the length that reaches the next wall, and a wall that reaches another one joins it, splitting the room. Points are also handy elsewhere: drag a wall's end (or a whole wall) near a point and it snaps onto it and joins that wall, just like snapping to another wall's end; the Measure tool snaps to them, Draw walls starts a wall on a point when you click it, and in Type walls **+ Line from a wall** starts a line exactly at a point. Delete removes a selected point.
+
+## Sunlight
+
+**Sunlight**, above the view, lights the home with the real sun over Rosh HaAyin, Israel, so you can see where the light falls through the windows and doors at any time of day, in any season. Everything else stays as it is: leave Sunlight (its button again, ✕ on its bar, or Esc with nothing selected) and the view is back to normal.
+
+- **The time bar** at the bottom of the view: pick **21 Jun**, **22 Sep**, **21 Dec** or **Today**, then slide the sun along the day from sunrise to sunset (drag along its arc or the slider under it), or press **Play** to run the whole day in 12 seconds. It shows the time, sunrise and sunset, and how high the sun is and where.
+- **In the view:** the sun lights the rooms through their windows and doors only (an invisible roof keeps it out from above, and walls cut away to see in still cast their shadows), with warmer, dimmer light near sunrise and sunset. The house's shadow falls on the ground outside, the sun's path over the day arcs over the house, and a compass on the ground shows N, E, S and W.
+- **Setting north:** drag the **N** on the compass round the house to where north is (it snaps to the 8 main directions), or type it next to **North** on the bar. Or select an outside wall: its panel shows **This wall faces**; pick the way it really faces (where its windows look out) and north turns to match. North is kept with each project, and undo puts it back. The first time, Sunlight opens from above with the N waiting to be set.
+- You can still turn the view and select and move furniture in Sunlight, to see how the light falls with the furniture where you put it.
 
 ## Furniture designs
 
